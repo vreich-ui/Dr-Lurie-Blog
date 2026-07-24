@@ -2,7 +2,8 @@
  * Seed data for the site singleton — `site_drlurie` (W4, 2026-07-11).
  *
  * The body carries the CURRENT live values. It tracks the released production
- * export (`src/data/site/site.json`, the materialization of the store record) —
+ * export (`sites/drlurie/data/site/site.json` — W11 T11.6 relocated this from
+ * `src/data/site/site.json` — the materialization of the store record) —
  * NOT the original hardcoded literals: name / logo.text / metadataDefaults were
  * edited live (the "Skincare" rebrand) after W4, so this seed is kept in sync
  * with production by `scripts/sync-site-seed.mjs` (run it, or `--check` in CI,
@@ -30,7 +31,7 @@
  * authoritative for routing/permalink wiring — repointing listPath or base
  * here does not yet move routes. metadataDefaults, brandTokens, chrome,
  * logo, name and defaultNavigation ARE live: the renderers read them from
- * the derived export (src/data/site/site.json) with the old hardcoded
+ * the derived export (sites/drlurie/data/site/site.json) with the old hardcoded
  * values as fallback. chrome.announcement is deferred (B3) and omitted.
  *
  * Driver contract for scripts/home-conversion-roundtrip.mjs:

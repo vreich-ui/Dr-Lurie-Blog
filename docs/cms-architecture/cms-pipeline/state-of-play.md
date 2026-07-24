@@ -7,6 +7,58 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-24 (T11.6 step 3/3 — driver-script `--site` parameterization; T11.6 CLOSED)
+
+**T11.6 step 3 committed, closing T11.6.** Scope call recorded up front: the
+brief's literal "move driver scripts to `packages/core/cli/`" bullet was
+DEFERRED to T11.7, not executed here — the T11.4 amendment had already set
+this precedent ("rides T11.7 where site-parameterization makes the move
+meaningful"), and ~40 other task briefs across the queue reference
+`node scripts/build-diff.mjs` / `scripts/home-conversion-roundtrip.mjs` at
+their current literal path; moving the files now, before T11.7 builds
+whatever makes the new location meaningful, would silently break every one of
+those references for zero compensating benefit. What T11.6 genuinely
+required — `--site` parameterization, since step 2's `git mv` had actively
+broken both scripts — was done in place.
+
+`scripts/build-diff.mjs` gained `--site <path>` (default `sites/drlurie`);
+`SELF_TEST_FILE` now derives from it instead of a hardcoded
+`src/data/site/...` literal. `scripts/home-conversion-roundtrip.mjs` gained
+the same flag; `siteRoot`/`siteExportRoot` feed the default `--seeds` path,
+the navigation reference-target seed lookup, and the `--write-exports`
+materialize meta's `exportRoot`; production-mode endpoint resolution now
+reads `canonicalHost` from the site's compiled `site.config.js` rather than a
+hardcoded host (falling back to the old hardcoded endpoint if that compiled
+file is absent).
+
+**Found and fixed in passing** — latent, pre-existing breakage in
+`home-conversion-roundtrip.mjs` that this driver's exclusion from `npm test`
+had let sit undetected, but which blocked proving the acceptance criterion so
+it had to be fixed: (1) the default `--seeds` path still pointed at the
+pre-T11.6-step-1 `scripts/lib/page-home-seed-data.mjs` (the step-1 import
+rewrite only caught static `import` statements, not this `path.join()`);
+(2) the navigation reference-target seed path still built from
+`repoRoot + 'src/data/site/navigation'`, broken by this session's own step-2
+move; (3) the materializer/`local-blobs` compiled-path imports still pointed
+at the defunct `netlify/lib/...` location, an unnoticed T11.3 regression.
+Also fixed: `sites/drlurie/seeds/sync-site-seed.mjs`'s `EXPORT_PATH` still
+pointed at the pre-step-2 `src/data/site/site.json` (step 1 couldn't have
+caught this — the export hadn't moved yet at step-1 time); now points at
+`sites/drlurie/data/site/site.json`, verified `--check` reports "seed already
+matches the production export."
+
+**Gates (final, all green):** `astro check` 0 errors; `eslint .` clean;
+`prettier --check` clean; full test suite **1627/1627 + 70/70**;
+`build-diff.mjs --self-test --site sites/drlurie` PASS (both sub-checks);
+`build-diff.mjs HEAD origin/main --site sites/drlurie` — **74/74 pages
+byte-identical, EMPTY diff**; `home-conversion-roundtrip.mjs --local --site
+sites/drlurie` SUCCESS (run twice, once with `--write-exports` — both runs'
+working-tree pollution of the real committed exports reverted via
+`git checkout --` immediately after, per the flag's documented behavior).
+
+**T11.6 is CLOSED** — all three steps landed, full acceptance criteria met.
+Next in queue: T11.7 (Provisioning CLI).
+
 ## Session 2026-07-24 (T11.6 step 2/3 — committed exports → sites/drlurie/data/site/, materializer paths parameterized)
 
 **Also this session:** the T11.6-step-1 branch's 8 commits landed on `main`
@@ -58,11 +110,10 @@ test suite **1627/1627 + 70/70**; `build-diff.mjs --self-test` PASS;
 `build-diff.mjs --base origin/main` (working tree, all step-2 changes
 included) — **74/74 pages byte-identical, EMPTY diff**.
 
-**Remaining for T11.6:** step 3 (driver scripts → `packages/core/cli/` with
-`--site` parameterization; per-site seed drift-guard) — not yet started. T11.6
-is not "done" (queue-advance, next-task pickup) until step 3 lands and the
-brief's full acceptance criteria hold, including the local
-`--local --site sites/drlurie` driver rehearsal.
+**Remaining for T11.6 (at the time this entry was written):** step 3 (driver
+scripts — `--site` parameterization; per-site seed drift-guard). **Update:**
+step 3 landed the same day — see the newer entry above ("T11.6 step 3/3 —
+... T11.6 CLOSED") for the completed work and final gate results.
 
 ## Session 2026-07-24 (T11.6 step 1/3 — seeds into sites/drlurie/seeds/)
 

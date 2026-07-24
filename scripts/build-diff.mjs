@@ -17,6 +17,9 @@
  *   node scripts/build-diff.mjs --self-test         # T2.0 acceptance drill
  *   options: --report <path>   (default .tmp/build-diff/report.txt)
  *            --keep            (keep temp worktrees for inspection)
+ *            --site <path>     (default sites/drlurie, W11 T11.6 — only
+ *                               affects --self-test's planted-mutation file,
+ *                               which lives under <site>/data/site/)
  *
  * Ref builds happen in throwaway `git worktree`s under .tmp/build-diff/ with
  * node_modules symlinked from this checkout (same dependency tree both sides
@@ -63,6 +66,10 @@ const keepWorktrees = args.includes('--keep');
 const baseRef = readFlagValue('--base') ?? 'HEAD';
 const headRef = readFlagValue('--head'); // absent → working tree
 const reportPath = readFlagValue('--report') ?? path.join(workDir, 'report.txt');
+// W11 T11.6: sites/drlurie is this single-tenant repo's own default (this
+// script stays in scripts/ for now — cli/ relocation rides T11.7 where a
+// fleet CLI makes the move meaningful; see w11-move-map.md).
+const site = readFlagValue('--site') ?? 'sites/drlurie';
 
 // ─── build + snapshot ────────────────────────────────────────────────────────
 
@@ -231,7 +238,8 @@ const printSummary = (result) => {
 // The homepage renders from the page_home object export (src/pages/index.astro
 // is a thin PageObjectRenderer loader since the W-waves), so the planted
 // mutation lives in the export copy that actually reaches rendered HTML.
-const SELF_TEST_FILE = 'src/data/site/pages/page_home.json';
+// W11 T11.6: the export moved from src/data/site/ to <site>/data/site/.
+const SELF_TEST_FILE = `${site}/data/site/pages/page_home.json`;
 const SELF_TEST_NEEDLE = 'A few next steps, kept deliberately small.';
 const SELF_TEST_MUTATION = 'A few next steps, kept deliberately small!';
 

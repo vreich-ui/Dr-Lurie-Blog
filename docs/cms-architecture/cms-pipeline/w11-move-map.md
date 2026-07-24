@@ -115,13 +115,66 @@ re-hardcoded to the new literal:
   identically to the T11.5 incident) — fixed by rewording rather than
   escaping, twice, until zero apostrophes remained in that literal.
 
-**Step 3 (not yet executed):** driver scripts (`scripts/build-diff.mjs`,
-`scripts/home-conversion-roundtrip.mjs`, `scripts/lib/roundtrip-reconcile.mjs`)
-move to `packages/core/cli/` with explicit `--site sites/drlurie`
-parameterization; the site-seed drift-guard test runs per site. T11.6 is not
-committed as done until step 3 lands and the acceptance criteria (full suite
-green, build-diff EMPTY, a local `--local --site sites/drlurie` driver
-rehearsal green end-to-end) all hold.
+**Step 3 (this amendment, completed):** driver scripts stay at their current
+path — the physical `packages/core/cli/` relocation is DEFERRED to T11.7 (the
+T11.4 amendment already set this precedent: "rides T11.7 where site-
+parameterization makes the move meaningful"). Reasoning: ~40 other task briefs
+across the queue reference `node scripts/build-diff.mjs`/
+`scripts/home-conversion-roundtrip.mjs` at their literal current path; moving
+the files now (with no compensating value beyond the move itself, since T11.7
+hasn't yet built whatever cli scaffolding would make the new location
+meaningful) would silently break every one of those references. What T11.6
+genuinely requires — `--site` parameterization, since the scripts were
+actively broken by step 2's `git mv` — was done in place instead:
+
+- `scripts/build-diff.mjs` gained a `--site <path>` flag (default
+  `sites/drlurie`); `SELF_TEST_FILE` now derives from it
+  (`` `${site}/data/site/pages/page_home.json` ``) instead of a hardcoded
+  `src/data/site/...` literal.
+- `scripts/home-conversion-roundtrip.mjs` gained `--site <path>` (default
+  `sites/drlurie`); `siteRoot`/`siteExportRoot` derive from it and are used for
+  the default `--seeds` path, the navigation reference-target seed lookup, and
+  the `--write-exports` materialize meta's `exportRoot`. Production-mode
+  endpoint resolution now reads `canonicalHost` from the site's compiled
+  `site.config.js` (falling back to the existing hardcoded endpoint if that
+  compiled file isn't present), rather than hardcoding the one site's host.
+- **Found and fixed in passing** (latent breakage, not new scope, but blocking
+  the acceptance criterion so it had to be fixed to prove the criterion true):
+  three stale paths in `home-conversion-roundtrip.mjs` left over from earlier
+  waves and never caught because this driver isn't part of `npm test` — only a
+  manual rehearsal surfaces it. (1) the default `--seeds` path still pointed at
+  the pre-T11.6-step-1 `scripts/lib/page-home-seed-data.mjs` location (the step-1
+  import rewrite only caught static `import` statements, not this
+  `path.join()` construction); (2) the navigation reference-target seed path
+  still built from `repoRoot + 'src/data/site/navigation'`, broken by this
+  session's own step-2 move; (3) the materializer and `local-blobs` compiled-
+  path imports still pointed at the defunct `netlify/lib/...` location, a T11.3
+  regression that had gone unnoticed until now.
+- `sites/drlurie/seeds/sync-site-seed.mjs`'s `EXPORT_PATH` (the production-
+  export comparison target) still pointed at the pre-step-2
+  `src/data/site/site.json` — step 1 had correctly moved the seed/script but
+  couldn't have updated this, since the export itself hadn't moved yet at
+  step-1 time. Fixed to `sites/drlurie/data/site/site.json`; verified
+  `--check` reports "seed already matches the production export."
+
+Acceptance criteria verified after reverting two `--write-exports` rehearsal
+runs' pollution of the real committed export files (expected/documented
+behavior of that flag — it writes fresh-store rehearsal data with different
+`record_version`/`at` markers over the real files; reverted both times via
+`git checkout --`):
+
+- `npm test`: 1627/1627 + 70/70 pass.
+- `npx astro check`: 0 errors. `eslint .` / `prettier --check`: clean.
+- `node scripts/build-diff.mjs --self-test --site sites/drlurie`: PASS (both
+  sub-checks).
+- `node scripts/build-diff.mjs HEAD origin/main --site sites/drlurie`: EMPTY —
+  74 pages compared, 74 identical, 0 changed.
+- `node scripts/home-conversion-roundtrip.mjs --local --site sites/drlurie`
+  (and again with `--write-exports`): SUCCESS both times — full lifecycle
+  against the file-backed store, publish blocked only at the expected
+  `export_commit_failed` credential sandbox boundary.
+
+T11.6 is done as of this amendment.
 
 ## T11.4 execution amendment (2026-07-24 — per this file's amend clause)
 

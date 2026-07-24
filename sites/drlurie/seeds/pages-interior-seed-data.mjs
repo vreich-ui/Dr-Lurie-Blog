@@ -4,7 +4,8 @@
  * interior `lede` pages (reused verbatim from page-lede-family-seed-data.mjs)
  * and the three `system` pages (privacy + terms as `prose`, 404 as
  * `cta_banner`), whose bodies are inlined verbatim from their committed
- * exports (src/data/site/pages/page_{privacy,terms,404}.json) — the large legal
+ * exports (sites/drlurie/data/site/pages/page_{privacy,terms,404}.json — W11
+ * T11.6 relocated this from src/data/site/) — the large legal
  * copy is taken exactly rather than re-transcribed, so the materialized exports
  * stay byte-identical (empty build-diff).
  *

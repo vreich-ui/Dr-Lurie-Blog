@@ -5,8 +5,10 @@
  * overrides listed in src/lib/site-identity.ts) — no other code changes.
  *
  *   siteId            → object id of the site singleton in the object store.
- *                       The committed site export (src/data/site/site.json,
- *                       materialized from this record) stays authoritative:
+ *                       The committed site export (sites/drlurie/data/site/
+ *                       site.json — W11 T11.6 relocated this from
+ *                       src/data/site/site.json — materialized from this
+ *                       record) stays authoritative:
  *                       a lockstep test fails if the two drift.
  *   siteSlug          → hyphenated machine slug: GitHub User-Agent prefixes
  *                       (`<slug>-object-publisher`, …) and the default

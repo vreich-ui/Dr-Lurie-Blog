@@ -7,7 +7,9 @@
  * is converted" (root cause 4: no standing round-trip verification).
  *
  * The family comes from a SEED MODULE (--seeds, default the home-page family
- * in scripts/lib/page-home-seed-data.mjs). A seed module exports:
+ * in <site>/seeds/page-home-seed-data.mjs — W11 T11.6 relocated seeds out of
+ * scripts/lib/; --site picks the site, default sites/drlurie). A seed module
+ * exports:
  *   CONVERSION_SEEDS  ordered array of { objectType: 'page'|'section'|'template',
  *                     objectId, body } — every referenced object BEFORE the
  *                     object that references it;
@@ -39,8 +41,15 @@
  *   4. inventory— object_inventory must return every object (criterion 2).
  *
  * Modes:
+ *   --site <path>   Site root, relative to the repo root (W11 T11.6). Default:
+ *                 sites/drlurie. Drives which seeds/ dir --seeds defaults into
+ *                 and which data/site/ tree --write-exports writes to; also
+ *                 the source of --production's endpoint default (the site's
+ *                 canonicalHost, read from its compiled site.config.js when
+ *                 available).
  *   --seeds <path>  Seed module for the family under conversion (relative to
- *                 the repo root or absolute). Default: the home-page family.
+ *                 the repo root or absolute). Default: the home-page family
+ *                 under <site>/seeds/.
  *   --local       (default) Drive the compiled handler in-process against an
  *                 isolated file-backed store (.tmp/home-roundtrip-blobs).
  *                 Compile first: rm -rf .tmp/ci-test && npx tsc -p tsconfig.test.json
@@ -52,10 +61,13 @@
  *                 module itself, ordered before their referrers.
  *   --write-exports  (local only) After the drill, materialize each object
  *                 with the real materializers and write the derived exports
- *                 into src/data/site/ — the committed-export half of the
+ *                 into <site>/data/site/ — the committed-export half of the
  *                 conversion.
  *   --production  Drive the DEPLOYED MCP endpoint over HTTPS. Requires:
- *                   MCP_ENDPOINT     (default https://drluriescience.netlify.app/.netlify/functions/mcp)
+ *                   MCP_ENDPOINT     (default: the --site config's canonicalHost
+ *                                    + /.netlify/functions/mcp when the compiled
+ *                                    site config is available, else
+ *                                    https://drluriescience.netlify.app/.netlify/functions/mcp)
  *                   PUBLISH_SECRET   (sent as x-publish-key; keep server-side)
  *                   MCP_HTTP_AUTH_TOKEN (if the endpoint sets one; sent as Bearer)
  *                 Publish must SUCCEED here (the server commits exports via
@@ -86,17 +98,30 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'
 const argv = process.argv.slice(2);
 const args = new Set();
 let seedsPathArg;
+let siteArg;
 for (let i = 0; i < argv.length; i += 1) {
   if (argv[i] === '--seeds') {
     seedsPathArg = argv[i + 1];
+    i += 1;
+  } else if (argv[i] === '--site') {
+    siteArg = argv[i + 1];
     i += 1;
   } else {
     args.add(argv[i]);
   }
 }
+// W11 T11.6: seeds + committed exports are per-site (sites/<client>/…); the
+// driver itself stays in scripts/ for now (cli/ relocation rides T11.7 —
+// site-parameterization is what T11.6 owes, physically moving the file
+// alongside a fleet CLI is what T11.7 needs it for; recorded in
+// w11-move-map.md). `sites/drlurie` is this single-tenant repo's own default,
+// not a core hardcode — override with --site for a second site.
+const site = siteArg ?? 'sites/drlurie';
+const siteRoot = path.resolve(repoRoot, site);
+const siteExportRoot = `${site}/data/site`; // relative, matches SiteBinding.dataRoot's shape
 const seedsPath = seedsPathArg
   ? path.resolve(repoRoot, seedsPathArg)
-  : path.join(repoRoot, 'scripts', 'lib', 'page-home-seed-data.mjs');
+  : path.join(siteRoot, 'seeds', 'page-home-seed-data.mjs');
 if (!fs.existsSync(seedsPath)) {
   console.error(`[roundtrip] seed module not found: ${seedsPath}`);
   process.exit(2);
@@ -161,7 +186,24 @@ let callTool;
 let compiledRoot; // set in local mode; used for the materializers
 
 if (production) {
-  const endpoint = process.env.MCP_ENDPOINT || 'https://drluriescience.netlify.app/.netlify/functions/mcp';
+  // Endpoint precedence: explicit env override → the --site config's
+  // canonicalHost (read from its compiled site.config.js, if the tsc compile
+  // step already ran) → the pre-multisite Dr-Lurie literal fallback.
+  let siteCanonicalHost;
+  const compiledSiteConfigPath = path.join(repoRoot, '.tmp', 'ci-test', site, 'site.config.js');
+  if (fs.existsSync(compiledSiteConfigPath)) {
+    try {
+      const siteConfigModule = await import(pathToFileURL(compiledSiteConfigPath).href);
+      siteCanonicalHost = siteConfigModule.siteConfig?.canonicalHost;
+    } catch (error) {
+      console.warn(`[roundtrip] warn: could not read ${compiledSiteConfigPath} (${error.message}); using fallback.`);
+    }
+  }
+  const endpoint =
+    process.env.MCP_ENDPOINT ||
+    (siteCanonicalHost
+      ? `${siteCanonicalHost}/.netlify/functions/mcp`
+      : 'https://drluriescience.netlify.app/.netlify/functions/mcp');
   const publishSecret = process.env.PUBLISH_SECRET;
   if (!publishSecret) {
     console.error('[roundtrip] PUBLISH_SECRET is required with --production. Keep it server-side only.');
@@ -219,7 +261,9 @@ if (production) {
   }
   process.env.PUBLISH_SECRET = 'local-roundtrip-secret';
   const { handler } = await import(handlerPath);
-  const { setLocalBlobsRootForTesting } = await import(path.join(compiledRoot, 'netlify', 'lib', 'local-blobs.js'));
+  const { setLocalBlobsRootForTesting } = await import(
+    path.join(compiledRoot, 'packages', 'core', 'server', 'lib', 'local-blobs.js')
+  );
   const blobsRoot = path.join(repoRoot, '.tmp', 'home-roundtrip-blobs');
   fs.rmSync(blobsRoot, { recursive: true, force: true });
   setLocalBlobsRootForTesting(blobsRoot);
@@ -284,7 +328,7 @@ const stripGenerated = (exported) => {
 
 if (!production) {
   for (const navId of ['nav_header', 'nav_footer', 'nav_footer_home']) {
-    const exportPath = path.join(repoRoot, 'src', 'data', 'site', 'navigation', `${navId}.json`);
+    const exportPath = path.join(siteRoot, 'data', 'site', 'navigation', `${navId}.json`);
     const body = stripGenerated(JSON.parse(fs.readFileSync(exportPath, 'utf8')));
     const result = await callTool('object_create', {
       object_type: 'navigation',
@@ -573,19 +617,17 @@ for (const seed of PAGE_HOME_SEEDS) {
 // ─── local mode: materialize the derived exports (playbook step 5) ───────────
 
 if (writeExports) {
-  const { materializePage } = await import(path.join(compiledRoot, 'netlify', 'lib', 'materializers', 'page.js'));
-  const { materializeSection } = await import(path.join(compiledRoot, 'netlify', 'lib', 'materializers', 'section.js'));
-  const { materializeTemplate } = await import(
-    path.join(compiledRoot, 'netlify', 'lib', 'materializers', 'template.js')
-  );
-  const { materializeTaxonomy } = await import(
-    path.join(compiledRoot, 'netlify', 'lib', 'materializers', 'taxonomy.js')
-  );
-  const { materializeSite } = await import(path.join(compiledRoot, 'netlify', 'lib', 'materializers', 'site.js'));
-  const { materializeProduct } = await import(path.join(compiledRoot, 'netlify', 'lib', 'materializers', 'product.js'));
-  const { materializeContentItem } = await import(
-    path.join(compiledRoot, 'netlify', 'lib', 'materializers', 'content-item.js')
-  );
+  // W11 T11.3/T11.6: materializers live under packages/core/server/lib/
+  // (moved out of netlify/lib/ at T11.3) and take an exportRoot (T11.6) —
+  // this driver's own copy of the site's SiteBinding.dataRoot.
+  const materializersDir = path.join(compiledRoot, 'packages', 'core', 'server', 'lib', 'materializers');
+  const { materializePage } = await import(path.join(materializersDir, 'page.js'));
+  const { materializeSection } = await import(path.join(materializersDir, 'section.js'));
+  const { materializeTemplate } = await import(path.join(materializersDir, 'template.js'));
+  const { materializeTaxonomy } = await import(path.join(materializersDir, 'taxonomy.js'));
+  const { materializeSite } = await import(path.join(materializersDir, 'site.js'));
+  const { materializeProduct } = await import(path.join(materializersDir, 'product.js'));
+  const { materializeContentItem } = await import(path.join(materializersDir, 'content-item.js'));
   const materializerByType = {
     page: materializePage,
     section: materializeSection,
@@ -603,7 +645,7 @@ if (writeExports) {
       step(`materialize ${seed.objectId}`, false, 'no record in the store (ensure failed?)');
       continue;
     }
-    const meta = { at: new Date().toISOString(), record_version: record.version };
+    const meta = { at: new Date().toISOString(), record_version: record.version, exportRoot: siteExportRoot };
     const file = materializerByType[seed.objectType](seed.objectId, record.body, meta);
     fs.mkdirSync(path.dirname(path.join(repoRoot, file.path)), { recursive: true });
     fs.writeFileSync(path.join(repoRoot, file.path), file.content);
