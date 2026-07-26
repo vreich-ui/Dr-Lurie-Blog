@@ -12,6 +12,26 @@ today) · **LOW** (constraint / infra).
 
 ---
 
+## Disposition (T14.7 fix wave) — every finding accounted for
+
+| #   | Sev      | Disposition                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | Where            |
+| --- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- |
+| F1  | CRITICAL | **→ T14.8.** The one-line code fix (fail-closed) CLOSES Dr-Lurié's live `/mcp` on deploy, which breaks any connector currently sending no token. That must land in lockstep with setting Dr-Lurié's token AND updating its connector's bearer — exactly T14.8's per-site-key scope. Not deploy-safe alone; flagged to Wolf as top priority.                                                                                                                                                             | T14.8            |
+| F2  | HIGH     | **FIXED + verified.** create-site now picks the export form from each core function's generation; platform artifact-upload shim corrected; regression test.                                                                                                                                                                                                                                                                                                                                             | commit `de89b79` |
+| F3  | MEDIUM   | **→ dedicated platform-chrome pass.** Root-caused below (header Logo renders empty though the site object carries `logo.text`; footer content present but unrendered; prose link/list typography not applied). Cosmetic, on a placeholder site; the real fix is live Astro-build debugging, not a seed tweak (a speculative nav-brand seed change was tried and REVERTED — the header wordmark comes from `site.logo.text` via `Logo.astro`, not the header nav's brand, so that change fixed nothing). | scoped           |
+| F4  | MEDIUM   | **FIXED + verified.** Reader-safety scan no longer blocks `private`/`strategy` as ordinary prose outside the content_item annotation model; camelCase markers and JSON-key leaks still caught everywhere.                                                                                                                                                                                                                                                                                               | commit `431186d` |
+| F5  | MEDIUM   | **wontfix-v1 (behavior) + documented.** Publish deliberately keeps the lock (pinned test: "the stamp write must preserve the lock") so concurrent drift is caught under the live lease. The contract now says so and tells callers to `object_checkin`; the surprise, not the behavior, was the defect.                                                                                                                                                                                                 | commit `3f5965f` |
+| F6  | MEDIUM   | **→ dedicated verb task.** A governed `object_retire`/delete is real fleet-law surface — archive-vs-hard-delete, restore, interaction with a live committed export, review-state, and the inventory default — that should be designed, not rushed in at the tail of a fix wave. The `archived` status infra is already half-present (schema + inventory filter); building notes are in the finding. Not wontfix — worth doing, in its own change.                                                       | scoped           |
+| F7  | LOW      | **wontfix-v1.** The get↔patch version drift is the documented eventual-consistency constraint (name-lookup blob path drops strong consistency fleet-wide). Mitigation is read-version-under-lock-and-retry (the T14.5 driver does this). The real remedy — the lock library / a blobs-scoped strong-read token — is already tracked for the genesis-entry decision; not a V1 blocker.                                                                                                                  | tracked          |
+| F8  | LOW      | **FIXED + verified.** Two real type holes repaired (string guard; cast the context-validated event); `npm run test:opt-in` now compiles and is gated in the CI `check` job so it can't rot again.                                                                                                                                                                                                                                                                                                       | commit `09fb09d` |
+
+Net: four fixed-and-verified (F2, F4, F5-doc, F8), one CRITICAL assigned to its
+designated task (F1 → T14.8), two scoped to dedicated follow-ups (F3 chrome, F6
+retire verb), one wontfix-v1 (F7). Suite green throughout (1711 core + 89 script;
+opt-in 1304). No PR.
+
+---
+
 ## F1 — CRITICAL — Dr-Lurié's `/mcp` is fully unauthenticated
 
 **Surface:** `POST https://drluriescience.netlify.app/mcp`
@@ -28,7 +48,7 @@ curl -X POST https://drluriescience.netlify.app/mcp \
 A **wrong** bearer (`Authorization: Bearer wrong-key-123`) returns the same 200.
 The mutating path is reachable too: an unauthenticated `object_checkout` of a
 non-existent id reaches the genuine `"Object record not found"` **404** — i.e.
-auth passed and the verb executed its lookup. A checkout of a *real* object would
+auth passed and the verb executed its lookup. A checkout of a _real_ object would
 take a 15-minute lock; patch / publish / release / (once F6 lands) delete are all
 one call away for an anonymous caller.
 
@@ -113,7 +133,7 @@ minimally (nav_header carries only "Home"), and the platform build isn't applyin
 the prose typography (link colour token, `list-style`) that Dr-Lurié's does. Every
 new client inherits the same bare chrome, so this is fleet-shaped, not a one-site
 cosmetic. **Fix (T14.7):** audit the platform theme/typography wiring and the
-starter nav/footer seed content; decide what a *born* site's chrome should look
+starter nav/footer seed content; decide what a _born_ site's chrome should look
 like out of the box.
 
 ---
@@ -235,7 +255,7 @@ again silently.
 - **Non-MCP function authz, both sites (deny-by-default all correct):**
   `object-store` 401; `admin-object` / `admin-release` / `admin-blob-manager` /
   `admin-users` / `admin-governance` / `admin-agent-chat` all `401 Authentication
-  is required`; `save-artifact` 401; `run-publisher-agent` 401; `track-ingest` 400
+is required`; `save-artifact` 401; `run-publisher-agent` 401; `track-ingest` 400
   (schema); `save-opt-in` 400 (needs formName); `deploy-status` / `admin-audit`
   405 on GET.
 - **Legacy trio isolation:** absent on platform (`save-json-blob` /
