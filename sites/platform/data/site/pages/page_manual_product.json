@@ -1,0 +1,33 @@
+{
+  "__generated": {
+    "at": "2026-07-26T17:53:56.318Z",
+    "from": "objects/page/by-id/page_manual_product.json",
+    "record_version": 2
+  },
+  "pageType": "system",
+  "route": "/manual/types/product",
+  "sections": [
+    {
+      "data": {
+        "body": "<p>A product is a sellable item: pricing, availability, and copy. Price changes go through a dedicated privileged operation, never a generic field patch.</p>"
+      },
+      "id": "s_intro",
+      "type": "prose"
+    },
+    {
+      "data": {
+        "body": "<h2>Body fields</h2><ul><li><strong>tracking</strong></li><li><strong>slug</strong> <em>(required)</em></li><li><strong>presentation</strong> <em>(required)</em></li><li><strong>commerce</strong> <em>(required)</em></li><li><strong>fulfillment</strong> <em>(required)</em></li></ul><h2>Patch operations</h2><ul><li><strong>set_product_fields</strong></li><li><strong>set_product_price</strong></li><li><strong>set_tracking</strong></li></ul><p><em>This reference is generated from the live <strong>object_contract</strong>. If it disagrees with the contract, the manual is wrong and the drift guard fails the build of it.</em></p>"
+      },
+      "id": "s_reference",
+      "type": "prose"
+    }
+  ],
+  "seo": {
+    "description": "Reference for the product object type: fields, operations, publish policy.",
+    "robots": {
+      "follow": false,
+      "index": false
+    }
+  },
+  "title": "Manual — product"
+}
