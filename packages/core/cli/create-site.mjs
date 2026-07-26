@@ -1107,6 +1107,39 @@ const bootstrap404PageExport = (brandName) =>
 // `netlify/functions/` tree — one three-line shim per factory, generated from
 // whatever factories `packages/core/server/functions/` actually exports at
 // scaffold time rather than from a list that would silently rot.
+/**
+ * The MCP server is the one core function that is not a plain
+ * createHandler(siteBinding) factory: it is a COMPOSITE that dispatches to
+ * three governed sibling handlers, and — on a site that has one — to the
+ * legacy article path. A freshly scaffolded client has no legacy path, so its
+ * shim wires the governed trio only. Every article on a new site is a
+ * content_item OBJECT; the legacy dialect deliberately does not propagate.
+ */
+const mcpShimTemplate = (ids) => `/**
+ * Site shim for '${ids.siteId}'s MCP endpoint. The server is fleet law in
+ * packages/core/server/functions/mcp.ts; this file is the per-site wire.
+ *
+ * This site has no legacy article path, so the legacy trio is not injected and
+ * the tools that need it are absent from this site's tool list — the correct
+ * outcome, not a gap.
+ */
+import '../../config/policy-bindings.js';
+
+import { configureMcp } from '../../../../packages/core/server/functions/mcp.js';
+import { createHandler as createSaveArtifactHandler } from '../../../../packages/core/server/functions/save-artifact.js';
+import { createHandler as createObjectStoreHandler } from '../../../../packages/core/server/functions/object-store.js';
+import { createHandler as createDeployStatusHandler } from '../../../../packages/core/server/functions/deploy-status.js';
+import { siteBinding } from '../../config/site-binding.js';
+
+configureMcp({
+  saveArtifactHandler: createSaveArtifactHandler(siteBinding),
+  objectStoreHandler: createObjectStoreHandler(siteBinding),
+  deployStatusHandler: createDeployStatusHandler(siteBinding),
+});
+
+export * from '../../../../packages/core/server/functions/mcp.js';
+`;
+
 const functionShimTemplate = (ids, fnName) => `/**
  * Site shim for '${ids.siteId}': instantiates the core \`${fnName}\` handler with
  * this site's SiteBinding. The implementation is fleet law in
@@ -1185,7 +1218,7 @@ export const buildPlan = (opts) => {
     { path: `${dir}/app/pages/[...objectPage].astro`, content: objectPageCatchAllTemplate() },
     ...coreFunctionNames().map((fnName) => ({
       path: `${dir}/netlify/functions/${fnName}.ts`,
-      content: functionShimTemplate(ids, fnName),
+      content: fnName === 'mcp' ? mcpShimTemplate(ids) : functionShimTemplate(ids, fnName),
     })),
     { path: `${dir}/public/.gitkeep`, content: '' },
     { path: `${dir}/assets/images/.gitkeep`, content: '' },

@@ -49,7 +49,7 @@ describe('timestamp publication contract', () => {
   });
 
   it('exposes only the timestamp publishing MCP tool', async () => {
-    const source = await readFile(join(REPO_ROOT, 'netlify/functions/mcp.ts'), 'utf8');
+    const source = await readFile(join(REPO_ROOT, 'packages/core/server/functions/mcp.ts'), 'utf8');
 
     assert.match(source, /save_json_blob_publish_by_time/);
     assert.equal(source.includes('save_json_blob_' + 'mark_' + 'published'), false);
@@ -59,7 +59,7 @@ describe('timestamp publication contract', () => {
   });
 
   it('defines future, immediate, and unpublish branches in publish_by_time', async () => {
-    const source = await readFile(join(REPO_ROOT, 'netlify/functions/mcp.ts'), 'utf8');
+    const source = await readFile(join(REPO_ROOT, 'packages/core/server/functions/mcp.ts'), 'utf8');
 
     assert.match(source, /status: isFuturePublish \? 'time_set' : 'published'/);
     assert.match(source, /status: 'unpublished'/);
