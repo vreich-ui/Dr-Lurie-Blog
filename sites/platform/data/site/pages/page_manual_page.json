@@ -1,0 +1,33 @@
+{
+  "__generated": {
+    "at": "2026-07-26T17:52:22.446Z",
+    "from": "objects/page/by-id/page_manual_page.json",
+    "record_version": 2
+  },
+  "pageType": "system",
+  "route": "/manual/types/page",
+  "sections": [
+    {
+      "data": {
+        "body": "<p>A page is a routed surface: a route, a title, SEO, and an ordered list of sections. Agents create pages, compose them from sections, and publish them; a published page whose route no code file owns is served automatically.</p>"
+      },
+      "id": "s_intro",
+      "type": "prose"
+    },
+    {
+      "data": {
+        "body": "<h2>Body fields</h2><ul><li><strong>tracking</strong></li><li><strong>route</strong> <em>(required)</em></li><li><strong>pageType</strong> <em>(required)</em></li><li><strong>title</strong> <em>(required)</em></li><li><strong>seo</strong> <em>(required)</em></li><li><strong>template</strong></li><li><strong>sections</strong> <em>(required)</em></li><li><strong>navigationOverrides</strong></li></ul><h2>Patch operations</h2><ul><li><strong>set_page_meta</strong> — Merge page meta fields (title/route/seo/…); sections are edited only via section ops.</li><li><strong>upsert_section</strong></li><li><strong>update_section_data</strong></li><li><strong>move_section</strong></li><li><strong>set_section_visibility</strong></li><li><strong>remove_section</strong></li><li><strong>set_tracking</strong></li></ul><p><em>This reference is generated from the live <strong>object_contract</strong>. If it disagrees with the contract, the manual is wrong and the drift guard fails the build of it.</em></p>"
+      },
+      "id": "s_reference",
+      "type": "prose"
+    }
+  ],
+  "seo": {
+    "description": "Reference for the page object type: fields, operations, publish policy.",
+    "robots": {
+      "follow": false,
+      "index": false
+    }
+  },
+  "title": "Manual — page"
+}
