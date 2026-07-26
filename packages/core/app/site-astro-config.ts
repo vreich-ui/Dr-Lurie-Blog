@@ -87,6 +87,12 @@ export const defineSiteAstroConfig = (options: SiteAstroConfigOptions) => {
     integrations: [
       tailwind({
         applyBaseStyles: false,
+        // Absolute, for the same reason as the astrowind config path below:
+        // Netlify builds from the project's base directory, and a relative
+        // lookup silently falls back to tailwind's defaults (empty `content`),
+        // which turns every `@apply` in the shell's stylesheet into a build
+        // error about a class that "does not exist".
+        configFile: path.join(REPO_ROOT, 'tailwind.config.js'),
       }),
       sitemap(),
       mdx(),
@@ -130,7 +136,12 @@ export const defineSiteAstroConfig = (options: SiteAstroConfigOptions) => {
       }),
 
       astrowind({
-        config: path.join(options.siteDir, 'config.yaml'),
+        // ABSOLUTE: the astrowind integration resolves this against the process
+        // cwd, and Netlify runs the build from the project's BASE DIRECTORY,
+        // not the repo root. A repo-relative path here builds fine locally and
+        // dies on Netlify with a config-not-found — so the whole build is made
+        // cwd-independent instead (Astro's own `root` is already absolute).
+        config: path.join(siteRoot, 'config.yaml'),
       }),
 
       // The /admin workspace is fleet law — injected, not copied per site.

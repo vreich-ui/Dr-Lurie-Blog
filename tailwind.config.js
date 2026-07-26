@@ -1,13 +1,20 @@
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 import defaultTheme from 'tailwindcss/defaultTheme';
 import plugin from 'tailwindcss/plugin';
 import typographyPlugin from '@tailwindcss/typography';
 
+const REPO_ROOT = path.dirname(fileURLToPath(import.meta.url));
+
 export default {
-  content: [
-    './packages/core/**/*.{astro,html,js,jsx,json,md,mdx,svelte,ts,tsx,vue}',
-    './sites/**/*.{astro,html,js,jsx,json,md,mdx,svelte,ts,tsx,vue}',
-    './src/**/*.{astro,html,js,jsx,json,md,mdx,svelte,ts,tsx,vue}',
-  ],
+  // ABSOLUTE (W14 T14.3): tailwind resolves these against the process cwd, and
+  // Netlify runs a site's build from that project's BASE DIRECTORY, not the
+  // repo root. Repo-relative globs matched nothing there, so every `@apply`
+  // referenced a class tailwind had never seen and the CSS build died.
+  content: ['packages/core', 'sites', 'src'].map((dir) =>
+    path.join(REPO_ROOT, dir, '**/*.{astro,html,js,jsx,json,md,mdx,svelte,ts,tsx,vue}')
+  ),
   theme: {
     extend: {
       colors: {
