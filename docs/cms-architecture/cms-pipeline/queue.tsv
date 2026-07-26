@@ -77,8 +77,27 @@ T11.7	auto	claude-opus-4-8	high	docs/cms-architecture/cms-pipeline/T11.7-provisi
 T11.8	auto	claude-opus-4-8	medium	docs/cms-architecture/cms-pipeline/T11.8-fleet-ci.md
 T11.9	notify	claude-fable-5	high	docs/cms-architecture/cms-pipeline/T11.9-schema-migration-harness.md
 T11.10	notify	claude-fable-5	high	docs/cms-architecture/cms-pipeline/T11.10-per-site-governance-credentials.md
-T11.11	human_gate	claude-sonnet-5	medium	docs/cms-architecture/cms-pipeline/T11.11-second-site-acceptance.md
-T11.12	auto	claude-sonnet-5	low	docs/cms-architecture/cms-pipeline/T11.12-w11-records-closeout.md
+# T11.11 + T11.12 SUPERSEDED by W14 (Wolf's platform-site ruling, 2026-07-26 —
+# docs/cms-architecture/decisions/2026-07-26-platform-site-ruling.md): the second
+# site IS the platform site (T14.2-T14.4); the W11 close-out folds into T14.10.
+#T11.11	human_gate	claude-sonnet-5	medium	docs/cms-architecture/cms-pipeline/T11.11-second-site-acceptance.md
+#T11.12	auto	claude-sonnet-5	low	docs/cms-architecture/cms-pipeline/T11.12-w11-records-closeout.md
+#
+# W14 — platform site + V1 finish line (ruling: decisions/2026-07-26-platform-site-ruling.md).
+# Runs AHEAD of W12/W13 (reordering this file IS the scheduler). Governing directive R8:
+# no parked blockers/questions — agents decide, record, and keep moving; only true
+# account-authority gates halt.
+T14.0	notify	claude-fable-5	high	docs/cms-architecture/cms-pipeline/T14.0-admin-login-fix.md
+T14.1	notify	claude-fable-5	xhigh	docs/cms-architecture/cms-pipeline/T14.1-app-shell-extraction.md
+T14.2	auto	claude-sonnet-5	medium	docs/cms-architecture/cms-pipeline/T14.2-platform-genesis.md
+T14.3	human_gate	claude-sonnet-5	medium	docs/cms-architecture/cms-pipeline/T14.3-platform-provisioning-repo-rename.md
+T14.4	auto	claude-sonnet-5	medium	docs/cms-architecture/cms-pipeline/T14.4-fleet-propagation-proof.md
+T14.5	notify	claude-fable-5	high	docs/cms-architecture/cms-pipeline/T14.5-instruction-manual.md
+T14.6	notify	claude-fable-5	high	docs/cms-architecture/cms-pipeline/T14.6-test-plan-execution.md
+T14.7	auto	claude-opus-4-8	high	docs/cms-architecture/cms-pipeline/T14.7-fix-wave.md
+T14.8	auto	claude-opus-4-8	medium	docs/cms-architecture/cms-pipeline/T14.8-agent-connection-hygiene.md
+T14.9	human_gate	claude-sonnet-5	medium	docs/cms-architecture/cms-pipeline/T14.9-synthetic-third-site.md
+T14.10	auto	claude-sonnet-5	low	docs/cms-architecture/cms-pipeline/T14.10-v1-closeout.md
 T12.1	notify	claude-fable-5	high	docs/cms-architecture/cms-pipeline/T12.1-capture-spike.md
 T12.2	notify	claude-fable-5	xhigh	docs/cms-architecture/cms-pipeline/T12.2-decomposition-mapper.md
 T12.3	auto	claude-opus-4-8	medium	docs/cms-architecture/cms-pipeline/T12.3-theme-extraction.md

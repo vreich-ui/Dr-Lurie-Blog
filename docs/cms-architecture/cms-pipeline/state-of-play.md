@@ -7,6 +7,44 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-26 (W14 ruling recorded — platform site, V1 finish line; admin-login triage)
+
+Wolf ratified the platform-site plan (iterated through three brief
+revisions in-session):
+`docs/cms-architecture/decisions/2026-07-26-platform-site-ruling.md` is
+the record — R1 monorepo stands; R2 core site = `platform`; R3 Dr-Lurie
+demoted to worked example (byte-identical build-diff DROPPED as a gate,
+informational only); R4 Netlify split = birth platform as its own project,
+`drluriescience` NOT renamed; R5 repo rename → `platform` (assessed LOW
+pain); R6 site birth stays CLI+runbook for V1; R7 third site synthetic;
+**R8 (governing): no parked blockers/questions — decide, record, keep
+moving; V1 crosses the line.**
+
+Queue: T11.11/T11.12 superseded (commented out with pointer); **W14 rows
+added ahead of W12/W13** — T14.0 admin-login fix → T14.1 app-shell
+extraction → T14.2 platform genesis → T14.3 HUMAN GATE provisioning+repo
+rename → T14.4 fleet proof → T14.5 instruction manual (authored as
+objects, drift-guarded vs object_contract) → T14.6 test plan → T14.7 fix
+wave → T14.8 agent hygiene (incl. the PUBLISH_SECRET rotation, finally) →
+T14.9 HUMAN GATE synthetic third site (timed) → T14.10 V1 close-out +
+separation design doc. All eleven briefs committed.
+
+**Admin-login triage (Wolf-reported: login on `/admin` doesn't work).**
+Unauthenticated probes, same day: `/admin` renders (form present); GoTrue
+healthy (`/.netlify/identity/settings` → email+google on, autoconfirm
+off); `admin-users` boots (GET → 405, NOT a module-load crash — clears
+the W11 factory-shim import chain as suspect). Fault is inside the login
+round trip: (a) server-side JWT verify/role resolution, (b) browser-side
+GoTrue exchange/hydration, or (c) unconfirmed Identity account. Full
+hypothesis tree in the ruling doc's known-issue log; T14.0 picks the
+branch via function logs + one observed browser symptom and fixes.
+
+Also this session (pre-ruling): W11 wave 2 (7 commits, T11.6 step 2/3 →
+T11.11 prep) delivered, merged by Wolf as PR #472, deployed — production
+serving the merge commit, deploy ready 15:59:42Z; MCP ping green.
+
+**Next in queue:** T14.0 (admin-login fix, NOTIFY, fable/high).
+
 ## Session 2026-07-24 (T11.11 prep — second-site acceptance run: agent-side readiness verified, HALTED on account authority)
 
 T11.11 is `human_gate` (queue.tsv) — "prepared by agents; executed with
