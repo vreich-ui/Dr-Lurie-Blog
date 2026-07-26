@@ -1,0 +1,33 @@
+{
+  "__generated": {
+    "at": "2026-07-26T18:06:13.197Z",
+    "from": "objects/page/by-id/page_manual_content_item.json",
+    "record_version": 2
+  },
+  "pageType": "system",
+  "route": "/manual/types/content-item",
+  "sections": [
+    {
+      "data": {
+        "body": "<p>A content item is an article in the annotated-node model: every block pairs its reader-facing body with editorial annotations the reader never sees. The published page renders only the projection.</p>"
+      },
+      "id": "s_intro",
+      "type": "prose"
+    },
+    {
+      "data": {
+        "body": "<h2>Body fields</h2><ul><li><strong>tracking</strong></li><li><strong>slug</strong> <em>(required)</em></li><li><strong>title</strong> <em>(required)</em></li><li><strong>deck</strong></li><li><strong>description</strong></li><li><strong>author</strong></li><li><strong>image</strong></li><li><strong>taxonomy</strong></li><li><strong>seo</strong></li><li><strong>nodes</strong> <em>(required)</em></li><li><strong>chat</strong></li><li><strong>editorial</strong></li><li><strong>emotional_strategy</strong></li><li><strong>sources</strong></li><li><strong>claims</strong></li><li><strong>compliance</strong></li><li><strong>publication_context</strong></li><li><strong>lineage</strong></li><li><strong>scores</strong></li></ul><h2>Patch operations</h2><ul><li><strong>set_article_meta</strong> — Merge article meta fields (title/slug/author/taxonomy/seo/scores/…); nodes are edited only via node ops.</li><li><strong>upsert_node</strong></li><li><strong>update_node</strong></li><li><strong>move_node</strong></li><li><strong>set_node_visibility</strong></li><li><strong>remove_node</strong></li><li><strong>set_tracking</strong></li></ul><p><em>This reference is generated from the live <strong>object_contract</strong>. If it disagrees with the contract, the manual is wrong and the drift guard fails the build of it.</em></p>"
+      },
+      "id": "s_reference",
+      "type": "prose"
+    }
+  ],
+  "seo": {
+    "description": "Reference for the content_item object type: fields, operations, publish policy.",
+    "robots": {
+      "follow": false,
+      "index": false
+    }
+  },
+  "title": "Manual — content_item"
+}
