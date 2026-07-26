@@ -1,0 +1,33 @@
+{
+  "__generated": {
+    "at": "2026-07-26T17:52:43.661Z",
+    "from": "objects/page/by-id/page_manual_navigation.json",
+    "record_version": 2
+  },
+  "pageType": "system",
+  "route": "/manual/types/navigation",
+  "sections": [
+    {
+      "data": {
+        "body": "<p>A navigation object is a menu — header or footer — of groups and items. The site singleton names which navigation objects are its defaults.</p>"
+      },
+      "id": "s_intro",
+      "type": "prose"
+    },
+    {
+      "data": {
+        "body": "<h2>Body fields</h2><ul><li><strong>tracking</strong></li><li><strong>role</strong> <em>(required)</em></li><li><strong>brand</strong></li><li><strong>groups</strong> <em>(required)</em></li><li><strong>actions</strong></li><li><strong>footNote</strong></li></ul><h2>Patch operations</h2><ul><li><strong>set_nav_meta</strong></li><li><strong>upsert_group</strong></li><li><strong>move_group</strong></li><li><strong>remove_group</strong></li><li><strong>upsert_item</strong></li><li><strong>update_item</strong></li><li><strong>move_item</strong></li><li><strong>remove_item</strong></li><li><strong>upsert_action</strong></li><li><strong>remove_action</strong></li><li><strong>set_tracking</strong></li></ul><p><em>This reference is generated from the live <strong>object_contract</strong>. If it disagrees with the contract, the manual is wrong and the drift guard fails the build of it.</em></p>"
+      },
+      "id": "s_reference",
+      "type": "prose"
+    }
+  ],
+  "seo": {
+    "description": "Reference for the navigation object type: fields, operations, publish policy.",
+    "robots": {
+      "follow": false,
+      "index": false
+    }
+  },
+  "title": "Manual — navigation"
+}
