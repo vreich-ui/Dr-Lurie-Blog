@@ -1458,6 +1458,14 @@ export const main = async (argv) => {
   }
 
   console.log('');
+  // A new site is a new npm WORKSPACE (the root package.json globs `sites/*`),
+  // so package-lock.json is now out of sync and every `npm ci` — which is what
+  // CI and Netlify both run — fails with "Missing: @fleet/site-<name> from lock
+  // file" before it reaches a single build step. Hit for real on the first
+  // scaffolded site (W14 T14.3).
+  console.log('NEXT: run `npm install` at the repo root and COMMIT package-lock.json.');
+  console.log('      A new site is a new npm workspace; without it every `npm ci` fails.');
+  console.log('');
   console.log('Env checklist:');
   console.log(renderEnvChecklist(Boolean(netlifyToken)));
   console.log('');

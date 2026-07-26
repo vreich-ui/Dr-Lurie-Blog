@@ -84,7 +84,15 @@ export const main = async () => {
   // module scope, which needs the site policy bindings registered first —
   // the same side-effect import every test that touches handleObjectVerb
   // needs (see packages/core/cli/migrate-site.test.ts's own first import).
-  await import(pathToFileURL(path.join(GATE_OUT_DIR, 'src', 'config', 'policy-bindings.js')).href);
+  //
+  // W14 T14.1 moved the bindings out of `src/config/` and into each site's
+  // own `config/`, so the path is derived from the discovered fleet rather
+  // than hardcoded. The providers are process-global and the gate only needs
+  // SOME site registered to resolve identity, so the first one wins — the
+  // per-site export parsing below is what actually iterates the fleet.
+  const [firstSite] = discoverSites();
+  if (!firstSite) throw new Error('[schema-migration-gate] no sites discovered — nothing to gate.');
+  await import(pathToFileURL(path.join(GATE_OUT_DIR, 'sites', firstSite, 'config', 'policy-bindings.js')).href);
 
   // tsc copies a .mjs source through as .mjs (it can't rename an ESM-mode
   // file's extension the way it emits .ts -> .js), unlike the co-located
