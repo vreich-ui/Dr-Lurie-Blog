@@ -70,6 +70,34 @@ const requireSiblings = (): McpSiblingHandlers => {
   return siblings;
 };
 
+/**
+ * Tools that cannot work without the legacy article path. A site that injects
+ * no legacy handlers must not ADVERTISE these — listing a tool an agent cannot
+ * call is worse than omitting it: the agent plans around it and fails mid-run,
+ * and (Wolf, 2026-07-26) the legacy surface is meant to be frozen and
+ * forgotten, not inherited by every new client.
+ *
+ * Caught by T14.4's live round-trip: injecting the handlers alone left all 12
+ * of these in `tools/list` on a site with no legacy path.
+ */
+const LEGACY_ARTICLE_TOOLS = new Set([
+  'save_json_blob_create_request',
+  'save_json_blob_create_article_draft',
+  'save_json_blob_get_request',
+  'save_json_blob_list_pending_requests',
+  'save_json_blob_patch_agent_output',
+  'save_json_blob_mark_agent_complete',
+  'save_json_blob_checkout_request',
+  'save_json_blob_refresh_lock',
+  'save_json_blob_checkin_request',
+  'save_json_blob_publish_by_time',
+  'save_json_blob_patch_canonical_input',
+  'verify_article_images',
+]);
+
+/** True when this site supplied the legacy article handlers. */
+const hasLegacyArticlePath = (): boolean => Boolean(requireSiblings().saveJsonBlobHandler);
+
 /** A legacy-only handler: present for a site with the pre-object article path. */
 const requireLegacy = (name: 'saveJsonBlobHandler' | 'publishArticleHandler' | 'verifyArticleImagesHandler') => {
   const handlerFn = requireSiblings()[name];
@@ -4498,7 +4526,7 @@ const handleRpcRequest = async (event: LambdaEvent, request: JsonRpcRequest): Pr
         serverInfo: { name: SERVER_NAME, version: '0.1.0' },
       });
     case 'tools/list':
-      return rpcResponse(request.id, { tools: TOOL_DEFINITIONS });
+      return rpcResponse(request.id, { tools: visibleToolDefinitions() });
     case 'tools/call':
       event.log?.({ event: 'rpc_tool_call_started', rpcMethod, slug, toolName: request.params?.name });
       return rpcResponse(
@@ -4510,6 +4538,14 @@ const handleRpcRequest = async (event: LambdaEvent, request: JsonRpcRequest): Pr
       return rpcError(request.id, -32601, `Method not found: ${request.method}`);
   }
 };
+
+/**
+ * The tool surface THIS site exposes. Identical to TOOL_DEFINITIONS for a site
+ * with the legacy article path; on every other site the legacy tools are
+ * omitted entirely.
+ */
+export const visibleToolDefinitions = (): ToolDefinition[] =>
+  hasLegacyArticlePath() ? TOOL_DEFINITIONS : TOOL_DEFINITIONS.filter((tool) => !LEGACY_ARTICLE_TOOLS.has(tool.name));
 
 export const _mcpInternal = {
   saveJsonBlobHandler,
