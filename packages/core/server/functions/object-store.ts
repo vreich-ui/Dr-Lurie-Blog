@@ -119,7 +119,23 @@ const buildHandlerImpl = (binding: SiteBinding) => async (event: LambdaEvent) =>
     return jsonResponse(result.status, result.body);
   } catch (error) {
     console.error('Object_Store request failed.', error);
-    return jsonResponse(500, { action: request.data.action, error: 'Object request could not be processed.' });
+    // W14 T14.4: the bare message cost a full debugging loop against a live
+    // site — every failure read identically. The 500 now carries a SANITIZED
+    // diagnostic: the error's message and top in-repo stack frame, never a
+    // dump. Secrets don't flow through error messages on this path (they live
+    // in env reads that fail closed), and knowing WHICH check threw is the
+    // difference between a fix and a guess.
+    const detail = error instanceof Error ? error.message.slice(0, 300) : String(error).slice(0, 200);
+    const frame =
+      error instanceof Error && error.stack
+        ? (error.stack.split('\n').find((line) => /packages\/core|netlify\//.test(line)) ?? '').trim().slice(0, 200)
+        : undefined;
+    return jsonResponse(500, {
+      action: request.data.action,
+      error: 'Object request could not be processed.',
+      detail,
+      ...(frame ? { frame } : {}),
+    });
   }
 };
 

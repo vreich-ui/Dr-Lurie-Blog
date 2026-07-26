@@ -69,7 +69,10 @@ export const ENV_CHECKLIST = [
       {
         name: 'NETLIFY_SITE_ID',
         cls: 'per-site',
-        note: 'Filled in from the created Netlify site (SITE_ID is the Netlify-injected alias — do not set by hand).',
+        note:
+          'Set AUTOMATICALLY by the provisioning run (W14 — blob runtime detection keys on it; a site without it ' +
+          'runs its functions on the file-backed test store and fails at the first write). Only set by hand if ' +
+          'provisioning reported a failure for it.',
       },
       {
         name: 'NETLIFY_BUILD_HOOK_URL',
@@ -1393,6 +1396,17 @@ export const executeNetlifyProvisioning = async (plan, { token, fetchImpl = fetc
   const secretsSet = [];
   const secretsFailed = [];
   if (accountId) {
+    // W14 T14.4: NETLIFY_SITE_ID is knowable HERE — it is the id of the site
+    // this run just created — and leaving it to the by-hand checklist is what
+    // put a freshly provisioned site's functions on the file-backed test store
+    // in production (blob runtime detection keys on it). Not a secret; set it
+    // like one so the checklist prints a tick.
+    try {
+      await setNetlifyEnvVar(fetchImpl, token, accountId, siteId, 'NETLIFY_SITE_ID', siteId);
+      secretsSet.push('NETLIFY_SITE_ID');
+    } catch (error) {
+      secretsFailed.push({ name: 'NETLIFY_SITE_ID', message: error instanceof Error ? error.message : String(error) });
+    }
     for (const { rows } of ENV_CHECKLIST) {
       for (const row of rows) {
         if (!row.generate) continue;
