@@ -14,7 +14,7 @@
  *   - routes are unique within the batch and every tier references a product
  *     that exists in the shop seed (one catalog, no ghost tiers).
  */
-import '../../src/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
+import '../../sites/drlurie/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
 import assert from 'node:assert/strict';
 import test from 'node:test';
 

@@ -3,7 +3,7 @@
  * product_set_price and order_reissue tool libs, and the claim-free path —
  * criterion-4 completeness for the product type.
  */
-import '../../src/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
+import '../../sites/drlurie/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
 import assert from 'node:assert/strict';
 import { readdir, rm } from 'node:fs/promises';
 import { join } from 'node:path';

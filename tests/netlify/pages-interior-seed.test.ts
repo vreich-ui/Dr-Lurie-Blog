@@ -9,7 +9,7 @@
  *     system PageType allows prose + cta_banner; standard allows any);
  *   - the batch is all pages (objectType 'page'), site site_drlurie.
  */
-import '../../src/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
+import '../../sites/drlurie/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
 import assert from 'node:assert/strict';
 import test from 'node:test';
 

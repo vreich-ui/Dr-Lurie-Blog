@@ -5,7 +5,7 @@
  * rich-text renderability), and the reader-safety projection (the annotation
  * layer is legitimate record data; the leak rule guards the RENDERED surface).
  */
-import '../../src/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
+import '../../sites/drlurie/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
 import { test } from 'node:test';
 import assert from 'node:assert';
 

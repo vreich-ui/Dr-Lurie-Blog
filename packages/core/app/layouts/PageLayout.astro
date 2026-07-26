@@ -1,0 +1,73 @@
+---
+import Layout from '~/layouts/Layout.astro';
+import Header from '~/components/widgets/Header.astro';
+import Footer from '~/components/widgets/Footer.astro';
+import { getEntry } from 'astro:content';
+import {
+  createNavTargetResolver,
+  navigationToFooterProps,
+  navigationToHeaderProps,
+  parseNavigationExport,
+} from '~/utils/navigation-data';
+import { getBlogPermalink } from '~/utils/permalinks';
+import { getSiteObject } from '~/utils/site-object';
+
+import type { MetaData } from '~/types';
+
+export interface Props {
+  metadata?: MetaData;
+}
+
+const { metadata } = Astro.props;
+
+// W4: WHICH navigation objects feed the default header/footer, and the Header
+// chrome flags, come from the site object (defaultNavigation / chrome — D§5.4:
+// the site object is the only place default menus bind), with the
+// pre-conversion ids/flags as fallback when the export is absent.
+const site = getSiteObject();
+const headerNavId = site?.defaultNavigation.header ?? 'nav_header';
+const footerNavId = site?.defaultNavigation.footer ?? 'nav_footer';
+const chrome = site?.chrome ?? { showRssFeed: true, showThemeToggle: true };
+
+// T2.5 cutover: header/footer render from the published navigation exports
+// (sites/drlurie/data/site/navigation/*.json — W11 T11.6 relocated the export
+// root — committed by the Tier 3 publish) through
+// the T2.4 prop adapter — same Header/Footer markup, new feed. There is
+// deliberately NO fallback to a hardcoded source: a missing export must fail
+// the build loudly, not half-feed the site (04 Part 2, "never leaves a
+// surface half-fed").
+const headerEntry = await getEntry('navigationObject', headerNavId);
+const footerEntry = await getEntry('navigationObject', footerNavId);
+if (!headerEntry || !footerEntry) {
+  throw new Error(
+    `PageLayout: this site's published navigation exports are missing ` +
+      `(<site>/data/site/navigation/${headerNavId}.json / ${footerNavId}.json). A site cannot render a single ` +
+      'page until its navigation objects are published — see the site-provisioning runbook (§ seed drive) for a ' +
+      'new site, or docs/cms-architecture/cms-pipeline/phase-2-runbook.md §4 for the original cutover.'
+  );
+}
+const resolveNavTarget = createNavTargetResolver({ blogPermalink: getBlogPermalink() });
+const headerData = navigationToHeaderProps(parseNavigationExport(headerEntry.data), resolveNavTarget);
+const footerData = navigationToFooterProps(parseNavigationExport(footerEntry.data), resolveNavTarget);
+---
+
+<Layout metadata={metadata}>
+  <slot name="header">
+    {
+      /* data-cms-nav-object: the edit-mode canvas reads this to offer chrome
+        copy editing on the navigation OBJECT (nav grammar ops, never page
+        ops). display:contents — no box, visitor-inert. */
+    }
+    <div style="display:contents" data-cms-nav-object={headerNavId} data-cms-nav-role="header">
+      <Header {...headerData} isSticky showRssFeed={chrome.showRssFeed} showToggleTheme={chrome.showThemeToggle} />
+    </div>
+  </slot>
+  <main>
+    <slot />
+  </main>
+  <slot name="footer">
+    <div style="display:contents" data-cms-nav-object={footerNavId} data-cms-nav-role="footer">
+      <Footer {...footerData} />
+    </div>
+  </slot>
+</Layout>

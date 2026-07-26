@@ -4,7 +4,7 @@
  * `sites/drlurie/site.config.ts` is the per-site routing/identity bundle
  * (Wolf B2: routing stays a committed FILE). v1 verifies rather than
  * generates: these tests make it impossible to land a change to
- * `netlify.toml`'s redirect table or `src/config.yaml`'s site URL without
+ * `netlify.toml`'s redirect table or `sites/drlurie/config.yaml`'s site URL without
  * updating the site config (and vice versa), which is the single-truth
  * invariant generation would have bought, without touching deploy wiring.
  */
@@ -40,9 +40,9 @@ test('netlify.toml [[redirects]] table equals site.config redirects, in order', 
 });
 
 test('config.yaml site URL equals site.config canonicalHost', () => {
-  const yaml = readFileSync(join(ROOT, 'src/config.yaml'), 'utf8');
+  const yaml = readFileSync(join(ROOT, 'sites/drlurie/config.yaml'), 'utf8');
   const url = yaml.match(/^\s{2}site: '([^']+)'/m)?.[1];
-  assert.equal(url, siteConfig.canonicalHost, 'src/config.yaml site URL drifted from site.config');
+  assert.equal(url, siteConfig.canonicalHost, 'sites/drlurie/config.yaml site URL drifted from site.config');
 });
 
 test('site.config identity agrees with the committed identity config', () => {

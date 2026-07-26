@@ -14,7 +14,7 @@
  * attribution tool but NEVER for a workflow-stage tool (the
  * save_json_blob_mark_agent_complete carve-out).
  */
-import '../../src/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
+import '../../sites/drlurie/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
 import assert from 'node:assert/strict';
 import { rm } from 'node:fs/promises';
 import { join } from 'node:path';

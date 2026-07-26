@@ -1,5 +1,5 @@
 /**
- * Ownership rules for the object-page catch-all (src/utils/object-page-routes.ts)
+ * Ownership rules for the object-page catch-all (packages/core/app/utils/object-page-routes.ts)
  * — the derivation that makes agent-created pages live at their route while
  * never fighting an existing owner for a path:
  *
@@ -12,7 +12,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { computeObjectPageRoutes } from '../../src/utils/object-page-routes.js';
+import { computeObjectPageRoutes } from '../../packages/core/app/utils/object-page-routes.js';
 
 const ROUTE_FILES = [
   './index.astro',
@@ -170,9 +170,14 @@ test('the real committed exports emit ZERO paths today — every page object is 
     fs
       .readdirSync(dir, { withFileTypes: true })
       .flatMap((entry) => (entry.isDirectory() ? walk(path.join(dir, entry.name)) : [path.join(dir, entry.name)]));
-  const routeFilePaths = walk(path.join(repoRoot, 'src', 'pages'))
+  const routeFilePaths = walk(path.join(repoRoot, 'sites', 'drlurie', 'app', 'pages'))
     .filter((file) => file.endsWith('.astro'))
-    .map((file) => `/src/pages/${path.relative(path.join(repoRoot, 'src', 'pages'), file).replace(/\\/g, '/')}`);
+    .map(
+      (file) =>
+        `/sites/drlurie/app/pages/${path
+          .relative(path.join(repoRoot, 'sites', 'drlurie', 'app', 'pages'), file)
+          .replace(/\\/g, '/')}`
+    );
 
   const { paths, skipped } = computeObjectPageRoutes({
     routeFilePaths,

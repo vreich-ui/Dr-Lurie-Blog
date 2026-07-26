@@ -84,17 +84,53 @@ test('buildPlan scaffolds the full baseline pack: config bundle + empty export t
     'sites/acme/seeds/taxonomy-seed-data.mjs',
     'sites/acme/seeds/themes-seed-data.mjs',
     'sites/acme/seeds/section-templates-seed-data.mjs',
+    // W14 T14.2: the per-site policy bundle. Without policy-bindings.ts the
+    // shell cannot resolve site identity and the site does not build at all.
+    'sites/acme/config/approval-policy.ts',
+    'sites/acme/config/creation-policy.ts',
+    'sites/acme/config/media-policy.ts',
+    'sites/acme/config/policy-bindings.ts',
+    // W14 T14.1/T14.2: the build entry over the shared shell.
+    'sites/acme/astro.config.ts',
+    'sites/acme/config.yaml',
+    'sites/acme/app/content/config.ts',
+    'sites/acme/app/pages/index.astro',
+    'sites/acme/app/pages/404.astro',
+    'sites/acme/app/pages/[...objectPage].astro',
   ]) {
     assert.ok(relPaths.includes(expected), `expected ${expected} in the plan`);
   }
-  // The committed-export tree ships empty (a fresh client has no store
-  // records yet) — every subdir gets a .gitkeep, no site.json/etc:
+});
+
+test('the committed-export tree ships as BOOTSTRAP only — enough to build, nothing store-backed', () => {
+  const plan = buildPlan({ name: 'acme' });
+  const relPaths = plan.files.map((f) => f.path);
   const dataSiteFiles = relPaths.filter((p) => p.startsWith('sites/acme/data/site/'));
-  assert.ok(
-    dataSiteFiles.every((p) => p.endsWith('.gitkeep')),
-    'data/site/ ships as empty placeholders only'
-  );
-  assert.ok(dataSiteFiles.length >= 8);
+
+  // Every per-type directory still ships as an empty placeholder…
+  assert.ok(dataSiteFiles.filter((p) => p.endsWith('.gitkeep')).length >= 8);
+
+  // …except for the five exports without which the site cannot render ONE
+  // page: PageLayout throws on a missing navigation export by design, and
+  // PageObjectRenderer throws on a missing page export.
+  for (const expected of [
+    'sites/acme/data/site/site.json',
+    'sites/acme/data/site/navigation/nav_header.json',
+    'sites/acme/data/site/navigation/nav_footer.json',
+    'sites/acme/data/site/pages/page_home.json',
+    'sites/acme/data/site/pages/page_404.json',
+  ]) {
+    assert.ok(relPaths.includes(expected), `expected ${expected} in the plan`);
+  }
+
+  // They are rendered stubs, NOT converted objects (CLAUDE.md's five-part
+  // definition: no store record backs them). The marker has to say so, or the
+  // seed drive that replaces them looks optional.
+  for (const file of plan.files.filter((f) => f.path.startsWith('sites/acme/data/site/') && f.path.endsWith('.json'))) {
+    const parsed = JSON.parse(file.content);
+    assert.match(parsed.__generated.from, /^create-site:bootstrap/);
+    assert.equal(parsed.__generated.record_version, 0);
+  }
 });
 
 test('CORE_BLOB_STORES matches the store-name literals in blob-store.ts/governance-store.ts/users-store.ts/chat-store.ts', () => {

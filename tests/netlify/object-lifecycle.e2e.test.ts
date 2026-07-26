@@ -1,4 +1,4 @@
-import '../../src/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
+import '../../sites/drlurie/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
 import assert from 'node:assert/strict';
 import { rm } from 'node:fs/promises';
 import { join } from 'node:path';

@@ -10,7 +10,7 @@
  * schema fields; the rich-text paragraph splitter is faithful and refuses
  * to drop content.
  */
-import '../../src/config/policy-bindings.js'; // W11 T11.2
+import '../../sites/drlurie/config/policy-bindings.js'; // W11 T11.2
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -43,7 +43,7 @@ import {
   homeHeroData,
   homeNewsletterSignupData,
   homeStartGridData,
-} from '../../src/fixtures/home-fixture-data.js';
+} from '../../sites/drlurie/app/fixtures/home-fixture-data.js';
 import { sectionInstanceSchema } from '../../packages/core/schema/bodies/section-v1.js';
 
 const DEFINITIONS = [

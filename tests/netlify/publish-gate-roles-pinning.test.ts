@@ -5,7 +5,7 @@
  * like an admin, existing role sets behave as before, and owner does NOT
  * bypass an approval requirement.
  */
-import '../../src/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
+import '../../sites/drlurie/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
 import assert from 'node:assert/strict';
 import test from 'node:test';
 

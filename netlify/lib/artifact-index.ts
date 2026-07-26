@@ -5,5 +5,5 @@
  * verify-article-images.ts — byte-untouched by mandate) keep importing
  * '../lib/artifact-index.js' with identical wire behavior. New code imports core directly.
  */
-import '../../src/config/policy-bindings.js'; // register site providers for the legacy path
+import '../../sites/drlurie/config/policy-bindings.js'; // register site providers for the legacy path
 export * from '../../packages/core/server/lib/artifact-index.js';

@@ -1,0 +1,20 @@
+---
+import { getSiteObject } from '~/utils/site-object';
+
+export interface Props {
+  text?: string;
+}
+
+// W4: the default logo text comes from the site object (logo.text). W14 T14.1:
+// the last-resort fallback is the site object's own `name` (then empty) rather
+// than a client literal — this component is fleet law now. An explicit `text`
+// prop still wins.
+const site = getSiteObject();
+const { text = site?.logo.text ?? site?.name ?? '' } = Astro.props;
+---
+
+<span
+  class="self-center ml-2 rtl:ml-0 rtl:mr-2 text-xl md:text-lg font-semibold tracking-[0.22em] text-gray-900 whitespace-nowrap dark:text-white"
+>
+  {text}
+</span>

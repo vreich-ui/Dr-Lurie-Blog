@@ -201,6 +201,17 @@ Do not skip this because the task instructions in front of you look self-contain
 - **Never open a PR unless the task brief explicitly says to.** Commit to the working branch and stop; ask before pushing further or opening a PR if it isn't specified.
 - **Check the task's `mode` before starting any task** (the `mode` column in `docs/cms-architecture/cms-pipeline/queue.tsv`, repeated in each brief's header). `checkpoint` tasks do not start until Wolf has answered the open question in the brief — don't infer an answer and proceed. `human_gate` tasks can be prepared in full, but the task isn't done until the specified human action happens — don't attempt to complete that step yourself. (`notify` marks tasks run interactively and watched rather than by the headless runner.)
 - **Every surface migration task (Phase 2 onward) follows the seed → publish → cutover → verify → cleanup template** and must produce an empty diff from `scripts/build-diff.mjs` (once T2.0 exists) before a cutover is considered done. Don't invent a different verification approach.
+- **Delivery to Wolf is a double-clickable script, not instructions.** Push
+  access does not exist from the sandbox, so work reaches him as a zip. That zip
+  contains a `git format-patch` series under `patches/` and ONE executable
+  `land.command` at its root — he is on a Mac, he saves the zip to Downloads,
+  and he expects to unzip and double-click. The script finds the repo itself,
+  refuses on a dirty tree, applies the series, pushes, and prints one line. No
+  README, no manifest, no path arguments to type: a breakdown of the zip's
+  contents is noise, and anything he has to read before clicking is a defect.
+  Substance — what landed, what needs his hands — goes in the chat message, not
+  in a file. Prefer a patch series over a `git bundle`: bundles reuse the whole
+  repo pack and come out ~150x larger.
 - **One task, one commit, minimal diff.** Don't bundle cleanup, refactoring, or "while I'm in here" changes into a task's commit — flag them separately instead.
 
 ## Known gotchas

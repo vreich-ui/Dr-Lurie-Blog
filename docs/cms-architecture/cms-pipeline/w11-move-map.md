@@ -564,3 +564,84 @@ Astro path, and the tests that hit the singletons). `bio.ts` (core) reads
 first. `src/config/*-policy.ts` + `site-identity.ts` stay site-side per the
 brief. Verified: no `packages/core` module imports `src/`, `netlify/`, or a site
 config.
+
+## W14 T14.1 amendment — the app shell (2026-07-26)
+
+W11 moved the ENGINE into `packages/core` and the DATA into `sites/drlurie`,
+but left the application shell where it started: `src/` at the repo root still
+*was* the app, and exactly one Astro build existed, hardwired to Dr-Lurie.
+T14.1 finishes the job. The map above is unchanged; this is the addendum.
+
+### Moved
+
+| Target | Source | Ownership |
+| --- | --- | --- |
+| `packages/core/app/layouts/**` | `src/layouts/**` | law |
+| `packages/core/app/components/**` | `src/components/**` | law |
+| `packages/core/app/utils/**` | `src/utils/**` | law |
+| `packages/core/app/admin/**` | `src/admin/**` (island entries) | law |
+| `packages/core/app/routes/admin/**` | `src/pages/admin/**` | law — INJECTED per site |
+| `packages/core/app/styles/**` | `src/assets/styles/**` | law (see the alias note) |
+| `packages/core/app/content/collections.ts` | `src/content/config.ts` (shapes) | law |
+| `packages/core/app/site-astro-config.ts` | `astro.config.ts` (machinery) | law |
+| `packages/core/netlify-blobs.d.ts` | `src/netlify-blobs.d.ts` | law |
+| `sites/drlurie/app/pages/**` | `src/pages/**` minus `admin/**` | this client's routes |
+| `sites/drlurie/app/content/config.ts` | `src/content/config.ts` (bases) | this client's data root |
+| `sites/drlurie/app/fixtures/**` | `src/fixtures/**` | this client's demo data |
+| `sites/drlurie/assets/**` | `src/assets/**` minus `styles/` | this client's media |
+| `sites/drlurie/public/**` | `public/**` | this client's static root |
+| `sites/drlurie/config.yaml` | `src/config.yaml` | this client's routing (Wolf B2) |
+| `sites/drlurie/config/{site-identity,site-binding,media-policy,policy-bindings}.ts` | `src/config/**` | this client's bindings |
+| `sites/drlurie/astro.config.ts` | new | this client's build entry |
+
+### Deliberately NOT moved — `src/` keeps exactly this residue
+
+- `src/schema/{schema-v1,workflow-contract,article-content-v1}.ts` and
+  `src/lib/{agents-naming.ts,article-content/to-markdown.ts}` — thin re-export
+  shims over `packages/core`, imported by the OFF-LIMITS legacy stack
+  (`publish-article.ts`, `admin-workflow-lock.ts`, `save-json-blob.ts`) whose
+  files must stay byte-untouched. `mcp/save-json-blob-mcp` also mirrors
+  `src/schema/workflow-contract.ts` by path.
+- `src/data/post/**` — the (empty) legacy markdown shelf. Core's
+  `content-item-index.ts` pins `CONTENT_DIR = 'src/data/post'` and
+  `article-path.ts` generates paths under it; both are the legacy publish
+  path's, and moving the directory would break it.
+- `src/chatkit/` — one unreferenced `.widget` file, retired surface. Dead-path
+  sweep is T14.10.
+
+### Route ownership — why `/admin` is injected and reader routes are not
+
+`packages/core/app/shell-routes.ts` injects the ten `/admin/*` routes into every
+site's build. They render from the object store at runtime, depend on no
+committed page export, and are identical fleet-wide — a per-client copy would
+drift the first time the console changed.
+
+Reader routes stay in `sites/<client>/app/pages/`. Each is a thin loader over a
+NAMED page object and `PageObjectRenderer` THROWS when that object is missing,
+so which routes exist is a property of the client's content, not of the shell.
+A site scaffolded by `create-site` starts with no page objects at all; giving it
+the full Dr-Lurie route set would fail its first build. `[...objectPage].astro`
+is site-owned for a second reason: it enumerates file-owned routes with
+`import.meta.glob('./**/*.astro')`, which only sees its own directory.
+
+### The alias contract
+
+    ~/assets/**  →  sites/<client>/assets/**    (site media)
+    ~/**         →  packages/core/app/**        (the shell)
+    @core/**     →  packages/core/**            (the engine)
+    @site/**     →  sites/<client>/**           (this deployment's values)
+
+`~/assets/**` is split out because that spelling is baked into STORED CONTENT —
+`to-markdown.ts` normalizes committed asset paths to `~/assets/…` and published
+article bodies carry it, so renaming it would mean rewriting published data. The
+shell's own stylesheets moved to `~/styles/` to keep the split clean.
+
+Two ordering rules follow from the toolchain, and both bit once during T14.1:
+
+1. `sites/<client>/astro.config.ts` must import the shell by RELATIVE path.
+   Astro loads the config before Vite's aliases exist.
+2. Shell `.ts` modules that a Node test can reach must use RELATIVE
+   cross-package imports, not `@core/…`. `tsc` emits the specifier verbatim and
+   the test runtime has no alias resolver — the same rule
+   `sites/drlurie/config/policy-bindings.ts` has carried since T11.2. `.astro`
+   files are Vite-only and may alias freely.

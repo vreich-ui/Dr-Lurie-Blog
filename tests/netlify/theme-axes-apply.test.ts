@@ -9,7 +9,7 @@
  * inert on unknown axis keys), and object_contract advertises the axis keys —
  * derived from THEME_AXES, never hand-written.
  */
-import '../../src/config/policy-bindings.js'; // W11 T11.2: register providers for tests hitting active*/getSiteIdentity
+import '../../sites/drlurie/config/policy-bindings.js'; // W11 T11.2: register providers for tests hitting active*/getSiteIdentity
 import assert from 'node:assert/strict';
 import test from 'node:test';
 

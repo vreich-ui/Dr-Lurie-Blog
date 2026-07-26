@@ -12,7 +12,7 @@
  *     least one raw string (no orphan terms, no dangling mappings) — this map
  *     is the input for step 2's frontmatter normalization pass.
  */
-import '../../src/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
+import '../../sites/drlurie/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
 import assert from 'node:assert/strict';
 import test from 'node:test';
 

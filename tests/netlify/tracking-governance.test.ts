@@ -9,7 +9,7 @@
  * server-side write path is Owner-only (the T9.15 boundary this card
  * reuses — re-asserted here against the governance function's contract).
  */
-import '../../src/config/policy-bindings.js'; // W11 T11.2: register providers for tests hitting active*/getSiteIdentity
+import '../../sites/drlurie/config/policy-bindings.js'; // W11 T11.2: register providers for tests hitting active*/getSiteIdentity
 import assert from 'node:assert/strict';
 import test from 'node:test';
 

@@ -8,7 +8,7 @@
  * autonomy overrides (off/auto), the apply_theme Owner gate, edit-and-approve,
  * dry-run-first on creation tools, and stale-run takeover.
  */
-import '../../src/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
+import '../../sites/drlurie/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
 import assert from 'node:assert/strict';
 import test from 'node:test';
 

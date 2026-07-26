@@ -7,8 +7,10 @@
     "jsx": "react-jsx",
     "jsxImportSource": "react",
     "paths": {
-      "~/*": ["src/*"],
-      "@core/*": ["packages/core/*"]
+      "~/assets/*": ["sites/drlurie/assets/*"],
+      "~/*": ["packages/core/app/*"],
+      "@core/*": ["packages/core/*"],
+      "@site/*": ["sites/drlurie/*"]
     }
   },
   "include": [".astro/types.d.ts", "**/*"],

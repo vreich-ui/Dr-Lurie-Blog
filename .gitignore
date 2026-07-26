@@ -1,5 +1,6 @@
 # build output
 dist/
+sites/*/dist/
 .output/
 
 # dependencies

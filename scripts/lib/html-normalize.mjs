@@ -22,7 +22,11 @@
  *      yet astro-compress reorders it by site-wide class frequency, so any new
  *      component shifts it everywhere. The class SET is still content — a
  *      changed/added/removed class fails the diff; only the order is dropped;
- *   5. whitespace — runs collapse to a single space outside <script>/<style>.
+ *   5. whitespace — runs collapse to a single space outside <script>/<style>;
+ *   6. Astro scoped-style ids — `data-astro-cid-<hash>` is derived from the
+ *      component's FILE PATH (the attribute twin of rule 1's chunk hashes) and
+ *      moves in lockstep with the CSS selector that matches it, so relocating a
+ *      component changes it site-wide with zero rendered difference.
  *
  * <script> and <style> contents are treated as opaque (inline scripts on this
  * site legitimately contain `<div …>` template-literal HTML that a naive tag
@@ -58,6 +62,23 @@ export const normalizeCssChunkStems = (html) => html.replace(CSS_CHUNK_STEM_RE, 
 const ASTRO_ISLAND_UID_RE = /(<astro-island\b[^>]*?\buid=)(["']?)[A-Za-z0-9]+\2/g;
 
 export const normalizeIslandUids = (html) => html.replace(ASTRO_ISLAND_UID_RE, (_m, pre, q) => `${pre}${q}UID${q}`);
+
+// Astro's scoped-style ids are the same class of path-derived hash as the
+// island uids above: `data-astro-cid-<hash>` is computed from the COMPONENT'S
+// FILE PATH, stamped on every element that component renders, and matched by
+// the `[data-astro-cid-<hash>]` selectors in the emitted CSS. Moving a
+// component file rewrites the hash on both sides in lockstep — the rendered
+// result is identical to the byte. W14 T14.1 moved the whole shell into
+// `packages/core/app`, which changed the id on 73 of 74 pages and nothing else.
+// Collapse it so a relocation does not read as a content change.
+//
+// Residual risk, stated plainly and identical to the island-uid rule's: if one
+// component were swapped for a DIFFERENT component emitting the same markup and
+// class set but different scoped CSS, this would hide it. Structure, text, and
+// the class set all still fail the diff, so that case is narrow and contrived.
+const ASTRO_SCOPED_ID_RE = /\bdata-astro-cid-[A-Za-z0-9_-]+/g;
+
+export const normalizeScopedStyleIds = (html) => html.replace(ASTRO_SCOPED_ID_RE, 'data-astro-cid-CID');
 
 // Attribute grammar: name, optionally =value (double-, single-, or unquoted).
 const ATTR_RE = /([^\s"'>/=]+)(\s*=\s*("[^"]*"|'[^']*'|[^\s>]+))?/g;
@@ -97,7 +118,9 @@ const SEGMENT_RE = /(<script\b[\s\S]*?<\/script\s*>|<style\b[\s\S]*?<\/style\s*>
 const TOKEN_RE = /(<[^>]*>)|([^<]+)/g;
 
 export const normalizeHtml = (html) => {
-  const withStableAssets = normalizeIslandUids(normalizeCssChunkStems(normalizeAssetHashes(html)));
+  const withStableAssets = normalizeScopedStyleIds(
+    normalizeIslandUids(normalizeCssChunkStems(normalizeAssetHashes(html)))
+  );
   const out = [];
   const segments = withStableAssets.split(SEGMENT_RE);
   for (const segment of segments) {

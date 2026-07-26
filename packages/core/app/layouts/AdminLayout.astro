@@ -1,0 +1,192 @@
+---
+// AdminLayout (T9.3) — static shell + client auth gate for the /admin/*
+// workspace. Same three states as the legacy dashboard (signed-out,
+// signed-in-but-not-admin, signed-in-admin), factored into a reusable layout.
+// The signed-in slot holds a page island (e.g. AdminHome) mounted by the page.
+// The real wall stays server-side in each function (getAdminStateFromEvent).
+import '~/styles/admin-tokens.css';
+import Layout from '~/layouts/PageLayout.astro';
+
+interface Props {
+  title?: string;
+}
+
+const { title = 'Admin workspace' } = Astro.props;
+const metadata = {
+  title,
+  robots: {
+    index: false,
+    follow: false,
+  },
+};
+---
+
+<Layout metadata={metadata}>
+  {
+    /* The /admin/* workspace is a full-viewport app: its own sidebar + topbar
+      are the chrome, and the AdminShell (min-h-screen) plus the chat panels'
+      100vh-anchored composers own the viewport. The public site footer has no
+      place here and, appended after the app, overlapped the chat composer /
+      Send (T9.16 drive finding) — suppress it by passing an empty footer slot.
+      The header stays: it hosts the login modal the signed-out gate opens. */
+  }
+  <Fragment slot="footer"></Fragment>
+  <div class="admin-gate adm-root">
+    <p class="admin-gate-status" data-auth-status aria-live="polite" role="status"></p>
+
+    <!-- Signed out -->
+    <div data-admin-signin-prompt hidden class="admin-gate-panel">
+      <p class="admin-gate-kicker">Admin login required</p>
+      <p class="admin-gate-message">
+        Sign in with your editor account to access the workspace. Public articles remain available without login.
+      </p>
+      <button type="button" class="btn-primary admin-gate-btn" data-admin-open-login>Sign in to editor</button>
+    </div>
+
+    <!-- Signed in, not an admin -->
+    <div data-admin-forbidden-prompt hidden class="admin-gate-panel">
+      <p class="admin-gate-kicker">Access restricted</p>
+      <p class="admin-gate-message">
+        You are signed in, but this email is not listed in ADMIN_EMAILS. Contact the site admin to request access.
+      </p>
+    </div>
+
+    <!-- Signed-in admin: the workspace shell -->
+    <div data-admin-shell-container hidden>
+      <slot />
+    </div>
+  </div>
+</Layout>
+
+<style>
+  .admin-gate {
+    min-height: 60vh;
+  }
+
+  .admin-gate-status:empty {
+    display: none;
+  }
+
+  .admin-gate-status {
+    padding: 1rem;
+    color: var(--adm-text-muted, #5b6470);
+  }
+
+  .admin-gate-panel {
+    max-width: 32rem;
+    margin: 3rem auto;
+    padding: 1.5rem;
+    border: 1px solid var(--adm-border, rgba(120, 120, 120, 0.3));
+    border-radius: 0.75rem;
+  }
+
+  .admin-gate-kicker {
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--adm-text-muted, #5b6470);
+    margin-bottom: 0.25rem;
+  }
+
+  .admin-gate-message {
+    margin: 0.5rem 0 1rem;
+  }
+</style>
+
+<script>
+  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+  // @ts-nocheck
+  // T14.0: register this site's identity/policy providers FIRST. goTrueClient
+  // derives its localStorage keys from getSiteIdentity() at call time (W11
+  // T11.5), which throws — silently, inside the storage helpers' catch blocks —
+  // until the provider is registered. Without this the gate reads "signed out"
+  // for a validly signed-in admin on every cold load.
+  import '@site/config/policy-bindings';
+  import { currentUser, getAccessToken, handleOAuthCallback } from '@core/lib/admin/goTrueClient';
+
+  (() => {
+    const initializeAdminLayoutGate = () => {
+      const pageRoot = document.querySelector('.admin-gate');
+      if (!pageRoot || pageRoot.dataset.adminGateInitialized === 'true') return;
+      pageRoot.dataset.adminGateInitialized = 'true';
+
+      const shellContainer = document.querySelector('[data-admin-shell-container]');
+      const authStatus = document.querySelector('[data-auth-status]');
+      const signinPrompt = document.querySelector('[data-admin-signin-prompt]');
+      const forbiddenPrompt = document.querySelector('[data-admin-forbidden-prompt]');
+
+      const setShellVisible = (visible) => {
+        if (shellContainer) shellContainer.hidden = !visible;
+      };
+
+      const statusMessages = {
+        checking: 'Checking editor access…',
+        'signed-out': '',
+        forbidden: '',
+        error: 'Something went wrong. Please refresh or try again.',
+        'signed-in': '',
+      };
+
+      const setAuthState = (state) => {
+        if (authStatus) authStatus.textContent = statusMessages[state] ?? '';
+        setShellVisible(state === 'signed-in');
+        if (signinPrompt) signinPrompt.hidden = state !== 'signed-out';
+        if (forbiddenPrompt) forbiddenPrompt.hidden = state !== 'forbidden';
+      };
+
+      document.querySelector('[data-admin-open-login]')?.addEventListener('click', () => {
+        window.__cmsLoginModal?.open();
+      });
+
+      const getAdminStateForUser = async () => {
+        const token = await getAccessToken();
+        if (!token) return { authenticated: false, isAdmin: false };
+        const response = await fetch('/.netlify/functions/admin-auth-state', {
+          method: 'GET',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        });
+        return response
+          .json()
+          .catch(() => ({ authenticated: true, isAdmin: false, error: 'Admin access could not be verified.' }));
+      };
+
+      const renderAuthState = async () => {
+        const user = currentUser();
+        if (!user) {
+          setAuthState('signed-out');
+          return;
+        }
+        const adminState = await getAdminStateForUser();
+        setAuthState(adminState.isAdmin ? 'signed-in' : 'forbidden');
+      };
+
+      const initializeIdentityAuth = async () => {
+        setAuthState('checking');
+        try {
+          const oauthUser = await handleOAuthCallback();
+          if (oauthUser) window.__cmsLoginModal?.close();
+          await renderAuthState();
+          document.addEventListener('cms:login', () => {
+            renderAuthState().catch((error) => console.error('Auth refresh failed.', error));
+          });
+          document.addEventListener('cms:logout', () => {
+            renderAuthState().catch((error) => console.error('Auth refresh failed.', error));
+          });
+        } catch (error) {
+          console.error('Identity authentication initialization failed.', error);
+          setAuthState('error');
+        }
+      };
+
+      initializeIdentityAuth();
+    };
+
+    if (!window.__cmsAdminLayoutPageLoadListener) {
+      window.__cmsAdminLayoutPageLoadListener = true;
+      document.addEventListener('astro:page-load', initializeAdminLayoutGate);
+    }
+
+    initializeAdminLayoutGate();
+  })();
+</script>

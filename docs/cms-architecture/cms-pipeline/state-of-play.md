@@ -7,6 +7,209 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-26 (T14.3 PREP — agent side complete; HALTED at the account-authority gate)
+
+`human_gate` mode: prepared in full, not completed. Nothing here is titled
+`T14.3:` — the task is not done. The instantiated checklist is
+`cms-pipeline/T14.3-checklist.md`; it is the only thing Wolf needs to read.
+
+**Prepared (committed):**
+
+- **Per-site Netlify function shims.** Every core server function is a factory
+  over a `SiteBinding`, so the file that instantiates it is per-site by
+  definition — and Netlify resolves `functions.directory` against a project's
+  BASE DIRECTORY, so a project based at `sites/platform` needs its own tree.
+  `create-site` now generates one three-line shim per factory, discovered from
+  `packages/core/server/functions/` at scaffold time rather than from a list
+  that would rot. 32 shims for platform.
+- **The per-site `netlify.toml` now describes a REAL build** — base directory
+  `sites/<client>`, `npx astro build --config sites/<client>/astro.config.ts`,
+  `sites/<client>/dist`, and this site's function tree. It previously said
+  `npm run build` / `dist`, which would have silently built Dr-Lurie into a
+  second project.
+- Scaffold total: 67 files. Dry-run fixture regenerated; both sites build.
+
+**The one discovery Wolf should see before the sitting.**
+`netlify/functions/mcp.ts` is NOT a shim — it is a 4,533-line implementation
+bound to Dr-Lurie with no core factory (same for `save-json-blob.ts`, 2,349
+lines, and `verify-article-images.ts`, 476). So the platform site will deploy,
+serve `/admin`, and serve every governed verb, but **`/mcp` will 404 on it**
+until `mcp.ts` is extracted into core behind `createHandler(siteBinding)` like
+its 32 siblings. That is ordinary agent work, not account authority, and it
+should land BEFORE the sitting so T14.3's step 5 can pass. It is queued at the
+top of the checklist rather than parked. `publish-article.ts` and
+`admin-workflow-lock.ts` stay off-limits and stay Dr-Lurie-bound; nothing in
+W14 needs them on platform.
+
+**A shim-discovery bug found and fixed in the same change:** `coreFunctionNames`
+filtered for `.ts` only, so when the CLI ran from the COMPILED test tree
+(`.tmp/ci-test`, where the same directory holds `.js`) it returned an empty list
+and the scaffold dropped all 32 shims — passing every gate. It now accepts
+`.ts`/`.js`/`.mjs` and dedupes by stem.
+
+**Straggler sweep for the rename is already clean:** the literal repo string
+appears exactly once in the tree, in `CLAUDE.md`, inside the warning that
+explains why it must not appear. Nothing to change before the click.
+
+Gates: both sites build; astro check 0 errors; eslint + prettier clean;
+1699/1699 core tests; 89/89 script tests.
+
+**Wolf's actions:** `T14.3-checklist.md`, steps 1 and 3. Everything else on that
+page is agent work.
+
+## Session 2026-07-26 (T14.2 — platform genesis: `sites/platform` scaffolded, builds, renders)
+
+`sites/platform` (`site_platform`) exists and builds: 12 pages — the ten
+injected `/admin/*` shell routes plus `/` and `/404` from its own starter
+exports. `npx astro build --config sites/platform/astro.config.ts` is green,
+and Dr-Lurie still builds unchanged from the same shell.
+
+**Most of this task was work on `create-site`, not on the platform site.** The
+scaffold as T11.7 left it could not produce a site that builds, and that gap
+would have been discovered again — more expensively — at T14.9, where the
+scaffold IS the thing being timed. Two things were missing:
+
+1. **The build entry.** T14.1 made every site a thin entry over the shell; the
+   scaffold predates it. It now writes `astro.config.ts`, `config.yaml`,
+   `app/content/config.ts`, and the three reader routes a new site can actually
+   serve (`index`, `404`, and the object-page catch-all — the catch-all must be
+   site-owned because it enumerates its sibling routes with `import.meta.glob`).
+2. **The per-site policy bundle.** The scaffold wrote `site-identity.ts` and
+   `site-binding.ts` but not `approval-policy.ts` / `creation-policy.ts` /
+   `media-policy.ts` / `policy-bindings.ts` — Dr-Lurie has all four. Without
+   `policy-bindings.ts` nothing can resolve site identity and the build dies on
+   the first component that asks. Fleet-default values; an operator retunes.
+
+**Bootstrap exports — stated plainly, because this is the one place T14.2
+touches the definition of "converted".** A scaffolded site has an empty store,
+but the shell fails LOUDLY on a missing navigation or page export by design
+("never leaves a surface half-fed"), so a site with nothing committed cannot
+render one page. The scaffold now writes five: `site.json`, `nav_header`,
+`nav_footer`, `page_home`, `page_404`. They are **rendered stubs, not converted
+objects** — no store record backs them, so they fail CLAUDE.md's criteria 2–5.
+Their `__generated.from` says exactly that (`create-site:bootstrap (not
+store-backed — replaced by the seed drive)`), a unit test asserts the marker so
+the label cannot quietly rot, and T14.3's seed drive through the front door
+replaces every one with a genuine derived export. The alternative — shipping a
+scaffold whose first build fails — would have made "cost of a new client"
+unmeasurable at T14.9.
+
+**Decisions recorded (R8):**
+
+1. **Platform keeps the neutral scaffold branding and theme.** The brief says
+   the manual's content is the product, not the styling (T14.5), so nothing was
+   spent on a palette. Brand name "Platform", starter blue/teal tokens.
+2. **`sites/*/dist` added to `.gitignore` and eslint's ignore list.** Only the
+   root `dist` was covered; the first platform build put 1402 lint errors of
+   minified output into the gate.
+3. **The `create-site` dry-run fixture was regenerated, not hand-edited** —
+   `tests/fixtures/create-site-dry-run-acme.mjs` now shows 35 files. The
+   scaffold test was split in two so the bootstrap-export rule has its own name
+   in the output rather than hiding inside a "ships empty" assertion that is no
+   longer true.
+
+**Still Dr-Lurie-shaped, deliberately, and now visible:** `sites/platform` has
+no Netlify project, no env, no store, and no MCP endpoint. That is exactly
+T14.3, which is a human gate.
+
+**Next in queue:** T14.3 (HUMAN GATE — Netlify provisioning + repo rename).
+
+## Session 2026-07-26 (T14.1 — app-shell extraction: one shell in core, per-site build entries)
+
+The build is no longer hardwired to one client. `src/` at the repo root WAS
+the app; the shell now lives in `packages/core/app/` and every
+`sites/<client>/astro.config.ts` is a thin entry over it. Full source→target
+table, the not-moved residue, and the route-ownership rule: the **W14 T14.1
+amendment in `w11-move-map.md`**.
+
+**The seam is four aliases**, resolved per build:
+
+    ~/assets/**  →  sites/<client>/assets/**    ~/**      →  packages/core/app/**
+    @core/**     →  packages/core/**            @site/**  →  sites/<client>/**
+
+`~/assets/**` is split off from `~` because that spelling is baked into
+PUBLISHED CONTENT (`to-markdown.ts` normalizes committed asset paths to
+`~/assets/…`; article bodies carry it), so it cannot be renamed without
+rewriting stored data. The shell's own stylesheets moved to `~/styles/`.
+
+**`/admin` is fleet law and is INJECTED** into every site's build
+(`packages/core/app/shell-routes.ts`, ten routes): it renders from the object
+store, depends on no committed export, and a per-client copy would drift.
+Reader routes stay site-owned — each is a thin loader over a NAMED page object
+and `PageObjectRenderer` throws when that object is missing, so a freshly
+scaffolded site (which has no page objects at all) would fail its first build
+if it inherited Dr-Lurie's route set. That is the shape T14.2 builds on.
+
+**Verification.** `npm run build` and `npx astro build --config
+sites/drlurie/astro.config.ts` both green, 73 pages. `astro check` 0 errors.
+eslint + prettier clean. 1698/1698 core tests, 89/89 script tests. The
+zero-drlurie core lint is GREEN over the newly-arrived shell — which is where
+most of the real work was, see below.
+
+**build-diff vs `origin/main`: 71 of 74 pages byte-identical, 3 differences,
+all intended de-siting, each verified by hand:**
+
+| Difference | Why |
+| --- | --- |
+| `id="dr-lurie-login-modal"` → `id="cms-login-modal"` | internal DOM id; the whole `__drLurie*` / `dr-lurie:*` browser namespace (globals, custom events, controllers) is renamed to `__cms*` / `cms:*`. Client-name literals cannot ship in fleet law. |
+| `Search Dr. Lurié` → `Search Dr. Lurié Skincare` | the search dialog's heading hardcoded the client's name. Now `Search ${site.name}` from the site object, falling back to the logo wordmark, then to plain `Search`. The only VISIBLE copy change in the wave. |
+| minified inline script identifiers | the same namespace rename, as compiled. |
+
+R3 makes byte-identity informational, so these were reviewed rather than
+blocked. Nothing else moved: `0 only-in-base, 0 only-in-head` — the injected
+admin routes emit exactly the route set the file-based ones did.
+
+**build-diff itself gained a normalization rule** (`html-normalize.mjs` rule 6,
+its own commit): `data-astro-cid-<hash>` is Astro's scoped-style id, derived
+from the component's FILE PATH and moving in lockstep with the CSS selector
+that matches it. Relocating the shell changed it on 73 of 74 pages with zero
+rendered difference — the same argument, and the same stated residual risk, as
+the existing island-uid rule. Without it the tool reports the entire wave as
+changed and stops being readable.
+
+**Decisions recorded rather than parked (R8):**
+
+1. **`src/` is not empty and should not be.** It keeps exactly three things,
+   all bound to the OFF-LIMITS legacy publish stack: the `schema/` + `lib/`
+   re-export shims that `publish-article.ts` / `admin-workflow-lock.ts` /
+   `save-json-blob.ts` import (those files must stay byte-untouched, and
+   `mcp/save-json-blob-mcp` mirrors `workflow-contract.ts` by path), and
+   `data/post/**`, whose path is pinned by core's `content-item-index.ts`
+   (`CONTENT_DIR`) and `article-path.ts`. Moving any of it means editing a hard
+   stop. `src/chatkit/` (one unreferenced `.widget`) is dead — T14.10 sweeps it.
+2. **De-siting the shell was the bulk of the task, not the moving.** Beyond the
+   three diffs above: `Logo.astro`'s fallback wordmark, the `sites/drlurie/...`
+   paths inside two error messages, and `object-page-routes.ts`'s hardcoded
+   `src/pages/` prefix strip (now "everything up to the last `/pages/`") were
+   all client-specific values sitting in what is now fleet law.
+3. **`EditMode.astro`'s pre-check no longer names a key.** It read
+   `localStorage['dr-lurie-gotrue-user']` directly so a visitor with no admin
+   session pays nothing. Resolving `<siteSlug>-gotrue-user` properly would pull
+   the site bindings into every visitor's bundle and defeat that. It now matches
+   the `-gotrue-user` SUFFIX: exactly as safe (a false positive costs one wasted
+   chunk fetch, and `bootEditMode` re-verifies server-side), and tenant-free.
+4. **`tsconfig.test.json` excludes `packages/core/app/**`.** Its blanket
+   `packages/core/**/*.ts` include swept in shell modules that resolve `~/…`,
+   `@site/…`, and the `astrowind:config` virtual module — none of which `tsc`
+   can see. Excluding the shell restores the pre-T14.1 arrangement exactly: a
+   shell module a Node test actually imports is still compiled as a reachable
+   dependency. The corollary is a real constraint, now written into the move
+   map: shell `.ts` files must use RELATIVE cross-package imports, never the
+   aliases, because `tsc` emits the specifier verbatim and the test runtime has
+   no resolver for them.
+5. **Dr-Lurie's `outDir` is pinned to the repo-root `dist`.** Every other site
+   defaults to `sites/<client>/dist`. The live Netlify project publishes `dist`
+   and T14.1 must not move the deploy's output path mid-wave; T14.3 repoints the
+   projects and the pin comes off. Root `netlify.toml` and `npm run build` are
+   untouched for the same reason — the root `astro.config.ts` is now a one-line
+   re-export of Dr-Lurie's entry.
+6. **`astro check` only typechecks Dr-Lurie's bindings.** `tsconfig.json` maps
+   `@site/*` to one site because a tsconfig has one root. A second site's
+   bindings are covered by its build, not by `astro check`. Acceptable for V1;
+   revisit if the fleet grows past a handful.
+
+**Next in queue:** T14.2 (platform genesis, AUTO, sonnet/medium).
+
 ## Session 2026-07-26 (T14.0 — admin login FIXED: unregistered site-identity provider in the client auth bundles)
 
 **Root cause — a W11 T11.5 regression, not pre-existing.** Hypothesis (b) of

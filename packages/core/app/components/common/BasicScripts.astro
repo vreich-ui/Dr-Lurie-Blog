@@ -1,0 +1,416 @@
+---
+import { UI } from 'astrowind:config';
+---
+
+<script is:inline define:vars={{ defaultTheme: UI.theme }}>
+  if (window.basic_script) {
+    return;
+  }
+
+  window.basic_script = true;
+
+  function applyTheme(theme) {
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }
+
+  const initTheme = function () {
+    if ((defaultTheme && defaultTheme.endsWith(':only')) || (!localStorage.theme && defaultTheme !== 'system')) {
+      applyTheme(defaultTheme.replace(':only', ''));
+    } else if (
+      localStorage.theme === 'dark' ||
+      (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)
+    ) {
+      applyTheme('dark');
+    } else {
+      applyTheme('light');
+    }
+  };
+  initTheme();
+
+  function attachEvent(selector, event, fn) {
+    const matches = typeof selector === 'string' ? document.querySelectorAll(selector) : selector;
+    if (matches && matches.length) {
+      matches.forEach((elem) => {
+        elem.addEventListener(event, (e) => fn(e, elem), false);
+      });
+    }
+  }
+
+  const initHeaderScrollBehavior = function () {
+    window.__cmsHeaderScrollController?.abort();
+
+    const header = document.querySelector('#header[data-aw-sticky-header]');
+    if (!header) return;
+
+    const controller = new AbortController();
+    window.__cmsHeaderScrollController = controller;
+
+    const minScrollDelta = 6;
+    const hideAfterScrollY = 96;
+    const showAtTopScrollY = 20;
+    let previousScrollPosition = Math.max(window.scrollY, 0);
+    let ticking = false;
+
+    const applyHeaderStylesOnScroll = function () {
+      const currentScrollPosition = Math.max(window.scrollY, 0);
+      const scrollDelta = currentScrollPosition - previousScrollPosition;
+      const menuIsExpanded = header.classList.contains('expanded');
+
+      header.classList.toggle('scroll', currentScrollPosition > 60);
+
+      if (menuIsExpanded || currentScrollPosition <= showAtTopScrollY) {
+        header.classList.remove('aw-hidden');
+        previousScrollPosition = currentScrollPosition;
+      } else if (Math.abs(scrollDelta) >= minScrollDelta) {
+        if (scrollDelta > 0 && currentScrollPosition > hideAfterScrollY) {
+          header.classList.add('aw-hidden');
+        } else if (scrollDelta < 0) {
+          header.classList.remove('aw-hidden');
+        }
+
+        previousScrollPosition = currentScrollPosition;
+      }
+
+      ticking = false;
+    };
+
+    const requestHeaderScrollUpdate = function () {
+      if (ticking) return;
+
+      window.requestAnimationFrame(applyHeaderStylesOnScroll);
+      ticking = true;
+    };
+
+    applyHeaderStylesOnScroll();
+    window.addEventListener('scroll', requestHeaderScrollUpdate, { passive: true, signal: controller.signal });
+  };
+
+  const initBackToTopButton = function () {
+    window.__cmsBackToTopController?.abort();
+
+    const backToTopButton = document.querySelector('[data-back-to-top]');
+    if (!(backToTopButton instanceof HTMLButtonElement)) return;
+
+    const controller = new AbortController();
+    window.__cmsBackToTopController = controller;
+
+    const showAfterScrollY = 360;
+    const minScrollDelta = 8;
+    let previousScrollPosition = Math.max(window.scrollY, 0);
+    let ticking = false;
+    let isReturningToTop = false;
+
+    const setButtonVisibility = function (isVisible) {
+      backToTopButton.classList.toggle('is-visible', isVisible);
+      backToTopButton.setAttribute('aria-hidden', String(!isVisible));
+      backToTopButton.tabIndex = isVisible ? 0 : -1;
+    };
+
+    const updateBackToTopVisibility = function () {
+      const currentScrollPosition = Math.max(window.scrollY, 0);
+      const scrollDelta = currentScrollPosition - previousScrollPosition;
+      const hasScrolledUp = scrollDelta < -minScrollDelta;
+      const hasScrolledDown = scrollDelta > minScrollDelta;
+
+      if (isReturningToTop) {
+        setButtonVisibility(false);
+        if (currentScrollPosition <= showAfterScrollY) isReturningToTop = false;
+        previousScrollPosition = currentScrollPosition;
+        ticking = false;
+        return;
+      }
+
+      if (currentScrollPosition <= showAfterScrollY) {
+        setButtonVisibility(false);
+      } else if (hasScrolledUp) {
+        setButtonVisibility(true);
+      } else if (hasScrolledDown) {
+        setButtonVisibility(false);
+      }
+
+      if (Math.abs(scrollDelta) >= minScrollDelta || currentScrollPosition <= showAfterScrollY) {
+        previousScrollPosition = currentScrollPosition;
+      }
+
+      ticking = false;
+    };
+
+    const requestBackToTopUpdate = function () {
+      if (ticking) return;
+
+      window.requestAnimationFrame(updateBackToTopVisibility);
+      ticking = true;
+    };
+
+    backToTopButton.addEventListener(
+      'click',
+      () => {
+        isReturningToTop = true;
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        setButtonVisibility(false);
+      },
+      { signal: controller.signal }
+    );
+
+    setButtonVisibility(false);
+    window.addEventListener('scroll', requestBackToTopUpdate, { passive: true, signal: controller.signal });
+  };
+
+  function resetMobileDropdown(dropdown) {
+    dropdown.classList.remove('mobile-open');
+    dropdown.querySelector('[data-mobile-accordion-trigger]')?.setAttribute('aria-expanded', 'false');
+
+    const authTrigger = dropdown.querySelector('[data-auth-trigger]');
+    const authMenu = dropdown.querySelector('[data-auth-menu]');
+
+    authTrigger?.setAttribute('aria-expanded', 'false');
+    if (authMenu) authMenu.hidden = true;
+    dropdown.querySelector('[data-auth-mobile-icon-closed]')?.classList.remove('hidden');
+    dropdown.querySelector('[data-auth-mobile-icon-open]')?.classList.add('hidden');
+  }
+
+  function resetMobileAccordions() {
+    document.querySelectorAll('#header .dropdown.mobile-open').forEach(resetMobileDropdown);
+  }
+
+  function closeMobileMenu() {
+    document.querySelector('[data-aw-toggle-menu]')?.classList.remove('expanded');
+    document.body.classList.remove('overflow-hidden');
+    document.getElementById('header')?.classList.remove('h-screen');
+    document.getElementById('header')?.classList.remove('expanded');
+    document.getElementById('header')?.classList.remove('bg-page');
+    document.querySelector('#header nav')?.classList.add('hidden');
+    resetMobileAccordions();
+  }
+
+  function toggleMobileAccordion(trigger) {
+    const dropdown = trigger.closest('.dropdown');
+    if (!dropdown) return;
+
+    const willOpen = !dropdown.classList.contains('mobile-open');
+
+    document.querySelectorAll('#header .dropdown.mobile-open').forEach((item) => {
+      if (item === dropdown) return;
+
+      resetMobileDropdown(item);
+    });
+
+    dropdown.classList.toggle('mobile-open', willOpen);
+    trigger.setAttribute('aria-expanded', String(willOpen));
+  }
+
+  const onLoad = function () {
+    attachEvent('#header nav', 'click', function (event) {
+      const target = event.target instanceof Element ? event.target : undefined;
+      const accordionTrigger = target?.closest('[data-mobile-accordion-trigger]');
+
+      if (accordionTrigger && window.matchMedia('(max-width: 767px)').matches) {
+        event.preventDefault();
+        event.stopPropagation();
+        toggleMobileAccordion(accordionTrigger);
+        return;
+      }
+
+      if (target?.closest('[data-mobile-menu-utilities], [data-mobile-auth-menu]')) {
+        if (target.closest('a[href]')) closeMobileMenu();
+        return;
+      }
+
+      closeMobileMenu();
+    });
+
+    attachEvent('[data-aw-toggle-menu]', 'click', function (_, elem) {
+      elem.classList.toggle('expanded');
+      document.body.classList.toggle('overflow-hidden');
+      document.getElementById('header')?.classList.toggle('h-screen');
+      document.getElementById('header')?.classList.toggle('expanded');
+      document.getElementById('header')?.classList.toggle('bg-page');
+      document.querySelector('#header nav')?.classList.toggle('hidden');
+
+      if (!elem.classList.contains('expanded')) resetMobileAccordions();
+    });
+
+    attachEvent('[data-aw-toggle-color-scheme]', 'click', function () {
+      if (defaultTheme.endsWith(':only')) {
+        return;
+      }
+
+      Observer.removeAnimationDelay();
+
+      document.documentElement.classList.toggle('dark');
+      localStorage.theme = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+    });
+
+    attachEvent('[data-aw-social-share]', 'click', function (_, elem) {
+      const network = elem.getAttribute('data-aw-social-share');
+      const url = encodeURIComponent(elem.getAttribute('data-aw-url'));
+      const text = encodeURIComponent(elem.getAttribute('data-aw-text'));
+
+      let href;
+      switch (network) {
+        case 'facebook':
+          href = `https://www.facebook.com/sharer.php?u=${url}`;
+          break;
+        case 'twitter':
+          href = `https://twitter.com/intent/tweet?url=${url}&text=${text}`;
+          break;
+        case 'linkedin':
+          href = `https://www.linkedin.com/shareArticle?mini=true&url=${url}&title=${text}`;
+          break;
+        case 'whatsapp':
+          href = `https://wa.me/?text=${text}%20${url}`;
+          break;
+        case 'mail':
+          href = `mailto:?subject=%22${text}%22&body=${text}%20${url}`;
+          break;
+
+        default:
+          return;
+      }
+
+      const newlink = document.createElement('a');
+      newlink.target = '_blank';
+      newlink.href = href;
+      newlink.click();
+    });
+
+    const screenSize = window.matchMedia('(max-width: 767px)');
+    screenSize.addEventListener('change', closeMobileMenu);
+
+    attachEvent([document], 'keydown', function (event) {
+      if (event.key === 'Escape' && document.getElementById('header')?.classList.contains('expanded')) {
+        closeMobileMenu();
+      }
+    });
+
+    initHeaderScrollBehavior();
+    initBackToTopButton();
+  };
+  const onPageShow = function () {
+    document.documentElement.classList.add('motion-safe:scroll-smooth');
+    closeMobileMenu();
+    document.getElementById('header')?.classList.remove('aw-hidden');
+  };
+
+  window.onload = onLoad;
+  window.onpageshow = onPageShow;
+
+  document.addEventListener('astro:after-swap', () => {
+    initTheme();
+    onPageShow();
+    onLoad();
+  });
+</script>
+
+<script is:inline>
+  /* Inspired by: https://github.com/heidkaemper/tailwindcss-intersect */
+  const Observer = {
+    observer: null,
+    delayBetweenAnimations: 100,
+    animationCounter: 0,
+    elements: null,
+
+    start() {
+      const selectors = [
+        '[class*=" intersect:"]',
+        '[class*=":intersect:"]',
+        '[class^="intersect:"]',
+        '[class="intersect"]',
+        '[class*=" intersect "]',
+        '[class^="intersect "]',
+        '[class$=" intersect"]',
+      ];
+
+      this.elements = Array.from(document.querySelectorAll(selectors.join(',')));
+
+      const getThreshold = (element) => {
+        if (element.classList.contains('intersect-full')) return 0.99;
+        if (element.classList.contains('intersect-half')) return 0.5;
+        if (element.classList.contains('intersect-quarter')) return 0.25;
+        return 0;
+      };
+
+      this.elements.forEach((el) => {
+        el.setAttribute('no-intersect', '');
+        el._intersectionThreshold = getThreshold(el);
+      });
+
+      const callback = (entries) => {
+        entries.forEach((entry) => {
+          requestAnimationFrame(() => {
+            const target = entry.target;
+            const intersectionRatio = entry.intersectionRatio;
+            const threshold = target._intersectionThreshold;
+
+            if (target.classList.contains('intersect-no-queue')) {
+              if (entry.isIntersecting) {
+                target.removeAttribute('no-intersect');
+                if (target.classList.contains('intersect-once')) {
+                  this.observer.unobserve(target);
+                }
+              } else {
+                target.setAttribute('no-intersect', '');
+              }
+              return;
+            }
+
+            if (intersectionRatio >= threshold) {
+              if (!target.hasAttribute('data-animated')) {
+                target.removeAttribute('no-intersect');
+                target.setAttribute('data-animated', 'true');
+
+                const delay = this.animationCounter * this.delayBetweenAnimations;
+                this.animationCounter++;
+
+                target.style.transitionDelay = `${delay}ms`;
+                target.style.animationDelay = `${delay}ms`;
+
+                if (target.classList.contains('intersect-once')) {
+                  this.observer.unobserve(target);
+                }
+              }
+            } else {
+              target.setAttribute('no-intersect', '');
+              target.removeAttribute('data-animated');
+              target.style.transitionDelay = '';
+              target.style.animationDelay = '';
+
+              this.animationCounter = 0;
+            }
+          });
+        });
+      };
+
+      this.observer = new IntersectionObserver(callback.bind(this), { threshold: [0, 0.25, 0.5, 0.99] });
+
+      this.elements.forEach((el) => {
+        this.observer.observe(el);
+      });
+    },
+
+    /* 
+      REF: #643;
+      We need to remove the delay to fix flickering/delay
+      when toggling the theme. Observer only removes them
+      after data-animated is gone (out of view).
+    */
+    removeAnimationDelay() {
+      this.elements.forEach((el) => {
+        if (el.getAttribute('data-animated') === 'true') {
+          el.style.transitionDelay = '';
+          el.style.animationDelay = '';
+        }
+      });
+    },
+  };
+
+  Observer.start();
+
+  document.addEventListener('astro:after-swap', () => {
+    Observer.start();
+  });
+</script>

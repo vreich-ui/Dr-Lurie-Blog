@@ -174,7 +174,9 @@ jobs:
       - run: npm ci
       - name: build-diff (${{ matrix.site }}) — base vs head, review artifact only
         run: |
-          node scripts/build-diff.mjs "${{ github.event.pull_request.base.sha }}" "${{ github.event.pull_request.head.sha }}" \
+          node scripts/build-diff.mjs \
+            --base "${{ github.event.pull_request.base.sha }}" \
+            --head "${{ github.event.pull_request.head.sha }}" \
             --site "sites/${{ matrix.site }}" > "build-diff-${{ matrix.site }}.txt" 2>&1 || true
       - uses: actions/upload-artifact@v4
         with:
