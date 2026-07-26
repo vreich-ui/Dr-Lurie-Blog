@@ -359,22 +359,29 @@ export { siteIdentityConfig };
 export { siteBinding } from './config/site-binding.js';
 `;
 
-const netlifyTomlTemplate = () => `# T11.7 scaffold — per-site Netlify config template. The redirects here MUST
-# equal this client's site.config.ts \`redirects\` (the drift-guard discipline
-# root netlify.toml/sites/drlurie's site.config.ts already share). This file
-# is not read by any live build today (there is one Netlify build, Dr-Lurie's
-# — see the site.config.ts scaffold note); it ships as the plan for this
-# client's own Netlify site once T11.11-style wiring points a real deploy at
-# this tree.
+const netlifyTomlTemplate = (ids) => `# Per-site Netlify config. The redirects here MUST equal this client's
+# site.config.ts \`redirects\` (the drift-guard discipline root netlify.toml and
+# sites/drlurie/site.config.ts already share).
+#
+# W14 T14.2: this file describes a REAL build. Point the Netlify project's base
+# directory at sites/${ids.clientSlug} so Netlify reads this file instead of the
+# repo-root one, and it builds this site's entry into this site's dist with this
+# site's function shims. Creating the project itself is T14.3 (account
+# authority) — see docs/cms-architecture/site-provisioning-runbook.md.
 
 [build]
-  publish = "dist"
-  command = "npm run build"
+  # Netlify resolves these against this project's BASE DIRECTORY, which must be
+  # set to this site's directory (Site settings -> Build & deploy -> Base
+  # directory). The build command runs from the repo root because the monorepo's
+  # node_modules and the shared shell live there.
+  base = "/"
+  publish = "sites/${ids.clientSlug}/dist"
+  command = "npx astro build --config sites/${ids.clientSlug}/astro.config.ts"
 [build.environment]
   NODE_VERSION = "20"
 
 [functions]
-  directory = "netlify/functions"
+  directory = "sites/${ids.clientSlug}/netlify/functions"
   node_bundler = "esbuild"
 
 [[redirects]]
@@ -1089,6 +1096,49 @@ const bootstrap404PageExport = (brandName) =>
     ],
   });
 
+// ─── per-site Netlify function shims (W14 T14.3 prep) ────────────────────────
+//
+// Every core server function is a FACTORY over a SiteBinding; the thin file
+// that instantiates it is per-site by definition. Netlify resolves
+// `functions.directory` relative to a project's base directory, so a site whose
+// Netlify project has base `sites/<client>` needs its own
+// `netlify/functions/` tree — one three-line shim per factory, generated from
+// whatever factories `packages/core/server/functions/` actually exports at
+// scaffold time rather than from a list that would silently rot.
+const functionShimTemplate = (ids, fnName) => `/**
+ * Site shim for '${ids.siteId}': instantiates the core \`${fnName}\` handler with
+ * this site's SiteBinding. The implementation is fleet law in
+ * packages/core/server/functions/${fnName}.ts; this file is the per-site wire.
+ */
+import '../../config/policy-bindings.js';
+import { createHandler } from '../../../../packages/core/server/functions/${fnName}.js';
+import { siteBinding } from '../../config/site-binding.js';
+
+export * from '../../../../packages/core/server/functions/${fnName}.js';
+
+export const handler = createHandler(siteBinding);
+`;
+
+/**
+ * Factory names discovered from packages/core/server/functions/.
+ *
+ * Accepts .ts OR .js and dedupes by stem: this module also runs from the
+ * COMPILED test tree (.tmp/ci-test), where the same directory holds .js. A
+ * .ts-only filter silently returned an empty list there and the scaffold
+ * dropped all 32 shims without failing anything.
+ */
+export const coreFunctionNames = () => {
+  const dir = path.join(repoRoot, 'packages', 'core', 'server', 'functions');
+  const stems = new Set();
+  for (const name of fs.readdirSync(dir)) {
+    const match = /^(.*)\.(ts|js|mjs)$/.exec(name);
+    if (!match) continue;
+    if (/\.(test|d)$/.test(match[1])) continue;
+    stems.add(match[1]);
+  }
+  return [...stems].sort();
+};
+
 // ─── plan builder ────────────────────────────────────────────────────────────
 
 export const buildPlan = (opts) => {
@@ -1106,7 +1156,7 @@ export const buildPlan = (opts) => {
     { path: `${dir}/config/media-policy.ts`, content: mediaPolicyTemplate() },
     { path: `${dir}/config/policy-bindings.ts`, content: policyBindingsTemplate(ids) },
     { path: `${dir}/site.config.ts`, content: siteConfigTemplate(ids, brandName, canonicalHost) },
-    { path: `${dir}/netlify.toml`, content: netlifyTomlTemplate() },
+    { path: `${dir}/netlify.toml`, content: netlifyTomlTemplate(ids) },
     { path: `${dir}/package.json`, content: packageJsonTemplate(ids) },
     { path: `${dir}/seeds/site-seed-data.mjs`, content: siteSeedTemplate(ids, brandName, canonicalHost) },
     { path: `${dir}/seeds/navigation-seed-data.mjs`, content: navigationSeedTemplate(ids, brandName) },
@@ -1131,6 +1181,10 @@ export const buildPlan = (opts) => {
       ),
     },
     { path: `${dir}/app/pages/[...objectPage].astro`, content: objectPageCatchAllTemplate() },
+    ...coreFunctionNames().map((fnName) => ({
+      path: `${dir}/netlify/functions/${fnName}.ts`,
+      content: functionShimTemplate(ids, fnName),
+    })),
     { path: `${dir}/public/.gitkeep`, content: '' },
     { path: `${dir}/assets/images/.gitkeep`, content: '' },
 

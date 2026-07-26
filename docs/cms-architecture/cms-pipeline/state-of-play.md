@@ -7,6 +7,56 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-26 (T14.3 PREP — agent side complete; HALTED at the account-authority gate)
+
+`human_gate` mode: prepared in full, not completed. Nothing here is titled
+`T14.3:` — the task is not done. The instantiated checklist is
+`cms-pipeline/T14.3-checklist.md`; it is the only thing Wolf needs to read.
+
+**Prepared (committed):**
+
+- **Per-site Netlify function shims.** Every core server function is a factory
+  over a `SiteBinding`, so the file that instantiates it is per-site by
+  definition — and Netlify resolves `functions.directory` against a project's
+  BASE DIRECTORY, so a project based at `sites/platform` needs its own tree.
+  `create-site` now generates one three-line shim per factory, discovered from
+  `packages/core/server/functions/` at scaffold time rather than from a list
+  that would rot. 32 shims for platform.
+- **The per-site `netlify.toml` now describes a REAL build** — base directory
+  `sites/<client>`, `npx astro build --config sites/<client>/astro.config.ts`,
+  `sites/<client>/dist`, and this site's function tree. It previously said
+  `npm run build` / `dist`, which would have silently built Dr-Lurie into a
+  second project.
+- Scaffold total: 67 files. Dry-run fixture regenerated; both sites build.
+
+**The one discovery Wolf should see before the sitting.**
+`netlify/functions/mcp.ts` is NOT a shim — it is a 4,533-line implementation
+bound to Dr-Lurie with no core factory (same for `save-json-blob.ts`, 2,349
+lines, and `verify-article-images.ts`, 476). So the platform site will deploy,
+serve `/admin`, and serve every governed verb, but **`/mcp` will 404 on it**
+until `mcp.ts` is extracted into core behind `createHandler(siteBinding)` like
+its 32 siblings. That is ordinary agent work, not account authority, and it
+should land BEFORE the sitting so T14.3's step 5 can pass. It is queued at the
+top of the checklist rather than parked. `publish-article.ts` and
+`admin-workflow-lock.ts` stay off-limits and stay Dr-Lurie-bound; nothing in
+W14 needs them on platform.
+
+**A shim-discovery bug found and fixed in the same change:** `coreFunctionNames`
+filtered for `.ts` only, so when the CLI ran from the COMPILED test tree
+(`.tmp/ci-test`, where the same directory holds `.js`) it returned an empty list
+and the scaffold dropped all 32 shims — passing every gate. It now accepts
+`.ts`/`.js`/`.mjs` and dedupes by stem.
+
+**Straggler sweep for the rename is already clean:** the literal repo string
+appears exactly once in the tree, in `CLAUDE.md`, inside the warning that
+explains why it must not appear. Nothing to change before the click.
+
+Gates: both sites build; astro check 0 errors; eslint + prettier clean;
+1699/1699 core tests; 89/89 script tests.
+
+**Wolf's actions:** `T14.3-checklist.md`, steps 1 and 3. Everything else on that
+page is agent work.
+
 ## Session 2026-07-26 (T14.2 — platform genesis: `sites/platform` scaffolded, builds, renders)
 
 `sites/platform` (`site_platform`) exists and builds: 12 pages — the ten

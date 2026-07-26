@@ -16,7 +16,7 @@ create-site plan for 'acme' (Acme)
   theme id:       thm_acme_default
   canonical host: https://acme.netlify.app
 
-Files to create under sites/acme/ (35):
+Files to create under sites/acme/ (67):
   + sites/acme/config/site-identity.ts
   + sites/acme/config/site-binding.ts
   + sites/acme/config/approval-policy.ts
@@ -45,6 +45,38 @@ Files to create under sites/acme/ (35):
   + sites/acme/app/pages/index.astro
   + sites/acme/app/pages/404.astro
   + sites/acme/app/pages/[...objectPage].astro
+  + sites/acme/netlify/functions/admin-agent-chat.ts
+  + sites/acme/netlify/functions/admin-agent-chat-run-background.ts
+  + sites/acme/netlify/functions/admin-artifact-upload-intent.ts
+  + sites/acme/netlify/functions/admin-ask-ai-object.ts
+  + sites/acme/netlify/functions/admin-audit.ts
+  + sites/acme/netlify/functions/admin-auth-state.ts
+  + sites/acme/netlify/functions/admin-blob-manager.ts
+  + sites/acme/netlify/functions/admin-blob-store-diagnostics.ts
+  + sites/acme/netlify/functions/admin-get-blob-image.ts
+  + sites/acme/netlify/functions/admin-get-blob-pdf.ts
+  + sites/acme/netlify/functions/admin-governance.ts
+  + sites/acme/netlify/functions/admin-list-blob-images.ts
+  + sites/acme/netlify/functions/admin-object.ts
+  + sites/acme/netlify/functions/admin-release.ts
+  + sites/acme/netlify/functions/admin-taxonomy.ts
+  + sites/acme/netlify/functions/admin-users.ts
+  + sites/acme/netlify/functions/artifact-upload.ts
+  + sites/acme/netlify/functions/checkout-session-status.ts
+  + sites/acme/netlify/functions/claim-free.ts
+  + sites/acme/netlify/functions/create-checkout-session.ts
+  + sites/acme/netlify/functions/deploy-status.ts
+  + sites/acme/netlify/functions/get-public-image.ts
+  + sites/acme/netlify/functions/get-public-pdf.ts
+  + sites/acme/netlify/functions/get-purchase.ts
+  + sites/acme/netlify/functions/mcp-keepalive.ts
+  + sites/acme/netlify/functions/object-store.ts
+  + sites/acme/netlify/functions/run-publisher-agent.ts
+  + sites/acme/netlify/functions/save-artifact.ts
+  + sites/acme/netlify/functions/save-commerce-event.ts
+  + sites/acme/netlify/functions/save-opt-in.ts
+  + sites/acme/netlify/functions/stripe-webhook.ts
+  + sites/acme/netlify/functions/track-ingest.ts
   + sites/acme/public/.gitkeep
   + sites/acme/assets/images/.gitkeep
   + sites/acme/data/site/site.json
