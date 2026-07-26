@@ -1,0 +1,26 @@
+{
+  "__generated": {
+    "at": "2026-07-26T17:52:02.168Z",
+    "from": "objects/page/by-id/page_manual_roles.json",
+    "record_version": 2
+  },
+  "pageType": "system",
+  "route": "/manual/roles",
+  "sections": [
+    {
+      "data": {
+        "body": "<h2>Principals</h2><ul><li><strong>Humans</strong> sign in through Identity; Owner and Admin are resolved server-side, and owner-only surfaces 403 regardless of what the UI shows.</li><li><strong>Agents</strong> authenticate to <strong>/mcp</strong> with the site’s key or their own per-agent key; per-agent keys make attribution verified instead of self-declared.</li></ul><h2>Policy</h2><ul><li><strong>Creation policy</strong> — who may mint objects of each type. Singletons such as the tracking registry are seed-minted only.</li><li><strong>Approval policy</strong> — which types publish autonomously and which require a human. Commerce requires approval by default: proposing a price is fine, a price going live unseen is not.</li><li>Both are committed per-site config: reviewable, versioned, and identical in kind across the fleet while differing in values.</li></ul>"
+      },
+      "id": "s_roles",
+      "type": "prose"
+    }
+  ],
+  "seo": {
+    "description": "Principals, keys, and policy: who may do what.",
+    "robots": {
+      "follow": false,
+      "index": false
+    }
+  },
+  "title": "Manual — roles and access"
+}
