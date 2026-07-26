@@ -1146,10 +1146,40 @@ configureMcp({
 export * from '../../../../packages/core/server/functions/mcp.js';
 `;
 
-const functionShimTemplate = (ids, fnName) => `/**
+/**
+ * A core function is Netlify **Functions-2.0** if it declares `export const
+ * config` (a `Request`→`Response` handler reached at `config.path`); otherwise
+ * it is v1 (`(event, context) => { statusCode, body }`). The export NAME the
+ * runtime honours differs by generation: v2 wants `export default`, v1 wants
+ * `export const handler`. Emit the wrong one and the function fails to
+ * initialise — Netlify returns "invalid status code returned from lambda: 0"
+ * (a 502 on every request, GET included). This is read from the core source,
+ * not a hand-list, so a future v2 function is wired right the day it lands.
+ * (T14.7 fix, W14 finding F2: the artifact-upload shim shipped as v1 `handler`
+ * for a v2 function and 502'd at init on the platform site.)
+ */
+const coreFunctionIsV2 = (fnName) => {
+  const dir = path.join(repoRoot, 'packages', 'core', 'server', 'functions');
+  for (const ext of ['ts', 'js', 'mjs']) {
+    const file = path.join(dir, `${fnName}.${ext}`);
+    if (fs.existsSync(file)) {
+      return /^\s*export\s+const\s+config\s*[:=]/m.test(fs.readFileSync(file, 'utf8'));
+    }
+  }
+  return false;
+};
+
+const functionShimTemplate = (ids, fnName) => {
+  const isV2 = coreFunctionIsV2(fnName);
+  const handlerExport = isV2
+    ? 'export default createHandler(siteBinding);'
+    : 'export const handler = createHandler(siteBinding);';
+  return `/**
  * Site shim for '${ids.siteId}': instantiates the core \`${fnName}\` handler with
  * this site's SiteBinding. The implementation is fleet law in
  * packages/core/server/functions/${fnName}.ts; this file is the per-site wire.
+ *
+ * ${isV2 ? 'Functions-2.0 (config.path): the handler is the DEFAULT export.' : 'Functions-1.0: the handler is a named `handler` export.'}
  */
 import '../../config/policy-bindings.js';
 import { createHandler } from '../../../../packages/core/server/functions/${fnName}.js';
@@ -1157,8 +1187,9 @@ import { siteBinding } from '../../config/site-binding.js';
 
 export * from '../../../../packages/core/server/functions/${fnName}.js';
 
-export const handler = createHandler(siteBinding);
+${handlerExport}
 `;
+};
 
 /**
  * Factory names discovered from packages/core/server/functions/.

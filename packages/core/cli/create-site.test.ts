@@ -247,6 +247,60 @@ test('scaffolded seed bodies parse against the real object schemas, and ids stay
   }
 });
 
+test('function shims use the export form the core function generation requires (W14 F2 regression)', () => {
+  // A Functions-2.0 core function (declares `export const config`) is reached
+  // at config.path with a Request→Response handler and MUST be exported as the
+  // DEFAULT export; a v1 function MUST be exported as a named `handler`. The
+  // artifact-upload shim shipped as v1 `handler` for a v2 function and 502'd at
+  // init on the platform site. This pins the generator to read the core source.
+  const plan = buildPlan({ name: 'acme' });
+  const coreDir = path.join(fileURLToPath(new URL('.', import.meta.url)), '..', 'server', 'functions');
+  const shim = (name) => plan.files.find((f) => f.path === `sites/acme/netlify/functions/${name}.ts`);
+
+  // artifact-upload is v2 (export const config) → default export, never `export const handler`.
+  const au = shim('artifact-upload');
+  assert.ok(au, 'artifact-upload shim should be scaffolded');
+  assert.match(au.content, /^export default createHandler\(siteBinding\);$/m, 'v2 fn must use export default');
+  assert.doesNotMatch(au.content, /export const handler\s*=/, 'v2 fn must NOT use export const handler');
+
+  // object-store is v1 → named handler export, never a default export.
+  const os = shim('object-store');
+  assert.ok(os, 'object-store shim should be scaffolded');
+  assert.match(
+    os.content,
+    /^export const handler = createHandler\(siteBinding\);$/m,
+    'v1 fn must use export const handler'
+  );
+  assert.doesNotMatch(os.content, /export default createHandler/, 'v1 fn must NOT default-export the handler');
+
+  // The rule is derived from the core source, not a hand-list: every generated
+  // shim (except mcp, whose composite shim re-exports its own handler) matches
+  // its core function's generation.
+  for (const file of plan.files) {
+    const m = /^sites\/acme\/netlify\/functions\/(.+)\.ts$/.exec(file.path);
+    if (!m || m[1] === 'mcp') continue;
+    const fnName = m[1];
+    let src = '';
+    for (const ext of ['ts', 'js', 'mjs']) {
+      const p = path.join(coreDir, `${fnName}.${ext}`);
+      if (fs.existsSync(p)) {
+        src = fs.readFileSync(p, 'utf8');
+        break;
+      }
+    }
+    const coreIsV2 = /^\s*export\s+const\s+config\s*[:=]/m.test(src);
+    if (coreIsV2) {
+      assert.match(file.content, /^export default createHandler\(siteBinding\);$/m, `${fnName} is v2 → default export`);
+    } else {
+      assert.match(
+        file.content,
+        /^export const handler = createHandler\(siteBinding\);$/m,
+        `${fnName} is v1 → named handler`
+      );
+    }
+  }
+});
+
 test('re-running against an existing sites/<client>/ is a no-op plan-wise (the caller checks existence before writeFiles)', () => {
   // buildPlan itself is pure/idempotent — same input, same output — the
   // existence check that makes re-runs a no-op lives in main()'s CLI flow
