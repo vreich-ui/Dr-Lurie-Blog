@@ -1,0 +1,15 @@
+{
+  "__generated": {
+    "at": "2026-07-26T16:59:50.213Z",
+    "from": "objects/taxonomy/by-id/tax_platform.json",
+    "record_version": 2
+  },
+  "kinds": {
+    "category": {
+      "terms": []
+    },
+    "tag": {
+      "terms": []
+    }
+  }
+}
