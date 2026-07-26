@@ -7,6 +7,53 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-26 (T14.4 in progress — two live MCP endpoints on one core; two real defects found)
+
+**The core architectural claim is demonstrated.** `kugel-platform` serves its
+own `/mcp`, auth-gated, identifying as `Platform_MCP`; `drluriescience` serves
+its own, unchanged. Two isolated tenants, one canonical engine, separate keys
+and separate stores. `object_inventory` on platform returns cleanly from its own
+blob stores — which also settles the earlier worry: the pre-flight blob probe's
+401 was a token-scope artifact, and a site's own functions provision their
+stores on first use exactly as predicted.
+
+**Defect 1 — found and FIXED (committed).** The T14.3 decoupling injected the
+legacy article HANDLERS per site but left the tool DECLARATIONS static, so
+platform advertised all twelve legacy `save_json_blob_*` / `verify_article_images`
+tools and would have thrown on any call. Listing a tool an agent cannot call is
+worse than omitting it — the agent plans around it and fails mid-run.
+`tools/list` now reports `visibleToolDefinitions()`: unchanged for a site WITH
+the legacy path, legacy-free everywhere else. Guard test pins both halves and
+refuses to let the omitted set grow past the legacy surface. This is exactly
+what the live proof is for; no offline test would have caught it.
+
+**Defect 2 — found, NOT fixed, and it blocks the seed drive.** A brand-new
+site cannot be seeded through the front door:
+
+- every non-`site` `object_create` returns an opaque **500** against an empty
+  store (`navigation`, `page` — with or without `requested_id`/`agent_name`),
+  while `site` reaches validation normally. The type-specific difference points
+  at owning-site resolution running before the site record exists;
+- and `site` itself fails 422 on **reference integrity**:
+  `defaultNavigation.header/footer` must resolve to existing navigation objects.
+
+So site needs nav, nav needs site. **Genesis is circular**, and no committed
+driver breaks the cycle. Dr-Lurie predates the current validation and never hit
+it. This is squarely T14.9's "cost of a new client" — a client cannot actually
+be born through the documented path today — and it is the next thing to fix.
+The likely shape: reference integrity is a PUBLISH-time criterion, not a
+CREATE-time one, so a site can be created with dangling default-nav refs and
+refuse to publish until they resolve. That is a validation-engine decision and
+wants its own task, not a patch tacked onto this one.
+
+The opaque 500 is a second-order problem worth fixing alongside: the object
+verb path swallowed the real cause and returned "Object request could not be
+processed", which cost the whole debugging loop.
+
+**Proofs 2–4 of T14.4 (fleet CI over two sites, Dr-Lurie no-unintended-change,
+recorded refs) are unblocked and not yet run** — they do not depend on the seed
+drive.
+
 ## Session 2026-07-26 (mcp.ts decoupled — the MCP server is fleet law; platform gets its own endpoint)
 
 Wolf sanctioned the bounded exception. The server now lives at
