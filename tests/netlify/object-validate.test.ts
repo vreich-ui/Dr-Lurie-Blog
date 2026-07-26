@@ -216,6 +216,33 @@ test('check4 reader safety REJECTION: a private marker leaked into a renderable 
   assert.equal(statusOf(checkReaderSafety(body), 'reader_safety'), 'missing');
 });
 
+test('check4 reader safety (F4): "strategy"/"private" as ordinary PAGE prose passes', () => {
+  // Outside the content_item annotation model these are just English. A page
+  // documenting the object model, or a marketing "Our Strategy" page, must
+  // publish. (W14 finding F4 — the content_item manual page 422'd on this.)
+  const body = validPageBody();
+  body.sections[1].data.body =
+    '<h2>Our Strategy</h2><p>Every block pairs its public body with private editorial strategy notes the reader never sees.</p>';
+  assert.equal(statusOf(checkReaderSafety(body, 'page'), 'reader_safety'), 'complete');
+});
+
+test('check4 reader safety (F4): a camelCase marker in PAGE prose is still rejected', () => {
+  // The natural-language relaxation is scoped to `private`/`strategy` only —
+  // the unambiguous generation-metadata field names stay forbidden everywhere.
+  const body = validPageBody();
+  body.sections[1].data.body = '<p>sourcePromptId leaked here</p>';
+  assert.equal(statusOf(checkReaderSafety(body, 'page'), 'reader_safety'), 'missing');
+});
+
+test('check4 reader safety (F4): "strategy" leaked into a content_item PUBLIC node is STILL rejected', () => {
+  // The projection scan keeps the strict prose rule where the annotation layer
+  // gives those words leak-meaning.
+  const leaked = articleBodyWith({
+    nodes: [{ id: 'n_a1', kind: 'content', public: { body: 'The strategy here is to push the offer.' } }],
+  });
+  assert.equal(statusOf(checkReaderSafety(leaked, 'content_item'), 'reader_safety'), 'missing');
+});
+
 // ═══ check 5: media / artifact trust ═════════════════════════════════════════
 
 const TRUSTED_REF = 'image/req_a_b_20260101_01/' + 'a'.repeat(64) + '.jpg';

@@ -597,10 +597,15 @@ export const checkReaderSafety = (body: unknown, objectType?: ObjectType): Readi
   // appear in RENDERABLE fields. `notes` is excluded — it is the private field.
   // content_item scans its READER PROJECTION (the annotation layer is
   // legitimate body data there, never rendered — the leak rule guards the
-  // rendered surface, not the record).
-  const renderable = objectType === 'content_item' ? contentItemReaderProjection(body) : stripNotes(body);
+  // rendered surface, not the record); only there do the bare words "private"
+  // and "strategy" carry leak-meaning. For every other type they are ordinary
+  // prose, so the projection scan runs field-name-only (W14 finding F4: a
+  // marketing "Our Strategy" page — or documenting the model itself — must
+  // publish).
+  const isContentItem = objectType === 'content_item';
+  const renderable = isContentItem ? contentItemReaderProjection(body) : stripNotes(body);
   try {
-    assertReaderSafe(renderable);
+    assertReaderSafe(renderable, { scanProseWords: isContentItem });
     return [crit('reader_safety', 'Reader-safe content', 'complete', '')];
   } catch (error) {
     return [crit('reader_safety', 'Reader-safe content', 'missing', (error as Error).message)];
