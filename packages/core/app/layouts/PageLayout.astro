@@ -40,9 +40,10 @@ const headerEntry = await getEntry('navigationObject', headerNavId);
 const footerEntry = await getEntry('navigationObject', footerNavId);
 if (!headerEntry || !footerEntry) {
   throw new Error(
-    `PageLayout: published navigation exports are missing (sites/drlurie/data/site/navigation/${headerNavId}.json / ` +
-      `${footerNavId}.json). The T2.3 Tier 3 publish must land on this branch before the T2.5 cutover builds — ` +
-      'see docs/cms-architecture/cms-pipeline/phase-2-runbook.md §4.'
+    `PageLayout: this site's published navigation exports are missing ` +
+      `(<site>/data/site/navigation/${headerNavId}.json / ${footerNavId}.json). A site cannot render a single ` +
+      'page until its navigation objects are published — see the site-provisioning runbook (§ seed drive) for a ' +
+      'new site, or docs/cms-architecture/cms-pipeline/phase-2-runbook.md §4 for the original cutover.'
   );
 }
 const resolveNavTarget = createNavTargetResolver({ blogPermalink: getBlogPermalink() });

@@ -26,11 +26,17 @@ const walk = (dir, out = []) => {
   return out;
 };
 
+// ORDER MATTERS: line comments go first. A `//` comment containing `/*` — a
+// glob like `navigation/*.json` is the realistic case — otherwise opens a fake
+// block comment for the regex below, which then swallows everything up to the
+// next `*/` anywhere in the file. That hid a genuine site literal in
+// packages/core/app/layouts/PageLayout.astro (W14 T14.1) behind a comment
+// eleven lines above it: the lint reported green over code it never read.
 const stripComments = (source) =>
   source
-    .replace(/\/\*[\s\S]*?\*\//g, '') // block comments (incl. JSDoc)
     .replace(/^\s*\/\/.*$/gm, '') // whole-line // comments
     .replace(/(?<=\s)\/\/(?!:).*$/gm, '') // trailing // comments (not protocol//)
+    .replace(/\/\*[\s\S]*?\*\//g, '') // block comments (incl. JSDoc)
     .replace(/<!--[\s\S]*?-->/g, ''); // HTML comments in .astro
 
 test('packages/core application code carries zero site-name literals (comments exempt)', () => {
