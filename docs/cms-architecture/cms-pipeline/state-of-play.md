@@ -7,6 +7,44 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-26 (T14.6 — test plan executed live on both sites; findings log committed)
+
+Full findings log: **`w14-findings.md`** (this directory). Ran the authz
+matrix, MCP connectivity/parity, layout audit, and agent E2E against both
+production sites. Headline results:
+
+- **F1 CRITICAL — Dr-Lurié's `/mcp` is fully unauthenticated.** No key and a
+  wrong key both return 200 with production data, and the mutating path is
+  reachable (an anonymous `object_checkout` reaches a real 404 lookup). Cause:
+  `MCP_HTTP_AUTH_TOKEN` is unset on `drluriescience`, and the gate
+  (`mcp.ts` ~L1938) **fails OPEN** on `undefined`. Platform is correctly gated
+  (token set → 401 for wrong/no key, both `tools/list` and `tools/call`). The
+  fix is T14.8's per-site keys pulled forward, PLUS making the gate fail closed
+  in a lambda runtime. Closing it on Dr-Lurié needs its live connector's bearer
+  set in lockstep — flagged to Wolf, not silently changed.
+- **F2 HIGH — every create-site client's `artifact-upload` is dead at init.**
+  It is a Netlify v2 function (`export const config = { path }`) needing
+  `export default`, but the generated `functionShimTemplate` emits
+  `export const handler`. Platform 502s on every request incl. GET; Dr-Lurié's
+  hand shim (`export default`) works. T14.7 fix in `create-site.mjs`.
+- **F3–F8** (medium/low): platform chrome renders bare vs Dr-Lurié (invisible
+  brand, empty footer, unstyled prose links/bullets); the reader-safety scan
+  over-blocks the words "private"/"strategy" in all page prose fleet-wide;
+  publish/discard don't release the lock; no governed delete verb; get↔patch
+  version drift under eventual reads; the `tests/netlify` opt-in suite doesn't
+  compile on main (CI never runs it).
+
+**Confirmed GOOD:** MCP tool parity (platform 50/0-legacy, Dr-Lurié 62/12);
+platform `/mcp` and all non-MCP admin/object functions deny-by-default on both
+sites; legacy trio isolated (404 on platform, gated on Dr-Lurié); the T14.5
+drive stands as the platform agent E2E.
+
+**Gated (need Wolf's Identity login or a harness):** authenticated `/admin`
+screens both sites (the login GATE renders correctly — T14.0 fix live),
+governance-toggle flip/revert, per-agent key mint→use→revoke (T14.8),
+mobile-viewport audit (cloud browser is fixed-canvas). T14.7 is scoped from F2–F8;
+F1 goes to T14.8 (and wants doing sooner). No code changed this task.
+
 ## Session 2026-07-26 (T14.5 SHIPPED — the manual IS the product; T14.4 CLOSED on Wolf's CI confirmation)
 
 **T14.4 is closed.** Wolf confirmed all checks GREEN on the merged PRs
