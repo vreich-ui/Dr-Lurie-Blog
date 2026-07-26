@@ -3,7 +3,7 @@
  * resolver feeds publish-gate and every Owner gate, so a precedence bug here
  * either locks Wolf out or over-grants. These pin the precedence rules.
  */
-import '../../src/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
+import '../../sites/drlurie/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
 import assert from 'node:assert/strict';
 import test from 'node:test';
 

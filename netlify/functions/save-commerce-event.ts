@@ -3,9 +3,9 @@
  * Dr-Lurie SiteBinding. The implementation is fleet law in
  * packages/core/server/functions/save-commerce-event.ts; this file is the per-site wire.
  */
-import '../../src/config/policy-bindings.js';
+import '../../sites/drlurie/config/policy-bindings.js';
 import { createHandler } from '../../packages/core/server/functions/save-commerce-event.js';
-import { drlurieSiteBinding } from '../../src/config/site-binding.js';
+import { drlurieSiteBinding } from '../../sites/drlurie/config/site-binding.js';
 
 export * from '../../packages/core/server/functions/save-commerce-event.js';
 

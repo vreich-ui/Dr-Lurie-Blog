@@ -1,4 +1,4 @@
-import '../../../src/config/policy-bindings.js'; // registers site providers — handleObjectVerb needs activeCreationPolicy()
+import '../../../sites/drlurie/config/policy-bindings.js'; // registers site providers — handleObjectVerb needs activeCreationPolicy()
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
 import fs from 'node:fs';

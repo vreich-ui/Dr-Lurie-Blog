@@ -10,7 +10,7 @@
  * tracking_config_ready criterion split (hard blocks vs publish-gated
  * warnings), and the engine-enforced singleton create-refusal.
  */
-import '../../src/config/policy-bindings.js'; // W11 T11.2: register providers for tests hitting active*/getSiteIdentity
+import '../../sites/drlurie/config/policy-bindings.js'; // W11 T11.2: register providers for tests hitting active*/getSiteIdentity
 import assert from 'node:assert/strict';
 import test from 'node:test';
 

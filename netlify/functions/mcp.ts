@@ -1,4 +1,4 @@
-import '../../src/config/policy-bindings.js'; // W11 T11.2: register site policy providers before active*Policy() runs
+import '../../sites/drlurie/config/policy-bindings.js'; // W11 T11.2: register site policy providers before active*Policy() runs
 import { randomUUID, timingSafeEqual } from 'node:crypto';
 
 import { handler as saveArtifactHandler } from './save-artifact.js';

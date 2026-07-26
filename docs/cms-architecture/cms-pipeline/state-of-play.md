@@ -7,6 +7,102 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-26 (T14.1 — app-shell extraction: one shell in core, per-site build entries)
+
+The build is no longer hardwired to one client. `src/` at the repo root WAS
+the app; the shell now lives in `packages/core/app/` and every
+`sites/<client>/astro.config.ts` is a thin entry over it. Full source→target
+table, the not-moved residue, and the route-ownership rule: the **W14 T14.1
+amendment in `w11-move-map.md`**.
+
+**The seam is four aliases**, resolved per build:
+
+    ~/assets/**  →  sites/<client>/assets/**    ~/**      →  packages/core/app/**
+    @core/**     →  packages/core/**            @site/**  →  sites/<client>/**
+
+`~/assets/**` is split off from `~` because that spelling is baked into
+PUBLISHED CONTENT (`to-markdown.ts` normalizes committed asset paths to
+`~/assets/…`; article bodies carry it), so it cannot be renamed without
+rewriting stored data. The shell's own stylesheets moved to `~/styles/`.
+
+**`/admin` is fleet law and is INJECTED** into every site's build
+(`packages/core/app/shell-routes.ts`, ten routes): it renders from the object
+store, depends on no committed export, and a per-client copy would drift.
+Reader routes stay site-owned — each is a thin loader over a NAMED page object
+and `PageObjectRenderer` throws when that object is missing, so a freshly
+scaffolded site (which has no page objects at all) would fail its first build
+if it inherited Dr-Lurie's route set. That is the shape T14.2 builds on.
+
+**Verification.** `npm run build` and `npx astro build --config
+sites/drlurie/astro.config.ts` both green, 73 pages. `astro check` 0 errors.
+eslint + prettier clean. 1698/1698 core tests, 89/89 script tests. The
+zero-drlurie core lint is GREEN over the newly-arrived shell — which is where
+most of the real work was, see below.
+
+**build-diff vs `origin/main`: 71 of 74 pages byte-identical, 3 differences,
+all intended de-siting, each verified by hand:**
+
+| Difference | Why |
+| --- | --- |
+| `id="dr-lurie-login-modal"` → `id="cms-login-modal"` | internal DOM id; the whole `__drLurie*` / `dr-lurie:*` browser namespace (globals, custom events, controllers) is renamed to `__cms*` / `cms:*`. Client-name literals cannot ship in fleet law. |
+| `Search Dr. Lurié` → `Search Dr. Lurié Skincare` | the search dialog's heading hardcoded the client's name. Now `Search ${site.name}` from the site object, falling back to the logo wordmark, then to plain `Search`. The only VISIBLE copy change in the wave. |
+| minified inline script identifiers | the same namespace rename, as compiled. |
+
+R3 makes byte-identity informational, so these were reviewed rather than
+blocked. Nothing else moved: `0 only-in-base, 0 only-in-head` — the injected
+admin routes emit exactly the route set the file-based ones did.
+
+**build-diff itself gained a normalization rule** (`html-normalize.mjs` rule 6,
+its own commit): `data-astro-cid-<hash>` is Astro's scoped-style id, derived
+from the component's FILE PATH and moving in lockstep with the CSS selector
+that matches it. Relocating the shell changed it on 73 of 74 pages with zero
+rendered difference — the same argument, and the same stated residual risk, as
+the existing island-uid rule. Without it the tool reports the entire wave as
+changed and stops being readable.
+
+**Decisions recorded rather than parked (R8):**
+
+1. **`src/` is not empty and should not be.** It keeps exactly three things,
+   all bound to the OFF-LIMITS legacy publish stack: the `schema/` + `lib/`
+   re-export shims that `publish-article.ts` / `admin-workflow-lock.ts` /
+   `save-json-blob.ts` import (those files must stay byte-untouched, and
+   `mcp/save-json-blob-mcp` mirrors `workflow-contract.ts` by path), and
+   `data/post/**`, whose path is pinned by core's `content-item-index.ts`
+   (`CONTENT_DIR`) and `article-path.ts`. Moving any of it means editing a hard
+   stop. `src/chatkit/` (one unreferenced `.widget`) is dead — T14.10 sweeps it.
+2. **De-siting the shell was the bulk of the task, not the moving.** Beyond the
+   three diffs above: `Logo.astro`'s fallback wordmark, the `sites/drlurie/...`
+   paths inside two error messages, and `object-page-routes.ts`'s hardcoded
+   `src/pages/` prefix strip (now "everything up to the last `/pages/`") were
+   all client-specific values sitting in what is now fleet law.
+3. **`EditMode.astro`'s pre-check no longer names a key.** It read
+   `localStorage['dr-lurie-gotrue-user']` directly so a visitor with no admin
+   session pays nothing. Resolving `<siteSlug>-gotrue-user` properly would pull
+   the site bindings into every visitor's bundle and defeat that. It now matches
+   the `-gotrue-user` SUFFIX: exactly as safe (a false positive costs one wasted
+   chunk fetch, and `bootEditMode` re-verifies server-side), and tenant-free.
+4. **`tsconfig.test.json` excludes `packages/core/app/**`.** Its blanket
+   `packages/core/**/*.ts` include swept in shell modules that resolve `~/…`,
+   `@site/…`, and the `astrowind:config` virtual module — none of which `tsc`
+   can see. Excluding the shell restores the pre-T14.1 arrangement exactly: a
+   shell module a Node test actually imports is still compiled as a reachable
+   dependency. The corollary is a real constraint, now written into the move
+   map: shell `.ts` files must use RELATIVE cross-package imports, never the
+   aliases, because `tsc` emits the specifier verbatim and the test runtime has
+   no resolver for them.
+5. **Dr-Lurie's `outDir` is pinned to the repo-root `dist`.** Every other site
+   defaults to `sites/<client>/dist`. The live Netlify project publishes `dist`
+   and T14.1 must not move the deploy's output path mid-wave; T14.3 repoints the
+   projects and the pin comes off. Root `netlify.toml` and `npm run build` are
+   untouched for the same reason — the root `astro.config.ts` is now a one-line
+   re-export of Dr-Lurie's entry.
+6. **`astro check` only typechecks Dr-Lurie's bindings.** `tsconfig.json` maps
+   `@site/*` to one site because a tsconfig has one root. A second site's
+   bindings are covered by its build, not by `astro check`. Acceptable for V1;
+   revisit if the fleet grows past a handful.
+
+**Next in queue:** T14.2 (platform genesis, AUTO, sonnet/medium).
+
 ## Session 2026-07-26 (T14.0 — admin login FIXED: unregistered site-identity provider in the client auth bundles)
 
 **Root cause — a W11 T11.5 regression, not pre-existing.** Hypothesis (b) of

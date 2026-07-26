@@ -23,7 +23,7 @@
  */
 import { z } from 'zod';
 
-import { siteIdentityConfig } from '../../src/config/site-identity.js';
+import { siteIdentityConfig } from './config/site-identity.js';
 
 const redirectSchema = z.strictObject({
   from: z.string().min(1),
@@ -63,4 +63,4 @@ export const siteConfig: SiteConfig = siteConfigSchema.parse({
 
 /** One import surface for site-side wiring (identity + server binding). */
 export { siteIdentityConfig };
-export { drlurieSiteBinding as siteBinding } from '../../src/config/site-binding.js';
+export { drlurieSiteBinding as siteBinding } from './config/site-binding.js';

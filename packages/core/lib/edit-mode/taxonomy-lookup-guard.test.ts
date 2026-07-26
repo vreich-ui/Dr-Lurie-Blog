@@ -17,7 +17,7 @@ import test from 'node:test';
 const repoRoot = (): string => {
   let dir = dirname(fileURLToPath(import.meta.url));
   for (let i = 0; i < 10; i += 1) {
-    if (existsSync(join(dir, 'src', 'config', 'site-identity.ts'))) return dir;
+    if (existsSync(join(dir, 'sites', 'drlurie', 'config', 'site-identity.ts'))) return dir;
     dir = dirname(dir);
   }
   throw new Error('could not locate the repo root');

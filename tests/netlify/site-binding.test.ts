@@ -14,7 +14,7 @@
  *      fallback chains are load-bearing wire behavior; silent reordering is a
  *      credential-resolution change and must fail here.
  */
-import '../../src/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
+import '../../sites/drlurie/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
 import assert from 'node:assert/strict';
 import test from 'node:test';
 

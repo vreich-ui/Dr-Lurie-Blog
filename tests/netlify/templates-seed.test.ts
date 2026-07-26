@@ -10,7 +10,7 @@
  *     that parses under page.v1 and validates clean under its PageType —
  *     including tpl_legal's registry-defaultData fallback path.
  */
-import '../../src/config/policy-bindings.js'; // W11 T11.2
+import '../../sites/drlurie/config/policy-bindings.js'; // W11 T11.2
 import assert from 'node:assert/strict';
 import test from 'node:test';
 

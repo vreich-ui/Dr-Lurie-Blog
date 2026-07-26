@@ -7,7 +7,7 @@
  * must keep nav_footer's validation profile untouched: zero blockers, zero
  * warnings — and the revert leg must restore the seed body EXACTLY.
  */
-import '../../src/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
+import '../../sites/drlurie/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
 import assert from 'node:assert/strict';
 import test from 'node:test';
 

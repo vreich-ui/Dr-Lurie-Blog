@@ -1,4 +1,4 @@
-import '../../src/config/policy-bindings.js'; // W11 T11.2
+import '../../sites/drlurie/config/policy-bindings.js'; // W11 T11.2
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { readdir } from 'node:fs/promises';

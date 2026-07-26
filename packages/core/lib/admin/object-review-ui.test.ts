@@ -1,5 +1,5 @@
 // W11 T11.4: this suite asserts behavior under the LIVE committed policy — register the site bindings (test carve-out).
-import '../../../../src/config/policy-bindings.js';
+import '../../../../sites/drlurie/config/policy-bindings.js';
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 

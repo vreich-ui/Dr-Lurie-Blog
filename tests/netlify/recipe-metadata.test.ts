@@ -5,7 +5,7 @@
  * additive guarantee that keeps pre-W8.3b records (the 3 production tpl_*)
  * parsing.
  */
-import '../../src/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
+import '../../sites/drlurie/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
 import assert from 'node:assert/strict';
 import test from 'node:test';
 

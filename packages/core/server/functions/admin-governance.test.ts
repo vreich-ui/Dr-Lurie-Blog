@@ -13,7 +13,7 @@
  * in agent-keys.test.ts (13 tests) — this file only proves the HTTP-layer
  * contract + auth wiring around it, not re-proving that logic.
  */
-import '../../../../src/config/policy-bindings.js'; // registers site providers — admin-governance.js's import chain reaches getSiteIdentity()
+import '../../../../sites/drlurie/config/policy-bindings.js'; // registers site providers — admin-governance.js's import chain reaches getSiteIdentity()
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
 import { readFileSync, existsSync } from 'node:fs';

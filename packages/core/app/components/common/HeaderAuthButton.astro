@@ -1,0 +1,420 @@
+---
+import { getPermalink } from '~/utils/permalinks';
+
+export interface Props {
+  variant?: 'desktop' | 'mobile-menu';
+}
+
+const { variant = 'desktop' } = Astro.props;
+---
+
+{
+  variant === 'mobile-menu' ? (
+    <li class="dropdown md:hidden" data-header-auth data-mobile-auth-menu>
+      <button
+        type="button"
+        class="flex w-full items-center justify-between whitespace-nowrap border-b border-gray-200/70 px-1 py-4 text-left hover:text-link focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:border-slate-800 dark:hover:text-white dark:focus-visible:ring-offset-slate-950"
+        data-auth-trigger
+        aria-haspopup="menu"
+        aria-expanded="false"
+      >
+        <span data-auth-trigger-label>Sign in</span>
+        <span class="hidden flex items-center" data-auth-trigger-chevron aria-hidden="true">
+          <svg
+            class="h-4 w-4"
+            data-auth-mobile-icon-closed
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+          >
+            <path d="M12 5v14" />
+            <path d="M5 12h14" />
+          </svg>
+          <svg
+            class="hidden h-4 w-4"
+            data-auth-mobile-icon-open
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+          >
+            <path d="M5 12h14" />
+          </svg>
+        </span>
+      </button>
+      <div class="dropdown-menu rounded-2xl pl-4 font-medium" data-auth-menu role="menu" hidden>
+        <div data-auth-signed-out>
+          <button type="button" data-auth-sign-in role="menuitem">
+            Sign in
+          </button>
+        </div>
+        <div data-auth-signed-in hidden>
+          <button type="button" data-auth-profile role="menuitem">
+            Account settings
+          </button>
+          <a href={getPermalink('/member-updates')} role="menuitem">
+            Member updates
+          </a>
+          <button type="button" data-auth-sign-out role="menuitem">
+            Sign out
+          </button>
+        </div>
+      </div>
+    </li>
+  ) : (
+    <div class="header-auth relative ml-1" data-header-auth>
+      <button
+        type="button"
+        class="flex items-center whitespace-nowrap px-2 py-3 text-base font-medium tracking-[0.01rem] text-default transition-colors hover:text-link focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:hover:text-white dark:focus-visible:ring-offset-slate-950 md:text-[0.9375rem]"
+        data-auth-trigger
+        aria-haspopup="menu"
+        aria-expanded="false"
+      >
+        <span data-auth-trigger-label>Sign in</span>
+        <svg
+          class="ml-0.5 hidden h-3.5 w-3.5 transition-transform rtl:ml-0 rtl:mr-0.5"
+          data-auth-trigger-chevron
+          aria-hidden="true"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+        >
+          <path d="m6 9 6 6 6-6" />
+        </svg>
+      </button>
+      <div
+        class="absolute right-0 z-50 mt-2 w-[min(14.5rem,calc(100vw-2rem))] max-w-[calc(100vw-2rem)] origin-top-right rounded-2xl border border-gray-200/80 bg-white p-2.5 text-sm shadow-xl shadow-slate-900/10 transition duration-200 dark:border-slate-700/80 dark:bg-slate-900 dark:shadow-black/30"
+        data-auth-menu
+        role="menu"
+        hidden
+      >
+        <div
+          class="mb-1.5 truncate border-b border-gray-200/70 px-2 pb-1.5 text-xs font-medium leading-4 text-muted dark:border-slate-700/70"
+          data-auth-label
+        >
+          Account
+        </div>
+
+        <div class="py-1" data-auth-signed-out>
+          <button
+            type="button"
+            class="mt-1 w-full rounded-lg bg-[var(--aw-color-accent,#4f46e5)] px-2.5 py-1.5 text-left text-xs font-semibold text-white transition-colors hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--aw-color-accent,#4f46e5)] focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-900"
+            data-auth-sign-in
+            role="menuitem"
+          >
+            Sign in
+          </button>
+        </div>
+
+        <div class="space-y-0.5" data-auth-signed-in hidden>
+          <button
+            type="button"
+            class="w-full rounded-lg px-2.5 py-1.5 text-left font-medium leading-5 text-slate-800 transition-colors hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:text-slate-100 dark:hover:bg-slate-800 dark:focus-visible:ring-offset-slate-900"
+            data-auth-profile
+            role="menuitem"
+          >
+            Account settings
+          </button>
+          <a
+            class="block rounded-lg px-2.5 py-1.5 font-medium leading-5 text-slate-800 transition-colors hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:text-slate-100 dark:hover:bg-slate-800 dark:focus-visible:ring-offset-slate-900"
+            href={getPermalink('/member-updates')}
+            role="menuitem"
+          >
+            Member updates
+          </a>
+          <div class="my-1 border-t border-gray-200/70 dark:border-slate-700/70" />
+          <button
+            type="button"
+            class="w-full rounded-lg px-2.5 py-1.5 text-left font-medium leading-5 text-slate-600 transition-colors hover:bg-gray-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white dark:focus-visible:ring-offset-slate-900"
+            data-auth-sign-out
+            role="menuitem"
+          >
+            Sign out
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+<script>
+  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+  // @ts-nocheck
+  // T14.0: see AdminLayout.astro — goTrueClient's storage keys resolve through
+  // getSiteIdentity(), which throws until this side-effect import runs.
+  import '@site/config/policy-bindings';
+  import {
+    currentUser,
+    logout,
+    handleOAuthCallback,
+    handleRecoveryCallback,
+    getAccessToken,
+  } from '@core/lib/admin/goTrueClient';
+
+  (() => {
+    if (!window.__cmsHeaderAuth) {
+      window.__cmsHeaderAuth = { initialized: false };
+    }
+
+    const headerAuthState = window.__cmsHeaderAuth;
+    const getAuthRoots = () => Array.from(document.querySelectorAll('[data-header-auth]'));
+
+    const setMenuOpen = (root, open) => {
+      const trigger = root.querySelector('[data-auth-trigger]');
+      const menu = root.querySelector('[data-auth-menu]');
+      if (!trigger || !menu) return;
+      menu.hidden = !open;
+      trigger.setAttribute('aria-expanded', String(open));
+      root.classList.toggle('mobile-open', root.hasAttribute('data-mobile-auth-menu') && open);
+      root.querySelector('[data-auth-trigger-chevron]')?.classList.toggle('rotate-180', open);
+      root.querySelector('[data-auth-mobile-icon-closed]')?.classList.toggle('hidden', open);
+      root.querySelector('[data-auth-mobile-icon-open]')?.classList.toggle('hidden', !open);
+    };
+
+    const closeMobileNavigationAccordions = (exceptRoot = undefined) => {
+      document.querySelectorAll('#header .dropdown.mobile-open').forEach((dropdown) => {
+        if (dropdown === exceptRoot) return;
+        if (dropdown.hasAttribute('data-mobile-auth-menu')) {
+          setMenuOpen(dropdown, false);
+          return;
+        }
+        dropdown.classList.remove('mobile-open');
+        dropdown.querySelector('[data-mobile-accordion-trigger]')?.setAttribute('aria-expanded', 'false');
+      });
+    };
+
+    let authMenuCloseTimer;
+    const clearAuthMenuCloseTimer = () => {
+      if (!authMenuCloseTimer) return;
+      window.clearTimeout(authMenuCloseTimer);
+      authMenuCloseTimer = undefined;
+    };
+    const closeAllMenus = () => {
+      clearAuthMenuCloseTimer();
+      getAuthRoots().forEach((root) => setMenuOpen(root, false));
+    };
+    const scheduleAuthMenuClose = (root) => {
+      clearAuthMenuCloseTimer();
+      authMenuCloseTimer = window.setTimeout(() => setMenuOpen(root, false), 180);
+    };
+
+    const getAdminState = async (token) => {
+      if (!token) return { authenticated: false, isAdmin: false };
+      const response = await fetch('/.netlify/functions/admin-auth-state', {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      });
+      return response.json().catch(() => ({ authenticated: false, isAdmin: false }));
+    };
+
+    // M-9 (2026-07-14): the admin menu moved OUT of this account dropdown and
+    // into the MAIN header nav as an admin-only group (nav_header, `adminOnly`),
+    // editable via MCP. This dropdown is now purely a login/account surface.
+    // Every admin-only nav element ships hidden (`data-admin-only`); reveal them
+    // site-wide when the visitor is a signed-in admin. NOT a security boundary —
+    // admin routes enforce auth server-side; this is convenience visibility only.
+    const revealAdminOnly = (isAdmin) => {
+      document.querySelectorAll('[data-admin-only]').forEach((el) => {
+        el.hidden = !isAdmin;
+      });
+    };
+
+    const renderAuthState = async () => {
+      const user = currentUser();
+      const signedIn = Boolean(user);
+      const token = signedIn ? await getAccessToken() : undefined;
+      const adminState = signedIn ? await getAdminState(token) : { authenticated: false, isAdmin: false };
+
+      // M-9: reveal the main-nav admin group (and any other [data-admin-only]
+      // element) once, site-wide — independent of the per-root account UI below.
+      revealAdminOnly(Boolean(adminState.isAdmin));
+
+      getAuthRoots().forEach((root) => {
+        const trigger = root.querySelector('[data-auth-trigger]');
+        const triggerLabel = root.querySelector('[data-auth-trigger-label]');
+        const triggerChevron = root.querySelector('[data-auth-trigger-chevron]');
+        const label = root.querySelector('[data-auth-label]');
+        const signedOutPanel = root.querySelector('[data-auth-signed-out]');
+        const signedInPanel = root.querySelector('[data-auth-signed-in]');
+
+        root.dataset.authSignedIn = String(signedIn);
+        root.dataset.authAdmin = String(Boolean(adminState.isAdmin));
+
+        if (triggerLabel) triggerLabel.textContent = signedIn ? 'Account' : 'Sign in';
+        // Chevron only makes sense when signed in (dropdown is available)
+        if (triggerChevron) {
+          triggerChevron.classList.toggle('hidden', !signedIn);
+          if (signedIn) {
+            triggerChevron.classList.toggle('rotate-180', trigger?.getAttribute('aria-expanded') === 'true');
+          }
+        }
+        if (!signedIn) setMenuOpen(root, false);
+        const email = adminState?.email || user?.email || '';
+        const displayName = email ? email.split('@')[0] || email : user?.user_metadata?.full_name || 'Account';
+        if (label) label.textContent = signedIn ? displayName : 'Account';
+        if (signedOutPanel) signedOutPanel.hidden = signedIn;
+        if (signedInPanel) signedInPanel.hidden = !signedIn;
+
+        // Renders on both mobile and desktop as of T2.8 (S-2: no
+        // viewport-conditional structure) — hide both instances alike.
+        document.querySelectorAll('[data-newsletter-cta]').forEach((cta) => {
+          cta.hidden = signedIn;
+        });
+      });
+    };
+
+    const openSignIn = () => {
+      closeAllMenus();
+      window.__cmsLoginModal?.open();
+    };
+
+    const openUserProfile = () => {
+      window.__cmsLoginModal?.open();
+    };
+
+    const signOut = async () => {
+      await logout();
+      await renderAuthState();
+      closeAllMenus();
+      document.dispatchEvent(new CustomEvent('cms:logout'));
+    };
+
+    const initializeHeaderAuthState = async () => {
+      // Check for a Netlify Identity recovery hash first.
+      // handleRecoveryCallback reads and clears the hash; handleOAuthCallback skips it.
+      const recovery = handleRecoveryCallback();
+      if (recovery) {
+        // Defer one tick so LoginModal's IIFE is guaranteed to have run first.
+        setTimeout(() => window.__cmsLoginModal?.openForRecovery(recovery.recoveryToken), 0);
+      } else {
+        // Handle regular Google OAuth redirect (URL hash has #access_token=...)
+        try {
+          const oauthUser = await handleOAuthCallback();
+          if (oauthUser) {
+            // Close the modal if it was somehow left open, then broadcast the login
+            window.__cmsLoginModal?.close();
+            document.dispatchEvent(new CustomEvent('cms:login', { detail: { user: oauthUser } }));
+          }
+        } catch (error) {
+          console.error('OAuth callback processing failed.', error);
+          document.dispatchEvent(
+            new CustomEvent('cms:auth-error', {
+              detail: { message: error instanceof Error ? error.message : 'Authentication failed.' },
+            })
+          );
+        }
+      }
+      await renderAuthState().catch((error) => {
+        console.error('Header authentication initialization failed.', error);
+      });
+    };
+
+    initializeHeaderAuthState();
+
+    // Re-render on login/logout events from the modal
+    document.addEventListener('cms:login', () => {
+      renderAuthState().catch((error) => {
+        console.error('Header authentication refresh failed.', error);
+      });
+    });
+
+    if (!headerAuthState.initialized) {
+      headerAuthState.initialized = true;
+
+      document.addEventListener('click', (event) => {
+        const target = event.target instanceof Element ? event.target : undefined;
+        const root = target?.closest('[data-header-auth]');
+        const trigger = target?.closest('[data-auth-trigger]');
+        const signInButton = target?.closest('[data-auth-sign-in]');
+        const profileButton = target?.closest('[data-auth-profile]');
+        const signOutButton = target?.closest('[data-auth-sign-out]');
+
+        if (trigger && root) {
+          event.preventDefault();
+          event.stopPropagation();
+          const isSignedIn = root.dataset.authSignedIn === 'true';
+
+          // Signed-out: trigger is a direct sign-in action — no dropdown
+          if (!isSignedIn) {
+            openSignIn();
+            return;
+          }
+
+          // Signed-in: toggle the account dropdown
+          if (root.hasAttribute('data-mobile-auth-menu') && window.matchMedia('(max-width: 767px)').matches) {
+            const willOpen = trigger.getAttribute('aria-expanded') !== 'true';
+            closeAllMenus();
+            closeMobileNavigationAccordions(root);
+            setMenuOpen(root, willOpen);
+            return;
+          }
+          const willOpen = trigger.getAttribute('aria-expanded') !== 'true';
+          closeAllMenus();
+          setMenuOpen(root, willOpen);
+          return;
+        }
+
+        if (signInButton) {
+          event.preventDefault();
+          event.stopPropagation();
+          openSignIn();
+          return;
+        }
+
+        if (profileButton) {
+          event.preventDefault();
+          event.stopPropagation();
+          openUserProfile();
+          return;
+        }
+
+        if (signOutButton) {
+          event.preventDefault();
+          event.stopPropagation();
+          signOut().catch((error) => {
+            console.error('Header sign-out failed.', error);
+          });
+          return;
+        }
+
+        if (!root) closeAllMenus();
+      });
+
+      const handleAuthPointerEnter = (event) => {
+        const target = event.target instanceof Element ? event.target : undefined;
+        const root = target?.closest('[data-header-auth]');
+        const trigger = target?.closest('[data-auth-trigger]');
+        const menu = target?.closest('[data-auth-menu]');
+        if (!root || (!trigger && !menu)) return;
+        // Only hover-open when signed in — signed-out trigger is a direct button
+        if (root.dataset.authSignedIn !== 'true') return;
+        clearAuthMenuCloseTimer();
+        setMenuOpen(root, true);
+      };
+
+      const handleAuthPointerLeave = (event) => {
+        const target = event.target instanceof Element ? event.target : undefined;
+        const root = target?.closest('[data-header-auth]');
+        const nextTarget = event.relatedTarget;
+        if (!root) return;
+        if (nextTarget instanceof Node && root.contains(nextTarget)) return;
+        scheduleAuthMenuClose(root);
+      };
+
+      document.addEventListener('pointerover', handleAuthPointerEnter);
+      document.addEventListener('pointerout', handleAuthPointerLeave);
+      document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') closeAllMenus();
+      });
+      document.addEventListener('astro:page-load', initializeHeaderAuthState);
+    }
+  })();
+</script>

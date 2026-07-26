@@ -1,0 +1,38 @@
+---
+/**
+ * Edit-mode canvas loader — included once in Layout.astro, dormant for
+ * visitors. The pre-check looks for a GoTrue session key in localStorage so a
+ * page with no admin session pays ~0: no editor chunk is fetched, no network
+ * call is made. When one exists, the real gate runs in
+ * `packages/core/lib/edit-mode/index.ts` — token refresh + server-side
+ * admin-auth-state — before anything mounts.
+ *
+ * W14 T14.1: the key is `<siteSlug>-gotrue-user` (goTrueClient's STORAGE_KEY),
+ * so this shell component cannot name it. Resolving the slug here would pull
+ * the site bindings into every visitor's bundle and defeat the whole point of
+ * the pre-check — so it matches the SUFFIX instead. Exactly as safe as the
+ * literal was: a false positive costs one wasted chunk fetch for a signed-in
+ * admin, and `bootEditMode` re-verifies the session server-side regardless.
+ */
+---
+
+<script>
+  const boot = () => {
+    try {
+      // Pre-check only; bootEditMode re-verifies via goTrueClient + admin-auth-state.
+      const hasSession = Object.keys(localStorage).some((key) => key.endsWith('-gotrue-user'));
+      if (!hasSession) return;
+    } catch {
+      return;
+    }
+    // T14.0: the edit-mode bundle reaches goTrueClient + media-policy, both of
+    // which resolve through provider seams that throw until the site bindings
+    // are registered. Loaded dynamically, in front of the editor chunk, so a
+    // visitor with no admin session still pays nothing.
+    import('@site/config/policy-bindings')
+      .then(() => import('@core/lib/edit-mode/index'))
+      .then((module) => module.bootEditMode());
+  };
+  boot();
+  document.addEventListener('astro:page-load', boot);
+</script>

@@ -7,7 +7,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { seededShuffle } from '../../src/utils/seeded-shuffle.js';
+import { seededShuffle } from '../../packages/core/app/utils/seeded-shuffle.js';
 
 const items = Array.from({ length: 12 }, (_, index) => `p${index}`);
 

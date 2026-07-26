@@ -22,7 +22,7 @@ import test from 'node:test';
 // committed site config resolves to the pre-parameterization literals. It
 // therefore registers the real site bindings (tests are exempt from the
 // zero-drlurie core lint per the ratified carve-out, 2026-07-22).
-import '../../../src/config/policy-bindings.js';
+import '../../../sites/drlurie/config/policy-bindings.js';
 import { getSiteIdentity, resolveSiteIdentity } from './site-identity.js';
 
 // The compiled test runs from a temp dir; ascend to the repo root to read the

@@ -14,7 +14,7 @@
  *   - the T3.1 `home` PageType constraints hold (hero required, every
  *     section type allowed — shared_ref targets counted by effective type).
  */
-import '../../src/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
+import '../../sites/drlurie/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -26,7 +26,7 @@ import {
   homeHeroData,
   homeNewsletterSignupData,
   homeStartGridData,
-} from '../../src/fixtures/home-fixture-data.js';
+} from '../../sites/drlurie/app/fixtures/home-fixture-data.js';
 import { validateObjectIdForType } from '../../packages/core/lib/object-ids.js';
 import { pageBodySchema } from '../../packages/core/schema/bodies/page-v1.js';
 import { sectionBodySchema, type SectionInstance, type SectionType } from '../../packages/core/schema/bodies/section-v1.js';

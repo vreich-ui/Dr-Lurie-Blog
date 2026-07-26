@@ -1,0 +1,88 @@
+---
+import '@site/config/policy-bindings'; // W11: register site providers before @core registry (bio.ts reads site identity at module load)
+/**
+ * PageObjectRenderer (T4.2) — the one thin loader every migrated page route
+ * delegates to, so 12 route files don't each re-implement load → resolve →
+ * dispatch. Given a published Page object id, it reads the derived export,
+ * resolves it (src/lib/renderer/resolve.ts: shared_ref dereference, hero/lede
+ * action hrefs, content_grid, page metadata), and dispatches each section to
+ * its registered component. The footer variant is applied only when the page
+ * carries navigationOverrides.footer (the homepage does, via S-4); every other
+ * page falls through to PageLayout's default footer slot.
+ *
+ * The proven section markup is unchanged inside each section. Since the
+ * edit-mode canvas landed, every dispatched section is wrapped in a
+ * `display:contents` element carrying its object/section identity
+ * (section-annotations.ts) — no box is generated, so layout is untouched;
+ * the attributes are inert for visitors and read only by the admin overlay.
+ */
+import { getEntry } from 'astro:content';
+
+import PageLayout from '~/layouts/PageLayout.astro';
+import Footer from '~/components/widgets/Footer.astro';
+import { buildSectionResolveDeps } from '~/components/cms/section-resolve-deps';
+import { getRegisteredComponent } from '@core/lib/registry/components/index';
+import { parsePageExport, resolvePage } from '@core/lib/renderer/resolve';
+import { sectionAnnotationAttrs } from '@core/lib/renderer/section-annotations';
+import { createNavTargetResolver, navigationToFooterProps, parseNavigationExport } from '~/utils/navigation-data';
+import { getBlogPermalink } from '~/utils/permalinks';
+import { getSiteObject } from '~/utils/site-object';
+
+interface Props {
+  objectId: string;
+}
+const { objectId } = Astro.props;
+
+const pageEntry = await getEntry('pageObject', objectId);
+if (!pageEntry) {
+  throw new Error(
+    `PageObjectRenderer: the published page export '${objectId}' is missing ` +
+      `(the site's committed page exports). The T3.5/T4.3 publish must land before this page builds.`
+  );
+}
+const page = parsePageExport(pageEntry.data);
+
+// Shared-ref preloading, the action-href policy, and the conditional
+// content_grid/content_embed resolvers all live in section-resolve-deps.ts
+// (extracted for W6 so the listing surfaces share them; behavior unchanged —
+// the blog module stays a dynamic import loaded only when a section needs it).
+const deps = await buildSectionResolveDeps(page.sections);
+
+const { metadata, sections } = resolvePage(page, deps);
+
+// Footer: the page's override if it names one (S-4, homepage → nav_footer_home),
+// else the site object's defaultNavigation.footer (W4; 'nav_footer' when the
+// site export is absent) — exactly what PageLayout's footer slot renders by
+// default. Always provided explicitly here rather than relying on the slot
+// fallback: a *conditional* `slot="footer"` makes Astro treat the slot as
+// handled and suppresses PageLayout's default, dropping the footer.
+const site = getSiteObject();
+const footerNavId = page.navigationOverrides?.footer ?? site?.defaultNavigation.footer ?? 'nav_footer';
+const footerEntry = await getEntry('navigationObject', footerNavId);
+if (!footerEntry) {
+  throw new Error(`PageObjectRenderer: the footer navigation export '${footerNavId}' is missing.`);
+}
+const footerData = navigationToFooterProps(
+  parseNavigationExport(footerEntry.data),
+  createNavTargetResolver({ blogPermalink: getBlogPermalink() })
+);
+---
+
+<PageLayout metadata={metadata}>
+  {
+    sections.map((section) => {
+      const { component: SectionComponent } = getRegisteredComponent(section.type);
+      return (
+        <div style="display:contents" {...sectionAnnotationAttrs(objectId, section)}>
+          <SectionComponent data={section.data} resolved={section.resolved} ctx={section.ctx} />
+        </div>
+      );
+    })
+  }
+
+  <Fragment slot="footer">
+    <div style="display:contents" data-cms-nav-object={footerNavId} data-cms-nav-role="footer">
+      <Footer {...footerData} />
+    </div>
+  </Fragment>
+</PageLayout>
