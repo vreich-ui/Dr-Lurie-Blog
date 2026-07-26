@@ -93,7 +93,7 @@ Env checklist:
     PUBLISH_SECRET                   [per-site]  ☐ human-supplied — see the provisioning runbook
       Publish/release gate secret.
     NETLIFY_SITE_ID                  [per-site]  ☐ human-supplied — see the provisioning runbook
-      Filled in from the created Netlify site (SITE_ID is the Netlify-injected alias — do not set by hand).
+      Set AUTOMATICALLY by the provisioning run (W14 — blob runtime detection keys on it; a site without it runs its functions on the file-backed test store and fails at the first write). Only set by hand if provisioning reported a failure for it.
     NETLIFY_BUILD_HOOK_URL           [per-site]  ☐ human-supplied — see the provisioning runbook
       Create a build hook on the new site, then paste its URL here.
     GITHUB_REPOSITORY                [per-site]  ☐ human-supplied — see the provisioning runbook

@@ -65,8 +65,12 @@ export type BlobStoreSourceDiagnostics = {
   };
 };
 
-const getSiteIdDiagnostic = (envNames: SiteBindingEnvNames = PLATFORM_ENV_NAMES): BlobStoreSourceDiagnostics['siteId'] => {
-  const envVar = envNames.blobSiteId.find((name) => process.env[name]) as BlobStoreSourceDiagnostics['siteId']['envVar'];
+const getSiteIdDiagnostic = (
+  envNames: SiteBindingEnvNames = PLATFORM_ENV_NAMES
+): BlobStoreSourceDiagnostics['siteId'] => {
+  const envVar = envNames.blobSiteId.find(
+    (name) => process.env[name]
+  ) as BlobStoreSourceDiagnostics['siteId']['envVar'];
   const value = envVar ? process.env[envVar] || '' : '';
 
   return {
@@ -175,7 +179,35 @@ export const getNetlifyBlobStore = async (
 
     if (hasNetlifyBlobContext(event)) netlifyBlobs.connectLambda(event);
 
+    // W14 T14.4, tried and REVERTED in the same session: passing
+    // `{ name, consistency: 'strong' }` here fails live — "Netlify Blobs has
+    // failed to perform a read using strong consistency because the
+    // environment has not been configured": the lambda name-lookup context on
+    // this runtime carries no uncached-edge URL, so strong reads are only
+    // possible on the explicit-API path (NETLIFY_SITE_ID + a blobs-scoped
+    // NETLIFY_BLOBS_TOKEN). CONSEQUENCE, stated plainly: on the name-lookup
+    // path every store's requested 'strong' has ALWAYS been silently eventual
+    // — for the whole fleet, Dr-Lurie included — and read-after-write can lag
+    // tens of seconds. Callers that need a fresh dependent read (the genesis
+    // seed drive's nav→site ordering) must wait-and-retry, or the site must
+    // carry a blobs-scoped token to unlock the explicit-API path.
     return netlifyBlobs.getStore(storeName);
+  }
+
+  // W14 T14.4: FAIL CLOSED in a real function runtime. The file-backed store
+  // exists for tests and local dev; in a production lambda it "works" for
+  // reads (empty dir → empty list) and dies at the first write against the
+  // read-only /var/task — which presented live as inventory returning [] and
+  // every create 500ing, and cost a full debugging loop to attribute. The
+  // trigger was runtime DETECTION failing (NETLIFY_SITE_ID unset on a freshly
+  // provisioned site), and a detection failure must be loud, not a silent
+  // switch to a test store.
+  if (process.env.LAMBDA_TASK_ROOT || process.env.AWS_LAMBDA_FUNCTION_NAME) {
+    throw new Error(
+      `Netlify Blobs unavailable for store '${storeName}' in a production function runtime — ` +
+        'refusing the file-backed test fallback. Set NETLIFY_SITE_ID on this site ' +
+        '(create-site sets it automatically as of W14) or check the Blobs runtime context.'
+    );
   }
 
   console.warn(`Using local file-backed ${storeName} blob store because @netlify/blobs is unavailable.`);

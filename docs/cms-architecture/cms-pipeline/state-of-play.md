@@ -7,6 +7,62 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-26 (GENESIS SOLVED — the cycle was a mirage; the real defect was a silent test-store fallback in production)
+
+**Supersedes the "genesis is circular" reading in the T14.4 entry below.** It
+is not circular. The order navs → site works and is now pinned by an e2e test.
+What actually happened, unraveled live with a debugging loop this session
+gained (netlify-cli direct deploys to `kugel-platform` — the platform site
+doing its staging job for the first time):
+
+**Root cause.** Blob runtime detection keys on `NETLIFY_SITE_ID`, which the
+provisioning run never set — it sat on the BY-HAND checklist even though
+`create-site` knows the id it just created. Detection failed → core silently
+fell back to the FILE-BACKED TEST STORE inside the production lambda. Reads
+degrade gracefully there (empty dir → empty list), writes die on the read-only
+`/var/task`. Hence the exact live symptoms: inventory `[]`, `site` create
+reaching validation and 422ing on refs that "didn't exist" (in a store that was
+really the empty local fallback), nav/page creates 500ing at the first write.
+The type-specific pattern was pure coincidence of WHERE each verb first writes.
+
+**Four fixes, all committed:**
+
+1. **Fail closed.** In a lambda runtime (`LAMBDA_TASK_ROOT`/
+   `AWS_LAMBDA_FUNCTION_NAME`), blob-store now THROWS instead of falling back
+   to the test store. A detection failure must be loud. Unit-tested both ways.
+2. **`create-site` auto-sets `NETLIFY_SITE_ID`** during provisioning — it is
+   the id of the site the run just created; it was never a human value.
+   Checklist row rewritten.
+3. **Diagnostic 500s** on the object-store path (sanitized message + top
+   in-repo frame). This is the fix that cracked the case — the first
+   diagnostic deploy returned `ENOENT mkdir /var/task/.netlify` and the whole
+   mystery collapsed.
+4. **Genesis e2e** (`site-genesis.e2e.test.ts`): EMPTY store → nav_header →
+   nav_footer → site → page through the MCP handler, all green, plus the
+   negative pin (site BEFORE navs correctly refuses). The order is law now.
+
+**Live result:** the platform store holds 12 objects created through the front
+door — site_platform, both navs, page_home, page_404, tax_platform,
+thm_platform_default, the 5 starter recipes. Checkout → patch → checkin
+round-tripped live on page_home. Publish reaches structured validation; the
+full publish→release drive waits on `GITHUB_CONTENT_TOKEN` (export commits
+need it) — first move of the next sitting.
+
+**A second latent defect, found, tried, and honestly reverted:** the
+name-lookup blob path silently DROPS the requested `consistency: 'strong'` —
+for the whole fleet, Dr-Lurie included, since W-forever. Passing it through
+fails live ("environment has not been configured" — the lambda context carries
+no uncached-edge URL), so strong reads exist only on the explicit-API path
+(blobs-scoped token). Reverted to the string lookup with the constraint
+documented at the call site. CONSEQUENCE: read-after-write can lag tens of
+seconds on every store; genesis drives wait-and-retry between dependent
+creates (mine did); a blobs-scoped `NETLIFY_BLOBS_TOKEN` per site is the
+upgrade path if strong consistency is ever needed. T14.6 should weigh the
+lock library against this.
+
+Gates: 1706/1706 core tests (4 new), 89/89 script tests, eslint + prettier
+clean, both sites build.
+
 ## Session 2026-07-26 (T14.4 in progress — two live MCP endpoints on one core; two real defects found)
 
 **The core architectural claim is demonstrated.** `kugel-platform` serves its
