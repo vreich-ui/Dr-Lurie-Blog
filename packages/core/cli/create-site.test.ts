@@ -255,7 +255,7 @@ test('function shims use the export form the core function generation requires (
   // init on the platform site. This pins the generator to read the core source.
   const plan = buildPlan({ name: 'acme' });
   const coreDir = path.join(fileURLToPath(new URL('.', import.meta.url)), '..', 'server', 'functions');
-  const shim = (name) => plan.files.find((f) => f.path === `sites/acme/netlify/functions/${name}.ts`);
+  const shim = (name: string) => plan.files.find((f) => f.path === `sites/acme/netlify/functions/${name}.ts`);
 
   // artifact-upload is v2 (export const config) → default export, never `export const handler`.
   const au = shim('artifact-upload');
