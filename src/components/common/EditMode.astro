@@ -18,7 +18,13 @@
     } catch {
       return;
     }
-    import('@core/lib/edit-mode/index').then((module) => module.bootEditMode());
+    // T14.0: the edit-mode bundle reaches goTrueClient + media-policy, both of
+    // which resolve through provider seams that throw until the site bindings
+    // are registered. Loaded dynamically, in front of the editor chunk, so a
+    // visitor with no admin session still pays nothing.
+    import('~/config/policy-bindings')
+      .then(() => import('@core/lib/edit-mode/index'))
+      .then((module) => module.bootEditMode());
   };
   boot();
   document.addEventListener('astro:page-load', boot);

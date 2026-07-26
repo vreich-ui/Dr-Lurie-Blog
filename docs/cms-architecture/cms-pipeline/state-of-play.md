@@ -7,6 +7,90 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-26 (T14.0 — admin login FIXED: unregistered site-identity provider in the client auth bundles)
+
+**Root cause — a W11 T11.5 regression, not pre-existing.** Hypothesis (b) of
+the triage tree (browser-side) was right; (a) server JWT/role resolution and
+(c) unconfirmed account are both cleared.
+
+T11.5 made the GoTrue browser-storage keys tenant-derived — `STORAGE_KEY()` /
+`KEEP_KEY()` in `packages/core/lib/admin/goTrueClient.ts` now call
+`getSiteIdentity()` at CALL time. `getSiteIdentity()` throws unless the site
+has registered its provider by importing `src/config/policy-bindings`. Astro
+compiles **each `<script>` block as its own client entry**, and the five client
+entries that reach the auth client never imported the bindings:
+`src/layouts/AdminLayout.astro` (the `/admin` gate),
+`src/components/common/LoginModal.astro`,
+`src/components/common/HeaderAuthButton.astro`, `src/pages/admin/kit.astro`,
+and `src/components/common/EditMode.astro` (via the `@core/lib/edit-mode/index`
+dynamic import, which also reaches `media-policy`). Their bundled chunks import
+`site-identity` but never the chunk carrying the registration — that lives only
+in the React islands' graph (`display-name.*.js`).
+
+Every storage helper in `goTrueClient` wraps its access in `try/catch`, so the
+throw never surfaced: it degraded **silently** to "always signed out". Nothing
+in the console, nothing in the function logs — which is why the unauthenticated
+triage found a healthy GoTrue, a healthy `admin-users`, and a rendering page.
+
+**Verified by a real browser repro** (Playwright + the actual `npm run build`
+output, GoTrue and `admin-auth-state` stubbed at the network layer), three
+scenarios, before → after:
+
+| Scenario | Before | After |
+| --- | --- | --- |
+| Valid session in localStorage, cold load of `/admin` | "Admin login required" | workspace renders |
+| Sign in via the modal on an already-hydrated `/admin` | worked (island had registered the provider by click time) | works |
+| …then reload `/admin` | "Admin login required" again | workspace renders |
+| Sign in from the public header (no admin island on the page) | session never persisted at all, header stayed "Sign in" | persists, header shows "Account" |
+
+That middle row is why the bug read as intermittent: the one path that worked
+was signing in *after* an island had hydrated, and it never survived a reload.
+
+**Fix:** one side-effect import (`import '~/config/policy-bindings';`) at the
+top of each of the five client script blocks — dynamic, in front of the editor
+chunk, for `EditMode.astro` so a visitor with no admin session still pays
+nothing. No auth redesign, no role-model change, no server change.
+
+**Regression test:** `tests/scripts/client-scripts-site-bindings.test.mjs` — a
+static lint at the layer the bug lived: any client `<script>` block importing
+an identity-dependent core module (`goTrueClient`, `edit-mode/index`,
+`site-identity`) must import the site bindings in the same block. Verified to
+FAIL on the pre-fix tree (all five entries flagged) and pass after. It also
+guards T14.1: moving the shell into core must not drop these imports.
+
+Gates: `astro check` 0 errors · eslint clean · prettier (`src`/`scripts` glob)
+clean · 1698/1698 core tests · 89/89 script tests (85 + 4 new) · build-diff
+informational and EMPTY (74/74 pages identical vs `origin/main`).
+
+**Decisions recorded here rather than parked (R8):**
+
+1. **Scope widened from `/admin` to all five client entries.** Wolf reported
+   `/admin`, but `HeaderAuthButton` + `LoginModal` ship on every public page and
+   were fully broken there (sign-in persisted nothing). Same root cause, one fix
+   cluster, one commit.
+2. **`goTrueClient`'s blanket `try/catch` swallow is left as-is** and logged
+   below as a T14.6 seed. Making it loud is a behavior change (private-mode
+   browsers legitimately throw on localStorage) and belongs in a test-plan
+   finding, not in the minimal login fix.
+3. **Pre-existing prettier drift NOT swept.** The manual extra glob reports 45
+   unformatted files under `tests/netlify/**` plus
+   `tests/scripts/roundtrip-reconcile.test.mjs`, all untouched by this task and
+   already unformatted on `origin/main`. Reformatting them here would be exactly
+   the bundled cleanup CLAUDE.md forbids — routed to T14.10 queue hygiene.
+4. **`EditMode.astro` still hardcodes the literal `'dr-lurie-gotrue-user'`** in
+   its zero-cost pre-check (a surviving site literal in `src/`). Left alone —
+   de-siting the shell is T14.1's job, and it is now flagged there.
+5. **Model reallocation, declared not silent:** `queue.tsv` allocates T14.0 to
+   `claude-fable-5`/high; this session ran on `claude-opus-5` at high effort.
+   Lateral-or-better, so the row was left unedited rather than churned.
+
+Production is NOT yet fixed — the commit is on `claude/w14-t14-0` and needs
+Wolf to land and release it. The end-to-end production login check in the
+brief's acceptance criteria happens on Wolf's next `/admin` visit after that
+deploy; every layer below it is verified here.
+
+**Next in queue:** T14.1 (app-shell extraction, NOTIFY, fable/xhigh).
+
 ## Session 2026-07-26 (W14 ruling recorded — platform site, V1 finish line; admin-login triage)
 
 Wolf ratified the platform-site plan (iterated through three brief

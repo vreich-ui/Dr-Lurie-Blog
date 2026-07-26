@@ -105,6 +105,9 @@ const metadata = {
 <script>
   // eslint-disable-next-line @typescript-eslint/ban-ts-comment
   // @ts-nocheck
+  // T14.0: see AdminLayout.astro — goTrueClient's storage keys resolve through
+  // getSiteIdentity(), which throws until this side-effect import runs.
+  import '~/config/policy-bindings';
   import { currentUser, getAccessToken, handleOAuthCallback } from '@core/lib/admin/goTrueClient';
 
   (() => {

@@ -91,7 +91,32 @@ project, env, blob stores, `/mcp`, `/admin` (OQ-W11-3/4 unchanged).
      (c) account-level: unconfirmed Identity user (autoconfirm is off).
    - T14.0 starts here: Netlify function logs + one observed browser
      symptom during Wolf's next login attempt pin the branch; fix follows.
-2. (further entries accrue from T14.6 execution)
+   - **RESOLVED (T14.0, same day) — hypothesis (b) confirmed, (a) and (c)
+     cleared.** A W11 T11.5 regression: the five client `<script>` entries
+     that reach `goTrueClient` (and the edit-mode chunk) never imported
+     `src/config/policy-bindings`, so `getSiteIdentity()` threw inside the
+     storage helpers' `try/catch` and the session was never read or written.
+     Silent by construction — no console error, no function-log trace, which
+     is why unauthenticated probes found everything healthy. Fixed by one
+     side-effect import per entry; guarded by
+     `tests/scripts/client-scripts-site-bindings.test.mjs`. Full write-up:
+     `state-of-play.md`, 2026-07-26 T14.0 entry.
+2. **`goTrueClient` swallows every storage error** (`try/catch` with an
+   `// ignored` body in `currentUser`/`writeStorage`/`clearStorage`/
+   `isKeepSignedIn`/`setKeepSignedIn`). That is what turned issue 1 from a
+   loud crash into a month-shaped mystery. Deliberately NOT changed in T14.0
+   (making it loud is a behavior change — private-mode browsers throw on
+   localStorage legitimately). T14.6: decide the right signal (one-shot
+   `console.warn`? a diagnostic surfaced in the gate?) and cover it.
+3. **`src/components/common/EditMode.astro` hardcodes
+   `'dr-lurie-gotrue-user'`** in its zero-cost pre-check — a surviving site
+   literal in the shell. T14.1 (app-shell extraction) must de-site it; it
+   cannot move into `packages/core` as written.
+4. **Prettier drift outside the `check:prettier` glob**: 45 files under
+   `tests/netlify/**` and `tests/scripts/roundtrip-reconcile.test.mjs` are
+   unformatted on `origin/main`. Not swept by T14.0 (bundled-cleanup rule).
+   T14.10 queue hygiene.
+5. (further entries accrue from T14.6 execution)
 
 ## Non-goals (W14)
 
