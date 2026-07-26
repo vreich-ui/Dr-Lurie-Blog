@@ -16,9 +16,13 @@ create-site plan for 'acme' (Acme)
   theme id:       thm_acme_default
   canonical host: https://acme.netlify.app
 
-Files to create under sites/acme/ (18):
+Files to create under sites/acme/ (35):
   + sites/acme/config/site-identity.ts
   + sites/acme/config/site-binding.ts
+  + sites/acme/config/approval-policy.ts
+  + sites/acme/config/creation-policy.ts
+  + sites/acme/config/media-policy.ts
+  + sites/acme/config/policy-bindings.ts
   + sites/acme/site.config.ts
   + sites/acme/netlify.toml
   + sites/acme/package.json
@@ -35,6 +39,19 @@ Files to create under sites/acme/ (18):
   + sites/acme/data/site/templates/.gitkeep
   + sites/acme/data/site/themes/.gitkeep
   + sites/acme/data/site/articles/.gitkeep
+  + sites/acme/astro.config.ts
+  + sites/acme/config.yaml
+  + sites/acme/app/content/config.ts
+  + sites/acme/app/pages/index.astro
+  + sites/acme/app/pages/404.astro
+  + sites/acme/app/pages/[...objectPage].astro
+  + sites/acme/public/.gitkeep
+  + sites/acme/assets/images/.gitkeep
+  + sites/acme/data/site/site.json
+  + sites/acme/data/site/navigation/nav_header.json
+  + sites/acme/data/site/navigation/nav_footer.json
+  + sites/acme/data/site/pages/page_home.json
+  + sites/acme/data/site/pages/page_404.json
 
 Netlify actions: none (no --netlify-token supplied — scaffold only).
 

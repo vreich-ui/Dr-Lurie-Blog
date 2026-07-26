@@ -696,6 +696,399 @@ export const CONVERSION_SEEDS = [
 ];
 `;
 
+// ─── the per-site policy bundle (W14 T14.2) ──────────────────────────────────
+//
+// T11.10 gave Dr-Lurie its own `config/approval-policy.ts` + `creation-policy.ts`
+// and T14.1 moved `media-policy.ts` + `policy-bindings.ts` alongside them. The
+// scaffold owed a new client the same four: without `policy-bindings.ts` the
+// shell cannot resolve site identity at all and the site does not build.
+// Values are the fleet defaults — an operator retunes them per client.
+
+const approvalPolicyTemplate = () => `/**
+ * This site's approval posture. \`master\` sets the default for every governed
+ * type; \`overrides\` narrows it per type.
+ *
+ * Commerce is the standing exception to an autonomous posture: an agent
+ * PROPOSING a product change is fine, a price going live unseen is not.
+ */
+import type { ApprovalPolicyConfig } from '../../../packages/core/lib/approval-policy.js';
+
+export const approvalPolicyConfig = {
+  master: 'all-autonomous',
+  overrides: { product: 'require-approval' },
+} satisfies ApprovalPolicyConfig;
+`;
+
+const creationPolicyTemplate = () => `/**
+ * Who may MINT objects of each type on this site. \`master: 'open'\` lets any
+ * authenticated agent create; an override names the only agents allowed.
+ *
+ * \`tracking_config\` is seed-minted only — agents edit the singleton, they
+ * never create one.
+ */
+import type { CreationPolicyConfig } from '../../../packages/core/lib/creation-policy.js';
+
+export const creationPolicyConfig = {
+  master: 'open',
+  overrides: { tracking_config: { agents: ['object-conversion-roundtrip'] } },
+} satisfies CreationPolicyConfig;
+`;
+
+const mediaPolicyTemplate = () => `/**
+ * This site's image budget. \`overBudget: 'warn'\` records the overage and lets
+ * the write through; 'block' refuses it.
+ */
+import type { MediaPolicyConfig } from '../../../packages/core/lib/media-policy.js';
+
+export const mediaPolicyConfig = {
+  maxImageBytes: 153_600, // 150 KB — web-optimized budget
+  overBudget: 'warn',
+  preferredImageFormat: 'webp',
+} satisfies MediaPolicyConfig;
+`;
+
+const policyBindingsTemplate = (ids) => `/**
+ * Site → core policy bindings for '${ids.siteId}'.
+ *
+ * \`packages/core\` holds the policy LAW and the provider seams; this module is
+ * the site-side wiring that closes them. Import it for its side effect at any
+ * entry point that reaches \`activeApprovalPolicy()\` / \`activeCreationPolicy()\`
+ * / \`activeMediaPolicy()\` / \`getSiteIdentity()\` before the first call — every
+ * Netlify function shim, and every client \`<script>\` that touches the auth
+ * client (W14 T14.0; tests/scripts/client-scripts-site-bindings enforces that
+ * half).
+ *
+ * Imports are RELATIVE, not the \`@core\` alias, so the module resolves under
+ * the Node test runtime as well as under Astro/Vite.
+ */
+import { approvalPolicyConfig } from './approval-policy.js';
+import { creationPolicyConfig } from './creation-policy.js';
+import { mediaPolicyConfig } from './media-policy.js';
+import { siteIdentityConfig } from './site-identity.js';
+import {
+  setActiveApprovalPolicyProvider,
+  resolveApprovalPolicy,
+  type ApprovalPolicy,
+} from '../../../packages/core/lib/approval-policy.js';
+import {
+  setActiveCreationPolicyProvider,
+  resolveCreationPolicy,
+  type CreationPolicy,
+} from '../../../packages/core/lib/creation-policy.js';
+import {
+  setActiveMediaPolicyProvider,
+  resolveMediaPolicy,
+  type MediaPolicy,
+} from '../../../packages/core/lib/media-policy.js';
+import { setSiteIdentityConfigProvider } from '../../../packages/core/lib/site-identity.js';
+
+let approvalPolicy: ApprovalPolicy | undefined;
+setActiveApprovalPolicyProvider((): ApprovalPolicy => (approvalPolicy ??= resolveApprovalPolicy(approvalPolicyConfig)));
+
+let creationPolicy: CreationPolicy | undefined;
+setActiveCreationPolicyProvider((): CreationPolicy => (creationPolicy ??= resolveCreationPolicy(creationPolicyConfig)));
+
+let mediaPolicy: MediaPolicy | undefined;
+setActiveMediaPolicyProvider((): MediaPolicy => (mediaPolicy ??= resolveMediaPolicy(mediaPolicyConfig)));
+
+// site-identity resolves committed config + process env on each call (env may
+// change between calls); the provider just supplies the committed config.
+setSiteIdentityConfigProvider((): unknown => siteIdentityConfig);
+`;
+
+// ─── W14 T14.1/T14.2: the BUILD ENTRY ────────────────────────────────────────
+//
+// T14.1 moved the application shell into `packages/core/app` and made each
+// site a thin entry over it. A scaffolded site therefore needs four small
+// files (astro config, content-collection binding, its own `config.yaml`
+// routing table, and the reader routes it can actually serve) plus a
+// BOOTSTRAP set of committed exports — see BOOTSTRAP_EXPORT_NOTE below.
+
+const astroConfigTemplate = (ids) => `/**
+ * ${ids.clientSlug}'s build entry — a thin entry over the shared shell in
+ * \`packages/core/app\` (W14 T14.1). Everything structural lives there.
+ *
+ * The import is RELATIVE, not \`@core/…\`: Astro loads this file before Vite's
+ * aliases exist.
+ *
+ *   npx astro build --config sites/${ids.clientSlug}/astro.config.ts
+ */
+import { defineSiteAstroConfig } from '../../packages/core/app/site-astro-config';
+
+import { siteConfig } from './site.config';
+
+export default defineSiteAstroConfig({
+  siteDir: 'sites/${ids.clientSlug}',
+  site: siteConfig.canonicalHost,
+  imageDomains: siteConfig.imageDomains,
+});
+`;
+
+const contentConfigTemplate = (ids) => `/**
+ * ${ids.clientSlug}'s content collections. The collection SHAPES are fleet law
+ * and live in the shell; this file supplies only this deployment's export root.
+ * Astro requires the file at \`<srcDir>/content/config.ts\`, which is why every
+ * site carries its own three-line copy.
+ */
+import { buildSiteCollections } from '@core/app/content/collections';
+
+export const collections = buildSiteCollections({ dataRoot: 'sites/${ids.clientSlug}/data/site' });
+`;
+
+const configYamlTemplate = (ids, brandName, canonicalHost) => `site:
+  name: ${brandName}
+  site: '${canonicalHost}'
+  base: '/'
+  trailingSlash: false
+
+# Default SEO metadata
+metadata:
+  title:
+    default: ${brandName}
+    template: '%s — ${brandName}'
+  description: '${brandName} — a starter site, ready for real content.'
+  robots:
+    index: true
+    follow: true
+  openGraph:
+    site_name: ${brandName}
+    images:
+      - url: '/Social/og-default.jpg'
+        width: 1200
+        height: 630
+    type: website
+  twitter:
+    cardType: summary_large_image
+
+i18n:
+  language: en
+  textDirection: ltr
+
+apps:
+  blog:
+    isEnabled: true
+    postsPerPage: 6
+
+    post:
+      isEnabled: true
+      permalink: '/%slug%'
+      robots:
+        index: true
+
+    list:
+      isEnabled: true
+      pathname: 'learn/library'
+      robots:
+        index: true
+
+    category:
+      isEnabled: true
+      pathname: 'category'
+      robots:
+        index: true
+
+    tag:
+      isEnabled: true
+      pathname: 'tag'
+      robots:
+        index: false
+
+    isRelatedPostsEnabled: false
+    relatedPostsCount: 4
+
+ui:
+  theme: 'system'
+`;
+
+const pageLoaderTemplate = (objectId, note) => `---
+/**
+ * ${note}
+ */
+import PageObjectRenderer from '~/components/cms/PageObjectRenderer.astro';
+---
+
+<PageObjectRenderer objectId="${objectId}" />
+`;
+
+const objectPageCatchAllTemplate = () => `---
+/**
+ * Object-page catch-all — a Page object an agent creates, publishes, and
+ * releases is served at its route by THIS file, no per-page loader needed.
+ * Site-owned rather than injected by the shell because it enumerates the
+ * file-owned routes NEXT TO IT with import.meta.glob, which only sees this
+ * directory.
+ */
+import type { InferGetStaticPropsType, GetStaticPaths } from 'astro';
+import { getCollection } from 'astro:content';
+
+import PageObjectRenderer from '~/components/cms/PageObjectRenderer.astro';
+import { fetchPosts } from '~/utils/blog';
+import { computeObjectPageRoutes } from '~/utils/object-page-routes';
+import { BLOG_BASE, CATEGORY_BASE, TAG_BASE } from '~/utils/permalinks';
+
+export const prerender = true;
+
+export const getStaticPaths = (async () => {
+  const routeFilePaths = Object.keys(import.meta.glob('./**/*.astro'));
+  const pageEntries = await getCollection('pageObject');
+  const posts = await fetchPosts();
+
+  const { paths, skipped } = computeObjectPageRoutes({
+    routeFilePaths,
+    pageExports: pageEntries.map((entry) => ({
+      objectId: entry.id,
+      route: entry.data.route,
+      pageType: entry.data.pageType,
+    })),
+    postPermalinks: posts.map((post) => post.permalink),
+    reservedPrefixes: [BLOG_BASE, CATEGORY_BASE, TAG_BASE, 'learn/topics', 'admin'],
+  });
+
+  for (const skip of skipped) {
+    if (skip.reason === 'file_route') continue;
+    if (skip.reason === 'loader_owned_page_type') continue;
+    console.warn(
+      \`[objectPage] NOT serving \${skip.objectId} at \${skip.route} — \${skip.reason}. \` +
+        'The published page is store-backed but unreachable; pick a route nobody else owns.'
+    );
+  }
+
+  return paths.map((path) => ({
+    params: { objectPage: path.param || undefined },
+    props: { objectId: path.objectId },
+  }));
+}) satisfies GetStaticPaths;
+
+type Props = InferGetStaticPropsType<typeof getStaticPaths>;
+const { objectId } = Astro.props as Props;
+---
+
+<PageObjectRenderer objectId={objectId} />
+`;
+
+// ─── bootstrap committed exports ─────────────────────────────────────────────
+//
+// A site cannot render one page until its navigation objects are published:
+// PageLayout throws on a missing nav export BY DESIGN ("never leaves a surface
+// half-fed"), and PageObjectRenderer throws on a missing page export. A freshly
+// scaffolded site has an empty store, so without these it would not build at
+// all — and "it builds" is the first thing an operator needs to see.
+//
+// These are BOOTSTRAP exports, not converted objects. Per CLAUDE.md's five-part
+// definition they are rendered stubs: no store record backs them yet. The
+// provisioning runbook's seed drive (create the real records through the front
+// door, publish, release) REPLACES every one of them with a genuine derived
+// export. `__generated.from` says so explicitly so nobody mistakes one for a
+// published artifact.
+const BOOTSTRAP_FROM = 'create-site:bootstrap (not store-backed — replaced by the seed drive)';
+
+const bootstrapExport = (body) =>
+  `${JSON.stringify(
+    {
+      __generated: { at: new Date().toISOString(), from: BOOTSTRAP_FROM, record_version: 0 },
+      ...body,
+    },
+    null,
+    2
+  )}\n`;
+
+const bootstrapSiteExport = (ids, brandName, canonicalHost) =>
+  bootstrapExport({
+    name: brandName,
+    logo: { text: brandName.toUpperCase() },
+    urls: { base: '/', canonicalHost },
+    metadataDefaults: {
+      description: `${brandName} — a starter site, ready for real content.`,
+      ogImage: '/Social/og-default.jpg',
+      titleTemplate: `%s - ${brandName}`,
+    },
+    brandTokens: {
+      colors: {
+        primary: 'rgb(51 102 204)',
+        secondary: 'rgb(38 77 153)',
+        accent: 'rgb(0 150 136)',
+        gold: 'rgb(191 155 48)',
+        'text-heading': 'rgb(20 24 28)',
+        'text-default': 'rgb(38 43 48)',
+        'text-muted': 'rgb(60 67 75 / 76%)',
+        'bg-page': 'rgb(255 255 255)',
+        'bg-surface': 'rgb(245 246 248)',
+        'bg-page-dark': 'rgb(10 12 20)',
+      },
+      fonts: { sans: 'system-ui, sans-serif', serif: 'Georgia, serif', heading: 'Georgia, serif' },
+    },
+    chrome: { showRssFeed: false, showThemeToggle: true },
+    defaultNavigation: { header: 'nav_header', footer: 'nav_footer' },
+    blog: { listPath: 'learn/library', postsPerPage: 6, categoryBase: 'category', tagBase: 'tag' },
+  });
+
+const bootstrapNavHeaderExport = (brandName) =>
+  bootstrapExport({
+    role: 'header',
+    brand: { text: brandName },
+    groups: [
+      {
+        id: 'g_primary',
+        items: [{ id: 'i_home', label: 'Home', target: { kind: 'route', href: '/' } }],
+      },
+    ],
+  });
+
+const bootstrapNavFooterExport = (brandName) =>
+  bootstrapExport({
+    role: 'footer',
+    brand: { text: brandName },
+    footNote: `© ${brandName}`,
+    groups: [
+      {
+        id: 'g_explore',
+        title: 'Explore',
+        items: [{ id: 'i_home', label: 'Home', target: { kind: 'route', href: '/' } }],
+      },
+    ],
+  });
+
+const bootstrapHomePageExport = (brandName) =>
+  bootstrapExport({
+    pageType: 'system',
+    route: '/',
+    title: brandName,
+    seo: {
+      description: `${brandName} — a starter site, ready for real content.`,
+      robots: { index: true, follow: true },
+    },
+    sections: [
+      {
+        id: 's_welcome',
+        type: 'prose',
+        data: {
+          body:
+            `<h2>${brandName} is live.</h2>` +
+            '<p>This starter page is a bootstrap export written by <code>create-site</code>, not a ' +
+            'store-backed object. Sign in at <a href="/admin">/admin</a> and publish real content — the ' +
+            'first publish replaces this file with a genuine derived export.</p>',
+        },
+      },
+    ],
+  });
+
+const bootstrap404PageExport = (brandName) =>
+  bootstrapExport({
+    pageType: 'system',
+    route: '/404',
+    title: 'Page not found',
+    seo: { description: 'Page not found.', robots: { index: false, follow: false } },
+    sections: [
+      {
+        id: 's_notfound',
+        type: 'prose',
+        data: {
+          body: `<h2>Page not found</h2><p>That page does not exist on ${brandName}.</p>`,
+        },
+      },
+    ],
+  });
+
 // ─── plan builder ────────────────────────────────────────────────────────────
 
 export const buildPlan = (opts) => {
@@ -708,6 +1101,10 @@ export const buildPlan = (opts) => {
   const files = [
     { path: `${dir}/config/site-identity.ts`, content: siteIdentityTemplate(ids, brandName) },
     { path: `${dir}/config/site-binding.ts`, content: siteBindingTemplate(ids) },
+    { path: `${dir}/config/approval-policy.ts`, content: approvalPolicyTemplate() },
+    { path: `${dir}/config/creation-policy.ts`, content: creationPolicyTemplate() },
+    { path: `${dir}/config/media-policy.ts`, content: mediaPolicyTemplate() },
+    { path: `${dir}/config/policy-bindings.ts`, content: policyBindingsTemplate(ids) },
     { path: `${dir}/site.config.ts`, content: siteConfigTemplate(ids, brandName, canonicalHost) },
     { path: `${dir}/netlify.toml`, content: netlifyTomlTemplate() },
     { path: `${dir}/package.json`, content: packageJsonTemplate(ids) },
@@ -717,6 +1114,34 @@ export const buildPlan = (opts) => {
     { path: `${dir}/seeds/themes-seed-data.mjs`, content: themeSeedTemplate(ids) },
     { path: `${dir}/seeds/section-templates-seed-data.mjs`, content: sectionTemplatesSeedTemplate(ids) },
     ...DATA_SITE_SUBDIRS.map((sub) => ({ path: `${dir}/data/site/${sub}/.gitkeep`, content: '' })),
+
+    // W14 T14.1/T14.2 — the build entry and the routes it can serve.
+    { path: `${dir}/astro.config.ts`, content: astroConfigTemplate(ids) },
+    { path: `${dir}/config.yaml`, content: configYamlTemplate(ids, brandName, canonicalHost) },
+    { path: `${dir}/app/content/config.ts`, content: contentConfigTemplate(ids) },
+    {
+      path: `${dir}/app/pages/index.astro`,
+      content: pageLoaderTemplate('page_home', 'Home — a thin loader over the published page_home object.'),
+    },
+    {
+      path: `${dir}/app/pages/404.astro`,
+      content: pageLoaderTemplate(
+        'page_404',
+        'Not found — Astro treats a file at this exact path as the error-page handler.'
+      ),
+    },
+    { path: `${dir}/app/pages/[...objectPage].astro`, content: objectPageCatchAllTemplate() },
+    { path: `${dir}/public/.gitkeep`, content: '' },
+    { path: `${dir}/assets/images/.gitkeep`, content: '' },
+
+    // Bootstrap committed exports — see BOOTSTRAP_FROM. Without these the site
+    // cannot render a single page, because the shell fails loudly (by design)
+    // on a missing navigation or page export.
+    { path: `${dir}/data/site/site.json`, content: bootstrapSiteExport(ids, brandName, canonicalHost) },
+    { path: `${dir}/data/site/navigation/nav_header.json`, content: bootstrapNavHeaderExport(brandName) },
+    { path: `${dir}/data/site/navigation/nav_footer.json`, content: bootstrapNavFooterExport(brandName) },
+    { path: `${dir}/data/site/pages/page_home.json`, content: bootstrapHomePageExport(brandName) },
+    { path: `${dir}/data/site/pages/page_404.json`, content: bootstrap404PageExport(brandName) },
   ];
 
   return { clientSlug, ids, brandName, canonicalHost, dir, files };

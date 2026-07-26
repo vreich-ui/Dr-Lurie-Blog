@@ -1,0 +1,28 @@
+{
+  "__generated": {
+    "at": "2026-07-26T12:01:24.459Z",
+    "from": "create-site:bootstrap (not store-backed — replaced by the seed drive)",
+    "record_version": 0
+  },
+  "role": "footer",
+  "brand": {
+    "text": "Platform"
+  },
+  "footNote": "© Platform",
+  "groups": [
+    {
+      "id": "g_explore",
+      "title": "Explore",
+      "items": [
+        {
+          "id": "i_home",
+          "label": "Home",
+          "target": {
+            "kind": "route",
+            "href": "/"
+          }
+        }
+      ]
+    }
+  ]
+}

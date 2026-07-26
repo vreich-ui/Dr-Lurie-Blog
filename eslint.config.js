@@ -57,6 +57,6 @@ export default [
   {
     // .tmp holds local build-diff worktrees and compiled test output (both
     // full repo copies) — linting them triples every finding.
-    ignores: ['dist', 'node_modules', '.github', 'types.generated.d.ts', '.astro', '.tmp'],
+    ignores: ['dist', 'sites/*/dist', 'node_modules', '.github', 'types.generated.d.ts', '.astro', '.tmp'],
   },
 ];

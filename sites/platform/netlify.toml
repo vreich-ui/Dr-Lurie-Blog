@@ -1,0 +1,47 @@
+# T11.7 scaffold — per-site Netlify config template. The redirects here MUST
+# equal this client's site.config.ts `redirects` (the drift-guard discipline
+# root netlify.toml/sites/drlurie's site.config.ts already share). This file
+# is not read by any live build today (there is one Netlify build, Dr-Lurie's
+# — see the site.config.ts scaffold note); it ships as the plan for this
+# client's own Netlify site once T11.11-style wiring points a real deploy at
+# this tree.
+
+[build]
+  publish = "dist"
+  command = "npm run build"
+[build.environment]
+  NODE_VERSION = "20"
+
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+
+[[redirects]]
+  from = "/pdf/*"
+  to = "/.netlify/functions/get-public-pdf?blobKey=pdf/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/img/*"
+  to = "/.netlify/functions/get-public-image?blobKey=image/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/mcp"
+  to = "/.netlify/functions/mcp"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/t"
+  to = "/.netlify/functions/track-ingest"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/admin/content/*"
+  to = "/admin/content/__workspace"
+  status = 200
+  force = true

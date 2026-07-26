@@ -7,6 +7,63 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-26 (T14.2 — platform genesis: `sites/platform` scaffolded, builds, renders)
+
+`sites/platform` (`site_platform`) exists and builds: 12 pages — the ten
+injected `/admin/*` shell routes plus `/` and `/404` from its own starter
+exports. `npx astro build --config sites/platform/astro.config.ts` is green,
+and Dr-Lurie still builds unchanged from the same shell.
+
+**Most of this task was work on `create-site`, not on the platform site.** The
+scaffold as T11.7 left it could not produce a site that builds, and that gap
+would have been discovered again — more expensively — at T14.9, where the
+scaffold IS the thing being timed. Two things were missing:
+
+1. **The build entry.** T14.1 made every site a thin entry over the shell; the
+   scaffold predates it. It now writes `astro.config.ts`, `config.yaml`,
+   `app/content/config.ts`, and the three reader routes a new site can actually
+   serve (`index`, `404`, and the object-page catch-all — the catch-all must be
+   site-owned because it enumerates its sibling routes with `import.meta.glob`).
+2. **The per-site policy bundle.** The scaffold wrote `site-identity.ts` and
+   `site-binding.ts` but not `approval-policy.ts` / `creation-policy.ts` /
+   `media-policy.ts` / `policy-bindings.ts` — Dr-Lurie has all four. Without
+   `policy-bindings.ts` nothing can resolve site identity and the build dies on
+   the first component that asks. Fleet-default values; an operator retunes.
+
+**Bootstrap exports — stated plainly, because this is the one place T14.2
+touches the definition of "converted".** A scaffolded site has an empty store,
+but the shell fails LOUDLY on a missing navigation or page export by design
+("never leaves a surface half-fed"), so a site with nothing committed cannot
+render one page. The scaffold now writes five: `site.json`, `nav_header`,
+`nav_footer`, `page_home`, `page_404`. They are **rendered stubs, not converted
+objects** — no store record backs them, so they fail CLAUDE.md's criteria 2–5.
+Their `__generated.from` says exactly that (`create-site:bootstrap (not
+store-backed — replaced by the seed drive)`), a unit test asserts the marker so
+the label cannot quietly rot, and T14.3's seed drive through the front door
+replaces every one with a genuine derived export. The alternative — shipping a
+scaffold whose first build fails — would have made "cost of a new client"
+unmeasurable at T14.9.
+
+**Decisions recorded (R8):**
+
+1. **Platform keeps the neutral scaffold branding and theme.** The brief says
+   the manual's content is the product, not the styling (T14.5), so nothing was
+   spent on a palette. Brand name "Platform", starter blue/teal tokens.
+2. **`sites/*/dist` added to `.gitignore` and eslint's ignore list.** Only the
+   root `dist` was covered; the first platform build put 1402 lint errors of
+   minified output into the gate.
+3. **The `create-site` dry-run fixture was regenerated, not hand-edited** —
+   `tests/fixtures/create-site-dry-run-acme.mjs` now shows 35 files. The
+   scaffold test was split in two so the bootstrap-export rule has its own name
+   in the output rather than hiding inside a "ships empty" assertion that is no
+   longer true.
+
+**Still Dr-Lurie-shaped, deliberately, and now visible:** `sites/platform` has
+no Netlify project, no env, no store, and no MCP endpoint. That is exactly
+T14.3, which is a human gate.
+
+**Next in queue:** T14.3 (HUMAN GATE — Netlify provisioning + repo rename).
+
 ## Session 2026-07-26 (T14.1 — app-shell extraction: one shell in core, per-site build entries)
 
 The build is no longer hardwired to one client. `src/` at the repo root WAS
