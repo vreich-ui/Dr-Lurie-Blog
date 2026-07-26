@@ -1,0 +1,26 @@
+{
+  "__generated": {
+    "at": "2026-07-26T17:52:12.221Z",
+    "from": "objects/page/by-id/page_manual_genesis.json",
+    "record_version": 2
+  },
+  "pageType": "system",
+  "route": "/manual/genesis",
+  "sections": [
+    {
+      "data": {
+        "body": "<h2>Genesis</h2><ol><li><strong>create-site --name &lt;client&gt;</strong> scaffolds the site directory: config bundle, build entry, function shims, seeds, and bootstrap exports that let the site build before any object exists.</li><li>The credentialed half provisions the Netlify project, links the repo, and sets the env — including the generated secrets and the site id the blob runtime keys on.</li><li>The seed drive creates the starter pack through <strong>/mcp</strong> in dependency order: <strong>navigation first, then the site singleton</strong> (its default-navigation references must resolve), then pages, taxonomy, theme, and recipes.</li><li>Publishing each object replaces its bootstrap stub with a genuine derived export; one release makes the site render from real objects.</li></ol><p>Every site is a thin entry over the same shell and engine. Fixing the engine fixes every site; a client’s content, policies, and workflows are data, never forked code.</p>"
+      },
+      "id": "s_genesis",
+      "type": "prose"
+    }
+  ],
+  "seo": {
+    "description": "From one command to a live tenant.",
+    "robots": {
+      "follow": false,
+      "index": false
+    }
+  },
+  "title": "Manual — how a site is born"
+}
