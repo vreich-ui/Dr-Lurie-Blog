@@ -37,7 +37,7 @@ export type SiteConfig = z.infer<typeof siteConfigSchema>;
 
 export const siteConfig: SiteConfig = siteConfigSchema.parse({
   siteId: siteIdentityConfig.siteId,
-  canonicalHost: 'https://platform.netlify.app',
+  canonicalHost: 'https://kugel-platform.netlify.app',
   imageDomains: [],
   redirects: [
     { from: '/pdf/*', to: '/.netlify/functions/get-public-pdf?blobKey=pdf/:splat', status: 200 },

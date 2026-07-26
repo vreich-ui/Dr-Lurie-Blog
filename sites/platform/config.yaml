@@ -1,6 +1,6 @@
 site:
   name: Platform
-  site: 'https://platform.netlify.app'
+  site: 'https://kugel-platform.netlify.app'
   base: '/'
   trailingSlash: false
 

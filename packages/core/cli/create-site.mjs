@@ -989,10 +989,16 @@ const { objectId } = Astro.props as Props;
 // published artifact.
 const BOOTSTRAP_FROM = 'create-site:bootstrap (not store-backed — replaced by the seed drive)';
 
+// A fixed sentinel, not the scaffold time. `at` means "when the store record
+// was published" and no record was: a real timestamp here would claim a publish
+// that never happened, and it would make buildPlan non-deterministic (two calls
+// a millisecond apart differ, which the idempotency test correctly caught).
+const BOOTSTRAP_AT = '1970-01-01T00:00:00.000Z';
+
 const bootstrapExport = (body) =>
   `${JSON.stringify(
     {
-      __generated: { at: new Date().toISOString(), from: BOOTSTRAP_FROM, record_version: 0 },
+      __generated: { at: BOOTSTRAP_AT, from: BOOTSTRAP_FROM, record_version: 0 },
       ...body,
     },
     null,
@@ -1260,7 +1266,24 @@ export const writeFiles = (plan) => {
   }
 };
 
+/**
+ * Look up an existing site by name so re-running provisioning is idempotent
+ * rather than creating a second project (W14 T14.3: the first live run failed
+ * partway through, and the only safe retry is one that reuses the site it
+ * already made).
+ */
+const findNetlifySite = async (fetchImpl, token, siteName) => {
+  const response = await fetchImpl(`https://api.netlify.com/api/v1/sites?name=${encodeURIComponent(siteName)}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) return undefined;
+  const sites = await response.json().catch(() => []);
+  return Array.isArray(sites) ? sites.find((site) => site.name === siteName) : undefined;
+};
+
 const createNetlifySite = async (fetchImpl, token, siteName) => {
+  const existing = await findNetlifySite(fetchImpl, token, siteName);
+  if (existing) return existing;
   const response = await fetchImpl('https://api.netlify.com/api/v1/sites', {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -1291,7 +1314,17 @@ const setNetlifyEnvVar = async (fetchImpl, token, accountId, siteId, key, value)
     {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ key, scopes: ['builds', 'functions'], values: [{ value, context: 'production' }] }),
+      // The endpoint takes an ARRAY of variables. A bare object comes back as
+      // 400 "param is missing or the value is empty: _json" — which is what the
+      // first live run of this path hit (W14 T14.3). Scopes cover every context
+      // so a preview/branch deploy is not silently missing its secrets.
+      body: JSON.stringify([
+        {
+          key,
+          scopes: ['builds', 'functions', 'runtime', 'post_processing'],
+          values: [{ value, context: 'all' }],
+        },
+      ]),
     }
   );
   if (!response.ok) {
@@ -1306,8 +1339,12 @@ const setNetlifyEnvVar = async (fetchImpl, token, accountId, siteId, key, value)
  * real network call — mirroring the object-publish.ts / provision-pdf-tool-
  * stores.mjs testing seam pattern used elsewhere in this repo.
  */
-export const executeNetlifyProvisioning = async (plan, { token, fetchImpl = fetch, getStoreImpl }) => {
-  const site = await createNetlifySite(fetchImpl, token, plan.clientSlug);
+export const executeNetlifyProvisioning = async (plan, { token, fetchImpl = fetch, getStoreImpl, siteName }) => {
+  // The Netlify subdomain is globally unique, so it cannot always equal the
+  // client slug (W14 T14.3: `platform.netlify.app` was taken). `siteName`
+  // overrides it; the in-repo slug — which every id, store, and path is derived
+  // from — stays the slug either way.
+  const site = await createNetlifySite(fetchImpl, token, siteName || plan.clientSlug);
   const siteId = site.id || site.site_id;
   const accountId = site.account_id;
 
@@ -1363,6 +1400,11 @@ const parseArgs = (argv) => {
       i += 1;
     } else if (arg === '--dry-run') {
       opts.dryRun = true;
+    } else if (arg === '--provision-only') {
+      opts.provisionOnly = true;
+    } else if (arg === '--netlify-site-name') {
+      opts.netlifySiteName = argv[i + 1];
+      i += 1;
     }
   }
   return opts;
@@ -1378,19 +1420,31 @@ export const main = async (argv) => {
     return;
   }
 
+  // W14 T14.3: scaffolding and PROVISIONING are separate sittings in practice —
+  // the directory is committed in one wave and the Netlify account authority
+  // arrives in another. Returning early on an existing directory silently
+  // skipped the Netlify half, so the only way to provision was to delete a
+  // committed site tree first. `--provision-only` is the seam.
   const targetDir = path.join(repoRoot, plan.dir);
-  if (fs.existsSync(targetDir)) {
+  const alreadyScaffolded = fs.existsSync(targetDir);
+
+  if (alreadyScaffolded && !opts.provisionOnly) {
     console.log(`[create-site] ${plan.dir}/ already exists — leaving it untouched (idempotent re-run).`);
-    console.log('[create-site] Delete or rename it first if you want a clean re-scaffold.');
+    console.log('[create-site] Re-run with --provision-only to do the Netlify half against this existing tree,');
+    console.log('[create-site] or delete/rename the directory first for a clean re-scaffold.');
     return;
   }
 
-  writeFiles(plan);
-  console.log(`[create-site] scaffolded ${plan.files.length} files under ${plan.dir}/.`);
+  if (alreadyScaffolded) {
+    console.log(`[create-site] ${plan.dir}/ already exists — provisioning only, no files written.`);
+  } else {
+    writeFiles(plan);
+    console.log(`[create-site] scaffolded ${plan.files.length} files under ${plan.dir}/.`);
+  }
 
   if (netlifyToken) {
     console.log('[create-site] provisioning the Netlify site + blob stores…');
-    const result = await executeNetlifyProvisioning(plan, { token: netlifyToken });
+    const result = await executeNetlifyProvisioning(plan, { token: netlifyToken, siteName: opts.netlifySiteName });
     console.log(`[create-site] Netlify site created: id=${result.siteId}`);
     for (const storeName of CORE_BLOB_STORES) {
       const failed = result.storeFailures.find((f) => f.storeName === storeName);
