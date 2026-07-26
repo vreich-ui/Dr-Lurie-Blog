@@ -7,6 +7,70 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-26 (mcp.ts decoupled — the MCP server is fleet law; platform gets its own endpoint)
+
+Wolf sanctioned the bounded exception. The server now lives at
+`packages/core/server/functions/mcp.ts` and each site owns its `/mcp` endpoint.
+Dr-Lurie's tool behavior is unchanged; the tool BODIES were not touched.
+
+**The plan's premise was wrong, and the correction is the interesting part.**
+The pre-work read said `mcp.ts` had exactly one coupling — the
+`sites/drlurie/config/policy-bindings` import — so the fix was "delete a line
+and move the file". That was true of the *obvious* coupling and missed the
+structural one: **`mcp.ts` is a COMPOSITE.** It statically imports the
+`handler` of six sibling functions and invokes them in-process:
+
+| Sibling | What it is |
+| --- | --- |
+| `save-artifact`, `object-store`, `deploy-status` | per-site SHIMS, already bound to a SiteBinding |
+| `save-json-blob`, `publish-article`, `verify-article-images` | the FROZEN legacy article path — Dr-Lurie's, repo-root, off-limits |
+
+A file move alone would have re-pointed the first three at the core factories
+(unbound) and made core import the second three (the legacy dialect, into fleet
+law). Both wrong. So the decoupling is **dependency injection, not relocation**:
+`configureMcp()` is the seam, each site's shim registers its own bindings,
+builds the governed trio from the core factories with ITS binding, and passes
+them in.
+
+**The legacy trio is OPTIONAL, and that is the load-bearing decision.** A client
+born after the object substrate injects nothing for it; the tools that need it
+throw a clear "this site has no legacy article path — articles here are
+content_item objects" rather than existing and half-working. This is Wolf's
+2026-07-13 ruling made structural: reverse support is not required, and the
+legacy dialect does not propagate to the fleet. It is also what protects the
+future learning layer — every client exposes the same governed contract, so
+workflow experience transfers; only Dr-Lurie carries the extra pre-object
+surface, and it dies with the legacy path.
+
+**Fails closed.** Importing the module without `configureMcp` throws. A silent
+fallback to another tenant's handlers is the one outcome worse than a crash.
+
+`create-site` special-cases the mcp shim (it is not a plain
+`createHandler(siteBinding)` factory) and generates the legacy-free version for
+every new client — so a third site's `/mcp` is born working, with no manual
+step.
+
+Also de-sited, because the file is fleet law now and the zero-drlurie lint
+correctly refused it: nine example ids in tool descriptions
+(`req_publish_drlurie_…` → `req_publish_launch_…`, `site_drlurie` → `site_acme`)
+and one user-visible sentence in the pdf-tool grant description that named the
+client's blob stores. Verified first that the test suite uses those strings as
+input fixtures for format validation, not as pinned description text.
+
+Gates: both sites build; 1699/1699 core tests; 89/89 script tests; eslint +
+prettier clean; zero-drlurie lint green over the newly-arrived 4,500-line file.
+
+**Netlify, same session — all three "Wolf-only" items turned out to be mine.**
+`kugel-platform` is linked to the repo (the Netlify GitHub App was already
+authorized for the account, so its installation id was reusable via the API — no
+UI handshake), Identity is enabled, base directory `sites/platform`, and the
+first build went READY. `/` and `/admin` return 200. `/mcp` returned 404 — this
+commit is what fixes it, on the next deploy. The blob-probe token scope stayed
+unresolved and stayed irrelevant: the stores provision on first write from the
+site's own functions.
+
+**Next in queue:** T14.4 (fleet propagation proof) — now genuinely unblocked.
+
 ## Session 2026-07-26 (T14.3 PREP — agent side complete; HALTED at the account-authority gate)
 
 `human_gate` mode: prepared in full, not completed. Nothing here is titled
