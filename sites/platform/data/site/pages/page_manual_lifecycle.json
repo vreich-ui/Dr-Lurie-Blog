@@ -1,0 +1,26 @@
+{
+  "__generated": {
+    "at": "2026-07-26T17:51:52.216Z",
+    "from": "objects/page/by-id/page_manual_lifecycle.json",
+    "record_version": 2
+  },
+  "pageType": "system",
+  "route": "/manual/lifecycle",
+  "sections": [
+    {
+      "data": {
+        "body": "<h2>One lifecycle for everything</h2><ol><li><strong>checkout</strong> — take a 15-minute lease on the object. One writer at a time; the lease expires on its own if a session dies.</li><li><strong>patch</strong> — apply typed operations (each with an exact inverse) under the lease, carrying the expected record version so concurrent edits fail loudly instead of merging silently.</li><li><strong>validate</strong> — every write runs the validation engine: schema, safety, reference integrity, structural invariants. A publish-blocking criterion refuses the publish, not the draft.</li><li><strong>publish</strong> — the record becomes the published revision and its derived export is committed to the repo (with <strong>[skip netlify]</strong> — publishing does not deploy).</li><li><strong>release</strong> — one build of the accumulated exports; the release verifies the deploy went live before reporting success.</li></ol><p>Store reads are eventually consistent on this runtime: a dependent read moments after a write may briefly see the previous state. Drives that chain dependent writes wait and retry.</p>"
+      },
+      "id": "s_lifecycle",
+      "type": "prose"
+    }
+  ],
+  "seo": {
+    "description": "Checkout, patch, publish, release: how a change becomes live.",
+    "robots": {
+      "follow": false,
+      "index": false
+    }
+  },
+  "title": "Manual — the object lifecycle"
+}
