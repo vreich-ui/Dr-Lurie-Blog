@@ -38,7 +38,13 @@ const ensureLambdaContext = (event: unknown) => {
   if (lambdaContextConnected) return;
   if (!hasNetlifyBlobContext(event)) return;
 
-  connectLambda(event);
+  // `hasNetlifyBlobContext` already verified the `blobs` context connectLambda
+  // actually consumes; the strict @netlify/blobs `LambdaEvent` also wants
+  // `headers`, which the blob path never reads (blob-store.ts does the same
+  // connect through its looser module type). Cast to the param type so the
+  // opt-in tsconfig — which type-checks the direct @netlify/blobs import —
+  // compiles instead of rotting out of CI (W14 finding F8).
+  connectLambda(event as Parameters<typeof connectLambda>[0]);
   lambdaContextConnected = true;
 };
 

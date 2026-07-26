@@ -146,7 +146,11 @@ const handleGetBlob: ActionHandler = async (params, event) => {
 
   const { buffer, metadata } = blob;
   const size = buffer.byteLength;
-  const declaredType = metadata.contentType || metadata['content-type'];
+  // Blob metadata values are `unknown` — a stored contentType is only usable if
+  // it is actually a string. Guarding here also lets the opt-in tsconfig, which
+  // resolves the metadata type strictly, compile (W14 finding F8).
+  const rawType = metadata.contentType || metadata['content-type'];
+  const declaredType = typeof rawType === 'string' ? rawType : undefined;
   const isText = declaredType
     ? declaredType.startsWith('text/') || /json|xml|javascript|csv/.test(declaredType)
     : looksLikeText(buffer);
