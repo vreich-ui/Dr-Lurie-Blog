@@ -7,6 +7,65 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-26 (T14.5 SHIPPED — the manual IS the product; T14.4 CLOSED on Wolf's CI confirmation)
+
+**T14.4 is closed.** Wolf confirmed all checks GREEN on the merged PRs
+(#474–#477) — that was the last outstanding proof: the first live TWO-SITE
+`discover-fleet` matrix run through Actions, both sites building from one
+core change. With the platform MCP round-trip (this phase, live), the
+informational build-diff on Dr-Lurie (reviewed, no unintended change), and
+the refs recorded here, all four T14.4 proofs stand. PUBLISH_SECRET rotation:
+Wolf ruled "ignore it" — recorded, nothing rotated.
+
+**T14.5 — the platform site now documents itself through its own front
+door.** Fifteen `page` objects on `site_platform`: `/manual` (index),
+`/manual/lifecycle`, `/manual/roles`, `/manual/genesis`, and one reference
+page per governed type (×11). The reference half of every type page is
+GENERATED from that type's live `object_contract` — fields, patch ops,
+lifecycle verbs, publish policy — never hand-typed. Driver:
+`scripts/platform-manual-drive.mjs` (create/update/publish through `/mcp`;
+`--check` regenerates from the live contracts and diffs — ran CLEAN 15/15).
+All fifteen published + released; verified rendering live (index, lifecycle,
+genesis, content-item spot-checked 200 with correct copy). `page_home` also
+patched live via `set_page_meta` — title `Platform — home` +
+`navigationOverrides.footer` — publish green (the `structure_home_footer`
+422 is gone), and the fix is now BORN into every future site:
+`create-site`'s `bootstrapHomePageExport` carries the footer override, the
+committed platform stub matches, and the genesis e2e pins it.
+
+**What the drive surfaced (T14.6 seeds, each hit for real):**
+
+1. **Reader-safety keyword overreach.** `assertReaderSafe` forbids the
+   literal words `private` and `strategy` (word-boundary, case-insensitive)
+   in ALL page prose, fleet-wide — the content_item manual intro could not
+   say "private strategy metadata" about its own model. Reworded here, but
+   the real finding is that no site can publish ordinary copy containing
+   "strategy" on any page. Weigh scoping the scan to article projections.
+2. **Publish does NOT release the lock** (and neither does discard — both
+   observed). All 13 pages from pass one were still locked a full lease
+   later; the driver now calls `object_checkin` after publish. Lock hygiene
+   needs a ruling: should publish auto-checkin?
+3. **No deletion verb exists.** Three probe pages made during 422 bisection
+   could not be removed through the front door at all — removed via the
+   Blobs API back door (API store name is `site:site-objects`, literal key
+   paths, fleet token). An agent mistake is otherwise PERMANENT. The store
+   needs a governed retire/delete verb.
+4. **Version drift between `object_get` and patch** under eventual reads —
+   first patch attempt hit "Record version conflict" with a fresh get;
+   retry-under-lock with a re-get succeeded. Known consistency constraint,
+   now with a live reproduction.
+5. **`tests/netlify` opt-in suite does not COMPILE on main** (pre-existing,
+   verified on a clean tree: `admin-blob-manager.ts` + `blob-admin.ts` tsc
+   errors). CI never runs it, so it rotted. Fix or gate in T14.7.
+
+The 422 itself was diagnosed by reading the FULL structured `validation`
+array off the raw RPC response — the driver's 180-char error truncation had
+hidden the `reader_safety` criterion entirely.
+
+Gates: 1706/1706 core, 89/89 scripts, genesis e2e green, eslint + prettier
+clean; acme fixture regenerated (byte-identical — the dry-run plan lists
+filenames, not contents). Committed `T14.5: …`; no PR.
+
 ## Session 2026-07-26 (GENESIS SOLVED — the cycle was a mirage; the real defect was a silent test-store fallback in production)
 
 **Supersedes the "genesis is circular" reading in the T14.4 entry below.** It

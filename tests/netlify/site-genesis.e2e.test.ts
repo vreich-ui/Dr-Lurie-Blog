@@ -120,6 +120,9 @@ test('an empty store births the starter pack in dependency order', async () => {
     pageType: 'system',
     route: '/',
     title: 'Genesis Test',
+    // Required to PUBLISH (structure_home_footer, the 2026-07-10 incident
+    // rule) — carried at create so the born page is publishable as-is.
+    navigationOverrides: { footer: 'nav_footer' },
     seo: { description: 'Genesis test home.', robots: { index: false, follow: false } },
     sections: [{ id: 's_hello', type: 'prose', data: { body: '<h2>Born.</h2><p>Through the front door.</p>' } }],
   });

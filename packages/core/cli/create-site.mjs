@@ -1065,6 +1065,9 @@ const bootstrapHomePageExport = (brandName) =>
     pageType: 'system',
     route: '/',
     title: brandName,
+    // Required to PUBLISH the real page_home (structure_home_footer) — carried
+    // in the bootstrap so the seeded object is publishable without a fix-up patch.
+    navigationOverrides: { footer: 'nav_footer' },
     seo: {
       description: `${brandName} — a starter site, ready for real content.`,
       robots: { index: true, follow: true },
