@@ -240,3 +240,40 @@ test('adapter carries adminOnly on group and item only when set — absent other
   assert.equal(props.links[1].links?.[0].adminOnly, true);
   assert.ok(!('adminOnly' in (props.links[1].links?.[1] ?? {})));
 });
+
+// ─── W14 F3: a titleless group is top-level links, not an unlabelled dropdown ──
+
+test('F3: a group with items but NO title flattens to top-level links', () => {
+  // Every create-site scaffold ships exactly this shape — one titleless
+  // `g_primary` holding "Home". Header draws any entry carrying `links` as a
+  // dropdown, so before this it rendered as a bare chevron with "Home" trapped
+  // inside an unlabelled menu.
+  const body = navigationBodySchema.parse({
+    role: 'header',
+    groups: [{ id: 'g_primary', items: [{ id: 'i_home', label: 'Home', target: { kind: 'route', href: '/' } }] }],
+  });
+
+  const props = navigationToHeaderProps(body, resolve);
+
+  assert.deepEqual(props.links, [{ text: 'Home', href: '/' }]);
+  assert.ok(!props.links.some((link) => 'links' in link), 'a titleless group must not produce a dropdown');
+});
+
+test('F3: a group WITH a title still renders as a dropdown (Dr-Lurié unchanged)', () => {
+  const body = navigationBodySchema.parse({
+    role: 'header',
+    groups: [
+      {
+        id: 'g_learn',
+        title: 'Learn',
+        items: [{ id: 'i_library', label: 'Library', target: { kind: 'route', href: '/learn/library' } }],
+      },
+    ],
+  });
+
+  const props = navigationToHeaderProps(body, resolve);
+
+  assert.equal(props.links.length, 1);
+  assert.equal(props.links[0].text, 'Learn');
+  assert.deepEqual(props.links[0].links, [{ text: 'Library', href: '/learn/library' }]);
+});

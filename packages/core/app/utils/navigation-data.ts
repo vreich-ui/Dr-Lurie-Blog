@@ -124,15 +124,32 @@ const headerItem = (item: NavItem, resolve: NavTargetResolver): HeaderMenuLink =
 export const navigationToHeaderProps = (body: NavigationBody, resolve: NavTargetResolver): HeaderNavProps => ({
   links: body.groups
     .filter((group) => group.slot === undefined || group.slot === 'primary')
-    .map((group) => ({
-      ...(group.title !== undefined ? { text: group.title } : {}),
-      // M-5: the stored parent target maps to the same (unrendered-for-
-      // dropdowns) href the literal carries. Data preserved, behavior not.
-      ...(group.target !== undefined ? { href: resolve(group.target) } : {}),
-      ...(group.items.length > 0 ? { links: group.items.map((item) => headerItem(item, resolve)) } : {}),
-      // M-9: group-level admin gate (carried only when set → byte-identical otherwise).
-      ...(group.adminOnly ? { adminOnly: true } : {}),
-    })),
+    .flatMap((group) => {
+      // A group with items but NO title has no label to render, and Header
+      // draws any group carrying `links` as a dropdown — so it came out as a
+      // bare chevron with its items trapped inside an unlabelled menu (W14 F3;
+      // every create-site scaffold ships exactly this shape: one titleless
+      // `g_primary` holding "Home"). A titleless group is not a menu, it is a
+      // set of TOP-LEVEL links, so flatten it. Groups WITH a title are
+      // untouched, which is every group Dr-Lurié has — its header is unchanged.
+      if (group.title === undefined && group.items.length > 0) {
+        return group.items.map((item) => ({
+          ...headerItem(item, resolve),
+          ...(group.adminOnly ? { adminOnly: true } : {}),
+        }));
+      }
+      return [
+        {
+          ...(group.title !== undefined ? { text: group.title } : {}),
+          // M-5: the stored parent target maps to the same (unrendered-for-
+          // dropdowns) href the literal carries. Data preserved, behavior not.
+          ...(group.target !== undefined ? { href: resolve(group.target) } : {}),
+          ...(group.items.length > 0 ? { links: group.items.map((item) => headerItem(item, resolve)) } : {}),
+          // M-9: group-level admin gate (carried only when set → byte-identical otherwise).
+          ...(group.adminOnly ? { adminOnly: true } : {}),
+        },
+      ];
+    }),
   actions: (body.actions ?? []).map((action) => ({
     text: action.label,
     href: resolve(action.target),
