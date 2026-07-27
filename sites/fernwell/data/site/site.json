@@ -1,8 +1,8 @@
 {
   "__generated": {
-    "at": "2026-07-27T08:48:36.020Z",
+    "at": "2026-07-27T08:53:02.359Z",
     "from": "objects/site/by-id/site_fernwell.json",
-    "record_version": 2
+    "record_version": 6
   },
   "blog": {
     "categoryBase": "category",
@@ -48,6 +48,6 @@
   "name": "Fernwell",
   "urls": {
     "base": "/",
-    "canonicalHost": "https://fernwell.netlify.app"
+    "canonicalHost": "https://kugel-fernwell.netlify.app"
   }
 }
