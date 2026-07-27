@@ -1,29 +1,29 @@
 {
   "__generated": {
-    "at": "1970-01-01T00:00:00.000Z",
-    "from": "create-site:bootstrap (not store-backed — replaced by the seed drive)",
-    "record_version": 0
+    "at": "2026-07-27T08:52:36.566Z",
+    "from": "objects/page/by-id/page_home.json",
+    "record_version": 2
   },
-  "pageType": "system",
-  "route": "/",
-  "title": "Fernwell",
   "navigationOverrides": {
     "footer": "nav_footer"
   },
+  "pageType": "system",
+  "route": "/",
+  "sections": [
+    {
+      "data": {
+        "body": "<h2>Fernwell is live.</h2><p>This starter page is a bootstrap export written by <strong>create-site</strong>. Sign in at <a href=\"https://kugel-fernwell.netlify.app/admin\">https://kugel-fernwell.netlify.app/admin</a> and publish real content — the first publish replaces this file with a genuine derived export.</p>"
+      },
+      "id": "s_welcome",
+      "type": "prose"
+    }
+  ],
   "seo": {
     "description": "Fernwell — a starter site, ready for real content.",
     "robots": {
-      "index": true,
-      "follow": true
+      "follow": true,
+      "index": true
     }
   },
-  "sections": [
-    {
-      "id": "s_welcome",
-      "type": "prose",
-      "data": {
-        "body": "<h2>Fernwell is live.</h2><p>This starter page is a bootstrap export written by <code>create-site</code>, not a store-backed object. Sign in at <a href=\"/admin\">/admin</a> and publish real content — the first publish replaces this file with a genuine derived export.</p>"
-      }
-    }
-  ]
+  "title": "Fernwell"
 }
