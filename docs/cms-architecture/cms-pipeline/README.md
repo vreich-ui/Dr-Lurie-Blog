@@ -35,7 +35,7 @@ This is the sweet spot for you: the boring Sonnet tasks take one command each, t
 **Scheduled (optional, only once you trust it):** a cron entry that runs the next auto task every few hours during the day and pings you:
 
 ```
-0 9,12,15 * * *  cd /path/to/Dr-Lurie-Blog && ./.cms-pipeline/run-next-task.sh >> .cms-pipeline/cron.log 2>&1
+0 9,12,15 * * *  cd /path/to/platform && ./.cms-pipeline/run-next-task.sh >> .cms-pipeline/cron.log 2>&1
 ```
 
 Because the runner halts at every non-`auto` task, a schedule can only ever advance the safe tasks — it physically cannot auto-run a Fable task or a checkpoint. That's the safety guarantee that makes scheduling acceptable here at all. I'd still do Phase 0 by hand first and only schedule from Phase 1 onward.

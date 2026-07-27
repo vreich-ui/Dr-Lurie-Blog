@@ -9,12 +9,18 @@ type RpcBody = {
 };
 
 const previousMcpHttpAuthToken = process.env.MCP_HTTP_AUTH_TOKEN;
+const previousLambdaTaskRoot = process.env.LAMBDA_TASK_ROOT;
 
 test.afterEach(() => {
   if (previousMcpHttpAuthToken === undefined) {
     delete process.env.MCP_HTTP_AUTH_TOKEN;
   } else {
     process.env.MCP_HTTP_AUTH_TOKEN = previousMcpHttpAuthToken;
+  }
+  if (previousLambdaTaskRoot === undefined) {
+    delete process.env.LAMBDA_TASK_ROOT;
+  } else {
+    process.env.LAMBDA_TASK_ROOT = previousLambdaTaskRoot;
   }
 });
 
@@ -41,6 +47,19 @@ test('MCP_HTTP_AUTH_TOKEN unset allows initialize', async () => {
 
   assert.equal(response.statusCode, 200);
   assert.equal((body.result?.serverInfo as { name?: string } | undefined)?.name, 'Dr_Lurie_MCP_Server');
+});
+
+test('MCP_HTTP_AUTH_TOKEN unset FAILS CLOSED in a lambda runtime (W14 F1)', async () => {
+  // The open-when-unset behavior above is a dev/test convenience. In a
+  // production function runtime an unset shared token must NOT open the gate —
+  // a site shipped with no MCP_HTTP_AUTH_TOKEN (drluriescience) was wide open.
+  delete process.env.MCP_HTTP_AUTH_TOKEN;
+  process.env.LAMBDA_TASK_ROOT = '/var/task';
+
+  const { response, body } = await mcpRequest('initialize');
+
+  assert.equal(response.statusCode, 401);
+  assert.equal(body.error?.data?.reason, 'mcp_auth_missing_token');
 });
 
 test('MCP_HTTP_AUTH_TOKEN set without Authorization returns 401 with safe diagnostic data', async () => {

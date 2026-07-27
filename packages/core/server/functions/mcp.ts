@@ -1936,7 +1936,16 @@ const getAuthResult = async (event: LambdaEvent): Promise<AuthResult> => {
 
   const token = toNonEmptyString(process.env.MCP_HTTP_AUTH_TOKEN);
   if (!token) {
-    if (process.env.MCP_HTTP_AUTH_TOKEN === undefined) return { ok: true, verifiedAgentName };
+    // W14 F1: an UNSET shared token opens the gate ONLY in a non-lambda dev/test
+    // runtime. In a production function runtime it must FAIL CLOSED — a verified
+    // per-agent token is then the only way through — so a site that ships with
+    // no MCP_HTTP_AUTH_TOKEN (as drluriescience did) is never wide open. Same
+    // lambda-detection posture as the blob-store fail-closed guard. An
+    // explicitly-empty token ('') already fails closed below, unchanged.
+    const inLambdaRuntime = Boolean(process.env.LAMBDA_TASK_ROOT || process.env.AWS_LAMBDA_FUNCTION_NAME);
+    if (process.env.MCP_HTTP_AUTH_TOKEN === undefined && !inLambdaRuntime) {
+      return { ok: true, verifiedAgentName };
+    }
     return verifiedAgentName ? { ok: true, verifiedAgentName } : { ok: false, reason: 'missing_token' };
   }
 
