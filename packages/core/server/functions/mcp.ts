@@ -1709,6 +1709,23 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
     ),
   },
   {
+    name: 'object_retire',
+    description:
+      'RETIRE an object: the governed way to remove one (W14 F6). Archives the record (reversible — history is preserved, and a separate purge hard-deletes only after a 30-day grace period), REMOVES its committed export in the same commit, and — for a page — writes a 301 redirect from the retired route so no reader is dropped on a 404. Requires a held lock_token, exactly like patch and publish. REFUSED (409) when anything still references the object (the referrers are named — repoint or retire those first), when a review is open, or for the site singleton. The retirement commits to main with [skip netlify]: the live site keeps serving the old build until an explicit release_to_production, which is when the page actually disappears. Idempotent — retiring an already-archived object reports success.',
+    inputSchema: objectSchema(
+      {
+        object_type: objectTypeEnumSchema(),
+        object_id: stringSchema(),
+        lock_token: stringSchema('Lock token from object_checkout; required to retire.'),
+        redirect_to: stringSchema(
+          'Where readers of the retired route should land. Defaults to "/" — a retired page never 404s.'
+        ),
+        reason: stringSchema('Optional note recorded in the retirement history entry.'),
+      },
+      ['object_type', 'object_id', 'lock_token']
+    ),
+  },
+  {
     name: 'object_publish',
     description:
       'Publish a CMS object (any of the nine governed types) through the generic publish operation: run the approval-policy publish gate, then validate → materialize → commit the export to git → stamp the record, in that order (the record is never stamped before the export commits). Requires a held lock_token. Omit published_time to publish now; null (unpublish) and future timestamps are rejected in this phase. The gate is identical to the admin UI: autonomous object types publish directly with no human; approval-gated types require a current human approval pinned (M-6) to the exact action being attempted. content_item (article objects) publishes here too since W7.3 — Tier 1 stays autonomous under the committed policy. The export commit carries [skip netlify], so a successful publish does NOT deploy — the change commits to main and goes live only on an explicit release (release_to_production); the response "production" block spells this out. Publish deliberately KEEPS your lock (it re-stamps under the live lease so concurrent body drift is caught, not silently overwritten) — it is NOT terminal for the lock. Call object_checkin when you are done, or the object stays locked to everyone else for the rest of the 15-minute lease.',
@@ -4361,6 +4378,15 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
         object_id: input.object_id,
         lock_token: input.lock_token,
         entries: input.entries,
+      });
+    case 'object_retire':
+      return callObjectAction(event, {
+        action: 'retire',
+        object_type: input.object_type,
+        object_id: input.object_id,
+        lock_token: input.lock_token,
+        ...(input.redirect_to !== undefined ? { redirect_to: input.redirect_to } : {}),
+        ...(input.reason !== undefined ? { reason: input.reason } : {}),
       });
     case 'object_publish':
       return callObjectPublish(event, {

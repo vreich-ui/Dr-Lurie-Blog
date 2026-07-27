@@ -334,3 +334,82 @@ test('object committer and article publisher share zero import edges (OQ-12)', (
     'publish-article.ts must not import the object committer'
   );
 });
+
+// ─── W14 F6: deletions (the primitive retire/unpublish needs) ────────────────
+
+test('F6: deletions become tree entries with sha:null against base_tree', async () => {
+  await withGitHubEnv(async () => {
+    const mock = createGitHubApiMock();
+    await run(mock, { deletions: ['sites/acme/data/site/pages/page_gone.json'] });
+
+    const treeCall = mock.calls.find((call) => call.method === 'POST' && call.path.endsWith('/git/trees'));
+    const entries = (treeCall?.body?.tree ?? []) as Array<Record<string, unknown>>;
+    const deletion = entries.find((entry) => entry.path === 'sites/acme/data/site/pages/page_gone.json');
+
+    assert.ok(deletion, 'the deleted path must appear as a tree entry');
+    assert.equal(deletion.sha, null, 'removal is expressed as sha:null');
+    assert.ok(treeCall?.body?.base_tree, 'deletion is only meaningful against a base_tree');
+  });
+});
+
+test('F6: a deletions-only commit is valid (retire writes nothing, removes an export)', async () => {
+  await withGitHubEnv(async () => {
+    const mock = createGitHubApiMock();
+    const result = await commitMaterializedFiles({
+      files: [],
+      deletions: ['sites/acme/data/site/pages/page_gone.json'],
+      message: 'Retire page: page_gone',
+      fetchImpl: mock.fetchImpl,
+      sleep: async () => {},
+    });
+
+    assert.equal(result.noOp, false);
+    const blobCalls = mock.calls.filter((call) => call.path.endsWith('/git/blobs'));
+    assert.equal(blobCalls.length, 0, 'a deletions-only commit uploads no blobs');
+  });
+});
+
+test('F6: deleting an already-absent path is a no-op, so a retried retire converges', async () => {
+  await withGitHubEnv(async () => {
+    // fixedTreeSha === the base tree the mock reports for head0: the resulting
+    // tree is unchanged, which is exactly what deleting an absent path yields.
+    const mock = createGitHubApiMock({ fixedTreeSha: 'tree0' });
+    const result = await commitMaterializedFiles({
+      files: [],
+      deletions: ['sites/acme/data/site/pages/already_gone.json'],
+      message: 'Retire page: already_gone',
+      fetchImpl: mock.fetchImpl,
+      sleep: async () => {},
+    });
+
+    assert.equal(result.noOp, true, 'no commit is minted when the tree is unchanged');
+    assert.equal(mock.calls.filter((call) => call.method === 'POST' && call.path.endsWith('/git/commits')).length, 0);
+  });
+});
+
+test('F6: refuses to write and delete the same path in one commit', async () => {
+  await withGitHubEnv(async () => {
+    const mock = createGitHubApiMock();
+    await assert.rejects(
+      () => run(mock, { deletions: [FILES[0].path] }),
+      /both written and deleted/,
+      'order-dependent intent must be rejected, not silently resolved'
+    );
+  });
+});
+
+test('F6: an empty commit (no files, no deletions) is still refused', async () => {
+  await withGitHubEnv(async () => {
+    const mock = createGitHubApiMock();
+    await assert.rejects(
+      () =>
+        commitMaterializedFiles({
+          files: [],
+          message: 'nothing',
+          fetchImpl: mock.fetchImpl,
+          sleep: async () => {},
+        }),
+      /No materialized files to commit/
+    );
+  });
+});

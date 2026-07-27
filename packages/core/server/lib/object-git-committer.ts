@@ -74,6 +74,16 @@ export class ObjectGitCommitError extends Error {
 
 export type CommitMaterializedFilesInput = {
   files: MaterializedFile[];
+  /**
+   * Repo-relative paths to DELETE in the same commit (W14 F6). A retire removes
+   * an object's export so the page stops building — without this the record can
+   * be archived while its export keeps rendering, which inverts the reader-safe
+   * direction (the exact reason unpublish was deferred in object-publish.ts).
+   * Deletion rides GitHub's tree API: an entry with `sha: null` against
+   * `base_tree` removes the path. Deleting a path that is already absent is a
+   * no-op for the resulting tree, so a retried retire converges.
+   */
+  deletions?: string[];
   message: string;
   /** Total attempts at the tree→commit→ref sequence, including the first. */
   maxAttempts?: number;
@@ -172,13 +182,26 @@ export const commitMaterializedFiles = async (
   input: CommitMaterializedFilesInput
 ): Promise<CommitMaterializedFilesResult> => {
   const { files, message } = input;
+  const deletions = input.deletions ?? [];
 
-  if (!files.length) {
+  // A commit must DO something: writes, deletions, or both. A retire commit
+  // carries deletions and no files, which is legitimate.
+  if (!files.length && !deletions.length) {
     throw new ObjectGitCommitError('invalid_input', 400, 'No materialized files to commit.');
   }
   const paths = new Set(files.map((file) => file.path));
   if (paths.size !== files.length) {
     throw new ObjectGitCommitError('invalid_input', 400, 'Materialized files contain duplicate paths.');
+  }
+  const deletionPaths = new Set(deletions);
+  if (deletionPaths.size !== deletions.length) {
+    throw new ObjectGitCommitError('invalid_input', 400, 'Deletions contain duplicate paths.');
+  }
+  // Writing and deleting the same path in one commit is a caller bug — the
+  // outcome would depend on tree-entry order rather than intent.
+  const conflict = deletions.find((path) => paths.has(path));
+  if (conflict) {
+    throw new ObjectGitCommitError('invalid_input', 400, `Path is both written and deleted: ${conflict}`);
   }
   if (!message.trim()) {
     throw new ObjectGitCommitError('invalid_input', 400, 'A commit message is required.');
@@ -201,12 +224,16 @@ export const commitMaterializedFiles = async (
       })
     )
   );
-  const treeEntries = files.map((file, index) => ({
-    path: file.path,
-    mode: '100644',
-    type: 'blob',
-    sha: blobs[index].sha,
-  }));
+  const treeEntries = [
+    ...files.map((file, index) => ({
+      path: file.path,
+      mode: '100644',
+      type: 'blob',
+      sha: blobs[index].sha,
+    })),
+    // `sha: null` against base_tree removes the path (GitHub Git Trees API).
+    ...deletions.map((path) => ({ path, mode: '100644', type: 'blob', sha: null })),
+  ];
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     const ref = await githubRequest<GitHubRef>(

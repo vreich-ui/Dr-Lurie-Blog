@@ -50,6 +50,8 @@ import {
   validateObject,
   type ObjectValidationContext,
 } from './object-validate.js';
+import { retireObject } from './object-retire.js';
+import { loadSiteRedirects } from './site-redirects.js';
 import { validateObjectIdForType } from '../../lib/object-ids.js';
 import { mintId, MintIdError } from '../../lib/object-ids-mint.js';
 import { applyPatchOps, PatchApplyError } from '../../lib/object-patch-apply.js';
@@ -265,6 +267,17 @@ export const objectVerbRequestSchema = z.discriminatedUnion('action', [
     lock_token: z.string().min(1),
     // Exactly what each rejected op's history entry stores (T0.6, C§2.4).
     entries: z.array(z.object({ op: z.unknown(), capture: z.unknown() })).min(1),
+  }),
+  z.object({
+    // W14 F6: the governed removal verb. `redirect_to` exists because a retired
+    // route must forward, never 404 (Wolf's ruling: this is a DTC sales and
+    // publishing project — readers are not lost to a removal).
+    action: z.literal('retire'),
+    object_type: objectTypeSchema,
+    object_id: objectId,
+    lock_token: z.string().min(1),
+    redirect_to: z.string().min(1).optional(),
+    reason: z.string().optional(),
   }),
   z.object({
     action: z.literal('publish_by_time'),
@@ -1392,6 +1405,44 @@ export const handleObjectVerb = async (
 
       await store.setJSON(key, result.record);
       return ok({ ...result.body, version: result.record.version, content_revision: result.record.content_revision });
+    }
+
+    case 'retire': {
+      // W14 F6. The heavy lifting (lock, review, references, export removal,
+      // redirect, archive) is in object-retire.ts; this wires it to the store
+      // and reuses the publish deps, since a retire is an export-commit too.
+      const referrerIndex = async (): Promise<(objectType: ObjectType, objectId: string) => string[]> => {
+        // A retire is rare and the sweep is bounded by the fleet's own inventory,
+        // so the simple approach — read every active record once and look for the
+        // id — is the honest one. It catches nav→page, page→section, site→nav.
+        const all = await listAllObjectRecords(store, { status: 'active' });
+        return (objectType, objectId) =>
+          all
+            .filter((candidate) => candidate.object_id !== objectId)
+            .filter((candidate) => JSON.stringify(candidate.body ?? {}).includes(`"${objectId}"`))
+            .map((candidate) => candidate.object_id);
+      };
+
+      const existingRedirects = await loadSiteRedirects(store);
+
+      const result = await retireObject(
+        store as unknown as Parameters<typeof retireObject>[0],
+        {
+          object_type: request.object_type,
+          object_id: request.object_id,
+          lock_token: request.lock_token,
+          actor: principal,
+          ...(request.redirect_to !== undefined ? { redirect_to: request.redirect_to } : {}),
+          ...(request.reason !== undefined ? { reason: request.reason } : {}),
+        },
+        {
+          nowMs: ts,
+          findReferrers: await referrerIndex(),
+          existingRedirects,
+          ...options.publishDeps,
+        }
+      );
+      return { status: result.status, body: result.body };
     }
 
     case 'publish_by_time': {
