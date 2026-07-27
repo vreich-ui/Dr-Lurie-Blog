@@ -7,6 +7,47 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-27 (F3 investigated — half of it was MY OWN measurement error; the real defects fixed)
+
+**The "empty footer" was never a site bug — it was an artifact of the agent's
+screenshot tool.** The automated browser tab runs with
+`document.visibilityState === "hidden"`, and I measured **zero `requestAnimationFrame`
+ticks in 800 ms** in it. The shell's intersect Observer sets `no-intersect` on every
+animated element at start and only removes it inside a `requestAnimationFrame`
+callback, so with no frames: the attribute is never cleared, `motion-safe:md:opacity-0`
+holds, and the footer photographs blank. A **fresh IntersectionObserver on the same
+element also never fired**, confirming it is frame-lifecycle starvation, not page code.
+Rendering the same build in a real browser (Playwright, `visibilityState: "visible"`)
+gives `no-intersect: false`, `opacity: 1`, full footer text — on a SHORT,
+non-scrollable page, which was the supposed trigger. Dr-Lurié only ever looked
+"fine" in the automated browser because I scrolled it, and scrolling forces a frame.
+
+**Lesson recorded: never file a rendering defect from an automated screenshot alone.**
+Verify visual findings in a frame-ticking context (the local Playwright render against
+a locally-served `dist` is the cheap, offline way — external fetches are blocked here).
+
+**What the honest render DID expose — two real defects, both fleet-law, both fixed:**
+
+1. **A client literal shipped in core.** `packages/core/app/components/widgets/Footer.astro`
+   hard-defaulted `descriptor` to Dr-Lurié's line ("Science-led education for aging
+   skin changes…"), so EVERY site without its own `nav_footer.brand.descriptor`
+   rendered Dr-Lurié's skincare copy in its footer — platform and fernwell both did.
+   Resolution is now `brand.descriptor` → this site's `metadataDefaults.description`
+   → empty. No client literal in fleet law. (The zero-drlurie lint missed it because
+   it is prose, not the token `drlurie` — worth extending that lint later.)
+2. **A titleless nav group rendered as an unlabelled dropdown.** Header draws any
+   entry carrying `links` as a dropdown; a group with items but no `title` produced a
+   bare chevron with its links trapped inside — and every `create-site` scaffold ships
+   exactly that shape (one titleless `g_primary` holding "Home"). `navigationToHeaderProps`
+   now flattens titleless groups to TOP-LEVEL links. Groups WITH a title are untouched,
+   which is every group Dr-Lurié has, so its header is unchanged (its byte-identity
+   adapter tests still pass).
+
+**Verified in a real browser after the fix:** platform's header shows "Home" as a
+top-level link (`headerHasEmptyDropdown: false`) and the footer reads "Platform — a
+starter site, ready for real content." Two regression tests pin both halves. Gates:
+1714 core (+2) + 89 script, opt-in 1311, eslint + prettier clean.
+
 ## Session 2026-07-27 (Identity fixed fleet-wide; the "all three sites rebuild" question answered)
 
 **Wolf reported admin login failing on BOTH platform and fernwell.** Identity was

@@ -2,6 +2,7 @@
 import { Icon } from 'astro-icon/components';
 import { SITE } from 'astrowind:config';
 import { getHomePermalink } from '~/utils/permalinks';
+import { getSiteObject } from '~/utils/site-object';
 
 interface Link {
   text?: string;
@@ -25,6 +26,13 @@ export interface Props {
   descriptor?: string;
 }
 
+// The footer descriptor is per-TENANT copy, so core must not carry a client's
+// sentence as its default — this file is fleet law and shipped Dr-Lurié's
+// skincare line to every other site's footer (W14 F3: platform and fernwell both
+// rendered it). Resolution order is now: the footer nav object's
+// brand.descriptor → this site's own metadataDefaults.description → nothing.
+// No client literal, and a site that sets neither simply shows no descriptor.
+const siteObject = getSiteObject();
 const {
   socialLinks = [],
   secondaryLinks = [],
@@ -32,7 +40,7 @@ const {
   footNote = '',
   theme = 'light',
   brand = SITE?.name,
-  descriptor = 'Science-led education for aging skin changes, age-related scent, and future age-aware skincare solutions.',
+  descriptor = siteObject?.metadataDefaults?.description ?? '',
 } = Astro.props;
 ---
 
