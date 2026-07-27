@@ -25,6 +25,7 @@ import { getRegisteredComponent } from '@core/lib/registry/components/index';
 import { parsePageExport, resolvePage } from '@core/lib/renderer/resolve';
 import { sectionAnnotationAttrs } from '@core/lib/renderer/section-annotations';
 import { createNavTargetResolver, navigationToFooterProps, parseNavigationExport } from '~/utils/navigation-data';
+import NotFoundAlternatives from '~/components/cms/NotFoundAlternatives.astro';
 import { getBlogPermalink } from '~/utils/permalinks';
 import { getSiteObject } from '~/utils/site-object';
 
@@ -62,6 +63,11 @@ const footerEntry = await getEntry('navigationObject', footerNavId);
 if (!footerEntry) {
   throw new Error(`PageObjectRenderer: the footer navigation export '${footerNavId}' is missing.`);
 }
+// W14 F6 (ruling 3): the not-found page offers somewhere to go. Detected from
+// the page's own route so it applies to every tenant's page_404 without each
+// site's scaffolded 404.astro having to opt in.
+const isNotFoundPage = page.route === '/404';
+
 const footerData = navigationToFooterProps(
   parseNavigationExport(footerEntry.data),
   createNavTargetResolver({ blogPermalink: getBlogPermalink() })
@@ -79,6 +85,8 @@ const footerData = navigationToFooterProps(
       );
     })
   }
+
+  {isNotFoundPage && <NotFoundAlternatives />}
 
   <Fragment slot="footer">
     <div style="display:contents" data-cms-nav-object={footerNavId} data-cms-nav-role="footer">

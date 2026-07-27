@@ -7,6 +7,65 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-27 (F6 CLOSED — governed removal exists: retire → redirect → purge)
+
+**The last open V1 finding is built.** There was no front-door removal at all:
+an agent's mistaken `object_create` was permanent, and the T14.5 probe pages had
+to be deleted through the Netlify Blobs back door. Wolf's rulings shaped it —
+(1) archive, then hard-delete after thirty days, since "anything can be
+recreated again"; (2) "retired means gone after a release"; (3) "this is dtc
+sales and publishing … we can't lose readers" → always redirect, and even the
+default 404 offers alternatives.
+
+**What shipped, in five parts:**
+
+1. **Export deletion in the committer.** It could only add and update, which is
+   precisely why unpublish was deferred (`object-publish.ts` says so in its own
+   header). `commitMaterializedFiles` now takes `deletions` (GitHub tree entries
+   with `sha: null`); a deletions-only commit is valid, and deleting an absent
+   path is a no-op so a retried retire converges.
+2. **`object_retire`.** Archives the record (body + history intact, status index
+   moves active → archived), REMOVES the committed export in the same commit —
+   pages render from exports, not the store, so archiving alone would leave the
+   page serving traffic — and writes the 301 for its route in that same commit,
+   so the URL never has a 404 window. Refusals, decided and recorded (R8):
+   still-referenced (referrers named — the symmetric edge of the genesis order
+   law), open review, the site singleton, and no lock. Ordering is reader-safe:
+   the record archives only AFTER the export is gone.
+3. **`_redirects` emission.** A build-done integration writes the table into the
+   publish directory. Not an Astro route: `build.format: 'directory'` would land
+   `/_redirects` as `_redirects/index.html` and Netlify would never read it.
+   netlify.toml keeps precedence, so infrastructure routing wins and content
+   forwarding fills in behind it.
+4. **404 alternatives.** `PageObjectRenderer` appends a suggestions block on the
+   page whose route is `/404`, built from the site's OWN published header
+   navigation — per-tenant by construction, no hardcoded fleet copy (the mistake
+   F3 caught). Applies to all three live sites without touching their scaffolded
+   `404.astro`.
+5. **`purge_archived`.** Owner-only sweep, 30-day grace, `dry_run` preview.
+   Deliberately a sweep rather than a per-object delete: "delete this one now"
+   would be an irreversible button with no waiting period, which is the whole
+   point of the grace window. It never touches git — the export is already gone
+   and the redirect must outlive the record.
+
+**Found and fixed en route: the opt-in suite was genuinely flaky** (~50% of runs,
+a different artifact test each time, always "same size, different content" at one
+key). Under `node --test` each file gets its own process but shares the working
+directory, so files that did not isolate the local blob store clobbered each
+other. The default root is now pid-scoped under the test runner. This mattered
+because F8 had put that suite INTO CI, and a gate that fails half the time
+trains people to ignore it. Three consecutive green runs where the same code
+failed run-over-run before.
+
+**Verified:** 12 new behavioral tests (deletion primitive ×5, retire ×8 covering
+all three rulings and every refusal, purge ×4); a real build emitting
+`/old-offer  /offers  301` into `dist/_redirects`; the 404 rendering
+alternatives while the home page does not. Gates: 1731 core + 89 script, opt-in
+1328, eslint + prettier clean.
+
+**V1 finding list is now clear** except the two explicit wontfix-v1 items (F5
+behavior, F7 version drift) and post-v1 per-agent keys.
+
 ## Session 2026-07-27 (F3 investigated — half of it was MY OWN measurement error; the real defects fixed)
 
 **The "empty footer" was never a site bug — it was an artifact of the agent's
