@@ -7,6 +7,55 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-27 (Identity fixed fleet-wide; the "all three sites rebuild" question answered)
+
+**Wolf reported admin login failing on BOTH platform and fernwell.** Identity was
+enabled and `/.netlify/identity/settings` answered 200 on all three sites, so the
+fault was not the service. Two distinct causes, found by reading the actual user
+records:
+
+1. **No usable account.** `platform` had ONE user — `invited_at` set,
+   `confirmed_at: null`: a PENDING invite from 2026-07-26 that was never
+   accepted, so no password and no account. `fernwell` had **zero** users. An
+   Identity-enabled site with no confirmed user rejects every login and looks
+   exactly like "Identity is broken."
+2. **Google was not enabled on the new sites.** Dr-Lurié's working login is the
+   **google** provider (`app_metadata.provider: "google"`); platform and fernwell
+   had `email` only. The shell's LoginModal always renders a "Continue with
+   Google" button, so clicking it on those sites could only fail — the provider
+   was off at the Netlify end.
+
+**Fixed:** Google enabled on platform AND fernwell via API, matching Dr-Lurié
+(which uses Netlify's shared Google OAuth app — `client_id`/`secret` empty, so
+nothing to provision). All three now report
+`external: {google: true, email: true}`. Combined with `ADMIN_EMAILS` (the
+bootstrap-Owner fallback, set to Wolf on both), a first Google sign-in lands as
+Owner with no per-user role write. **No user data was deleted** — the stale
+pending invite on platform is left in place; GoTrue links the Google identity to
+that address on sign-in.
+
+**API gotcha worth remembering:** enabling an external provider takes a
+**top-level** `{"external":{"google":{"enabled":true}}}` on
+`PUT /sites/{id}/identity/{instance_id}`. The `config`-nested form returns 204
+and silently does not persist — it cost several confused round-trips. Always
+re-read the instance to confirm, never trust the 204.
+
+**Why every merge builds all three sites (and why platform said "Canceled").**
+All three Netlify projects are linked to the SAME repo and branch
+(`vreich-ui/platform` @ `main`) with **no build filter**, so one merge triggers
+three builds — expected for a monorepo with per-site projects. Platform's showed
+`Canceled build due to no content change`: Netlify's optimization when a build's
+output is byte-identical to the live deploy. It reports in the `error` slot but
+is **not a failure** — the existing deploy stays live and correct. Dr-Lurié and
+fernwell published because their output did differ.
+
+**Decision (R8): not adding per-site `ignore` build filters.** They would cut
+redundant builds, but an ignore expression that is even slightly wrong makes a
+site silently NOT rebuild when core changes — strictly worse than a redundant
+build that cancels itself in ~30s. Revisit only if build minutes become a real
+constraint; the shape would be
+`git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- packages/core sites/<client> package.json package-lock.json`.
+
 ## Session 2026-07-27 (T14.9 CLOSED — Fernwell is LIVE; genesis is now a committed driver, not hand-driven)
 
 **The third site is real.** `kugel-fernwell` renders from store objects, serves
