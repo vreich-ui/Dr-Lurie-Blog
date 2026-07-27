@@ -1,6 +1,6 @@
 site:
   name: Fernwell
-  site: 'https://fernwell.netlify.app'
+  site: 'https://kugel-fernwell.netlify.app'
   base: '/'
   trailingSlash: false
 

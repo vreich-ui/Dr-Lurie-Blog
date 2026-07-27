@@ -1069,7 +1069,7 @@ const bootstrapNavFooterExport = (brandName) =>
     ],
   });
 
-const bootstrapHomePageExport = (brandName) =>
+const bootstrapHomePageExport = (brandName, canonicalHost) =>
   bootstrapExport({
     pageType: 'system',
     route: '/',
@@ -1086,11 +1086,16 @@ const bootstrapHomePageExport = (brandName) =>
         id: 's_welcome',
         type: 'prose',
         data: {
+          // MUST satisfy the RichText allowlist (p,br,strong,em,a,ul,ol,li,h2,h3;
+          // absolute http(s) hrefs only) — this body is not just rendered, it is
+          // the BODY the genesis drive creates page_home from. The original text
+          // used <code> and a root-relative /admin link, so every new client's
+          // page_home 422'd at creation (W14 T14.9, hit on fernwell).
           body:
             `<h2>${brandName} is live.</h2>` +
-            '<p>This starter page is a bootstrap export written by <code>create-site</code>, not a ' +
-            'store-backed object. Sign in at <a href="/admin">/admin</a> and publish real content — the ' +
-            'first publish replaces this file with a genuine derived export.</p>',
+            '<p>This starter page is a bootstrap export written by <strong>create-site</strong>. ' +
+            `Sign in at <a href="${canonicalHost}/admin">${canonicalHost}/admin</a> and publish real ` +
+            'content — the first publish replaces this file with a genuine derived export.</p>',
         },
       },
     ],
@@ -1275,7 +1280,7 @@ export const buildPlan = (opts) => {
     { path: `${dir}/data/site/site.json`, content: bootstrapSiteExport(ids, brandName, canonicalHost) },
     { path: `${dir}/data/site/navigation/nav_header.json`, content: bootstrapNavHeaderExport(brandName) },
     { path: `${dir}/data/site/navigation/nav_footer.json`, content: bootstrapNavFooterExport(brandName) },
-    { path: `${dir}/data/site/pages/page_home.json`, content: bootstrapHomePageExport(brandName) },
+    { path: `${dir}/data/site/pages/page_home.json`, content: bootstrapHomePageExport(brandName, canonicalHost) },
     { path: `${dir}/data/site/pages/page_404.json`, content: bootstrap404PageExport(brandName) },
   ];
 

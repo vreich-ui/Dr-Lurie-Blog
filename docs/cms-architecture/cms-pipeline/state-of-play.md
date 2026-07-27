@@ -7,6 +7,64 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-27 (T14.9 CLOSED — Fernwell is LIVE; genesis is now a committed driver, not hand-driven)
+
+**The third site is real.** `kugel-fernwell` renders from store objects, serves
+`/admin`, and answers `/mcp` as `Fernwell_MCP`. Twelve objects born through the
+front door, all published, released, and rendering.
+
+**Timings — the V1 "cost of a new client" baseline:**
+
+| Phase                                                 | Cost                                           |
+| ----------------------------------------------------- | ---------------------------------------------- |
+| Agent: scaffold + rebrand + lockfile + verify         | ~3.5 min                                       |
+| Agent: Netlify provisioning (site + auto-secrets)     | ~1 min                                         |
+| Agent: env (17 vars), repo link, build hook, Identity | ~4 min, ALL via API                            |
+| Agent: genesis drive (12 objects create→publish)      | ~2 min                                         |
+| Agent: MCP round-trip + release + verify              | ~3 min                                         |
+| **Wolf**                                              | **merging patches only — zero console clicks** |
+
+**Everything account-authority was done via API this run**, including the two
+steps T14.3 recorded as UI-only: the **repo link** (`PATCH /sites/{id}` with
+`build_settings.repo`, reusing installation id 95173329) and **Identity**
+(`POST /sites/{id}/identity` → 201). The T14.3 checklist's "the API cannot do
+this" claim is superseded — see the manual-steps note below.
+
+**NEW: `scripts/site-genesis-drive.mjs` — genesis is fleet law now.** Platform's
+genesis was hand-driven with ad-hoc MCP calls; that was the single largest manual
+cost of a new client and it is gone. The driver reads a scaffolded site's seed
+modules + bootstrap page exports, and creates → publishes → checks in each object
+in dependency order (navs → site → taxonomy → theme → recipes → pages), then
+releases once. Idempotent (re-runnable after a partial failure), `--dry-run`
+prints the plan, `--no-release` defers the deploy.
+
+**Three defects found and fixed by actually birthing a site** (each would have
+hit every future client):
+
+1. **First build downloads the wrong astro.** On a cold cache Netlify does not
+   install the monorepo root, so `npx astro` silently fetched astro@6, which
+   rejects NODE_VERSION 20. Per-site build command now self-heals the workspace
+   install and uses `--no-install` so a missing binary fails loudly. (Merged
+   separately; every existing site had the same latent cold-start failure.)
+2. **The bootstrap `page_home` was unpublishable.** create-site emitted `<code>`
+   and a root-relative `/admin` link — both rejected by the RichText allowlist —
+   so a new client's home page 422'd at creation. Template now emits allowlisted
+   markup and an absolute host link.
+3. **`canonicalHost` drifts when the bare subdomain is taken.** `fernwell.netlify.app`
+   was taken (project is `kugel-fernwell`), but the scaffold hard-defaults
+   canonicalHost to `<slug>.netlify.app`. Corrected across config/seed/config.yaml
+   and patched live on the site singleton through MCP.
+
+**Round-trip proof (live):** `object_checkout` → `object_patch`
+(`set_site_fields`, canonicalHost) → `object_publish` (export commit `b7c8792`)
+→ `object_checkin`, lock released. `release_to_production` confirmed production
+on that commit. **Fleet CI now discovers THREE sites**
+(`{"sites":["drlurie","fernwell","platform"]}`). **Tenant isolation verified:**
+platform and drlurie unchanged and serving throughout.
+
+T14.9's remaining optional half is retirement (delete the project + tree) — Wolf's
+to trigger; Fernwell stays up for feature testing.
+
 ## Session 2026-07-27 (T14.10 — V1 CLOSE-OUT) — the W14 wave, declared
 
 **V1 is declared.** The project crosses the line as a white-label agentic
