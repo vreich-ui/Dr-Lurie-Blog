@@ -7,6 +7,146 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-27 (T14.10 — V1 CLOSE-OUT) — the W14 wave, declared
+
+**V1 is declared.** The project crosses the line as a white-label agentic
+publishing fleet: `packages/core` is the one engine + app shell (fleet law);
+each client is data + bindings + its own Netlify project + its own `/mcp` over
+that core; a new client is scaffolded + provisioned in ~5–6 min of agent time
+(T14.9), and the fleet CI matrix builds every site on every core change.
+
+**W14 wave summary:**
+
+- **T14.0–T14.3** — admin-login fix, app-shell extraction into core, platform
+  genesis, and the platform Netlify project born + repo renamed to `platform`.
+- **T14.4** — fleet propagation proven: two live tenants on one core, the
+  two-site CI matrix green (Wolf-confirmed).
+- **T14.5** — the platform site documents itself: 15 contract-generated manual
+  pages through its own `/mcp`, drift-guarded.
+- **T14.6** — live test plan on both sites → `w14-findings.md` (F1–F8).
+- **T14.7** — fix wave: F2 (artifact-upload v2 export), F4 (reader-safety scope),
+  F5 (publish-lock contract documented), F8 (opt-in suite compiles + in CI).
+- **T14.8** — MCP auth fails closed in production (F1 code half); per-agent keys
+  deferred post-v1 on Wolf's ruling (shared key, now fail-closed, is the v1 path).
+- **T14.9** — synthetic third site (Fernwell) scaffolded + provisioned + building;
+  live runtime proof pending Wolf's account sitting.
+- **T14.10** — this: `13-separation-plan.md` (per-client repo/domain split,
+  design only), CLAUDE.md platform framing + R8 verbatim, this V1 declaration,
+  doc-path sweep.
+
+**Honest wontfix-v1 / deferred list (nothing hidden):**
+
+- **Per-agent MCP keys** — deferred post-v1; the shared `MCP_HTTP_AUTH_TOKEN`
+  (fail-closed) is the v1 auth path. Unblock is a mint UI (design recorded, T14.8).
+- **F3 platform chrome** (bare header/footer, unstyled prose links) — cosmetic on
+  a placeholder site; dedicated chrome pass, root cause recorded.
+- **F6 governed retire/delete verb** — real fleet-law surface; own task. The
+  `archived` status infra is half-present.
+- **F7 get↔patch version drift** — the eventual-consistency constraint; mitigated
+  by read-version-under-lock-and-retry; the lock-library / strong-read upgrade is
+  the real remedy, tracked.
+- **T14.9 runtime proof** (genesis round-trip on the 3rd LIVE site) — awaits
+  Wolf's account-authority sitting (fleet secrets, repo binding, Identity).
+- **PUBLISH_SECRET rotation** — ignored per Wolf (2026-07-26).
+
+**Doc-path sweep (fix or annotate, per the brief):**
+
+- `cms-pipeline/README.md` cron example path → `platform` (fixed).
+- `docs/agents/publishing-policy.md` `Dr-Lurie-Blog` refs — historical
+  provenance citations (the repo's name when the policy was derived at PR #463);
+  the bare string is NOT the scanner-triggering `owner/name`, so harmless to the
+  build. Left as provenance; annotate if the doc is revised.
+- `src/chatkit/widgets/…` — **dead path** (no importers found). Annotated here for
+  removal in a separate verified deletion commit, not deleted in this docs-only
+  close-out (deletion needs its own importer-verified change per CLAUDE.md).
+
+**V1.** Post-v1 queue = the W12/W13 rows (learning, optimization) + the deferred
+list above. Committed `T14.10: …` (docs only); no PR.
+
+## Session 2026-07-27 (T14.9 — third site scaffolded, provisioned, and building; live bring-up is the human gate)
+
+**The repeatability proof, agent half.** Invented a synthetic third client —
+**Fernwell**, a houseplant-care editorial brand with its own botanical palette
+(deep green / terracotta, distinct from Dr-Lurié's skincare tones) — and took it
+as far as the account-authority boundary allows, timed:
+
+- **Agent prep — scaffold + brand + lockfile + verify: ~3.5 min** (06:56:14 →
+  06:59:41Z). `create-site --name fernwell` wrote all 68 files; the site
+  singleton seed rebranded (name/palette/metadata); `@fleet/site-fernwell` added
+  to `package-lock.json`; `npm test` green (1712 core + 89 script — the scaffold
+  type-checks and its seed bodies parse).
+- **Agent provisioning — Netlify site + auto-secrets: ~1 min** (06:59:57Z). The
+  bare subdomain `fernwell.netlify.app` was taken, so the project is
+  **`kugel-fernwell`** (id `03ec1db7-ba8b-4a10-8045-c981e89833a9`,
+  `https://kugel-fernwell.netlify.app`) — same `kugel-` fallback platform used.
+  The four auto-mintable secrets (`PUBLISH_SECRET`, `MCP_HTTP_AUTH_TOKEN`,
+  `ARTIFACT_UPLOAD_TOKEN_SECRET`, `TRACKING_SALT`) + `NETLIFY_SITE_ID` are set.
+  The 8 blob-store probes 401'd — the known site-create-token scope gap (T14.3
+  #3), non-functional: stores create on first write.
+- **Build verified:** `astro build --config sites/fernwell/astro.config.ts`
+  builds 12 pages clean, so committing `sites/fernwell/` gives the **three-site
+  fleet-build proof automatically on merge** (the CI matrix discovers
+  `sites/*/site.config.ts`); platform + drlurie untouched.
+
+**Total agent hands-on for a new client: ~5–6 min** — the V1 "cost of a new
+client" baseline, agent side.
+
+**The human residual (Wolf's measured cost — the account-authority steps the
+brief scopes to him), NOT executed here:**
+
+- **Fleet-shared secrets** — `GITHUB_CONTENT_TOKEN`, `NETLIFY_AUTH_TOKEN`,
+  `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `PDF_TOOL_STORAGE_SITE_ID`/`_TOKEN`:
+  the account env API now **masks** secret reads (returns a 20-char placeholder,
+  not the real value), so copying them agent-side would set garbage. Secret
+  custody stays Wolf's — reuse the fleet values in the Netlify UI.
+- **Repo binding** — `GITHUB_REPOSITORY` (same monorepo), `GITHUB_BRANCH=main`,
+  committer name/email, `SECRETS_SCAN_OMIT_KEYS=GITHUB_REPOSITORY`; **link the
+  repo to `kugel-fernwell` with base directory `sites/fernwell`**.
+- **Identity** — enable Netlify Identity, set `IDENTITY_URL` +
+  `ADMIN_EMAILS`/`ROLE_EMAILS_*`.
+- **`NETLIFY_BUILD_HOOK_URL`** — create a build hook, paste it.
+
+Once those are set, the agent runs the **seed drive + MCP round-trip** (the
+runtime proof) and records the final timing. Retirement (delete the
+`kugel-fernwell` Netlify project + `sites/fernwell/`) is Wolf's to trigger — the
+agent can't hard-delete infrastructure — and is itself the tenant-removal proof.
+Committed the scaffold on `claude/w14-t14-9` (stacked on T14.8); no PR.
+
+## Session 2026-07-27 (T14.8 — F1 hardening landed; per-agent-key rollout is Owner/tooling-gated)
+
+**F1 closed at the code level (committed).** `getAuthResult` (`mcp.ts`) now
+fails CLOSED on an unset `MCP_HTTP_AUTH_TOKEN` in a production lambda runtime —
+open only in non-lambda dev/test. Combined with the token now SET on
+drluriescience (dormant until its next deploy), Dr-Lurié's `/mcp` closes on
+that deploy and no future site can be born wide open. Regression test added
+(unset+lambda → 401 `mcp_auth_missing_token`); suite green (1712/89/1309).
+
+**Per-agent keys: WOLF RULED "ship v1 on the shared key" (2026-07-27).** The
+attribution half of T14.8 is deferred post-v1. `agent_keys_create` is Owner-only
+on `admin-governance` with **no client/UI surface** (nothing in the admin kit
+calls it), so minting isn't reachable by the agent (no Owner JWT) or Wolf (no
+button) without ad-hoc work; rather than build an agent-keys admin panel for v1,
+the shared `MCP_HTTP_AUTH_TOKEN` — now fail-closed on both sites — is the v1 auth
+path. Attribution stays at shared-key level for v1. Post-v1 unblock (recorded,
+not built): a minimal Owner-gated agent-keys panel (list/create/revoke, the
+`AdminUsers.tsx` pattern) + connector repointing. The T11.10 mint mechanism
+(`createAgentKey`) already exists; only the surface is missing.
+
+**Other T14.8 steps:**
+
+- **Connector repointing (step 2)** — N/A for v1 (single shared key per site;
+  no per-agent connections to repoint).
+- **PUBLISH_SECRET rotation (step 4)** — Wolf ruled "ignore it" (2026-07-26).
+  Recorded; not performed. The brief's "do not park it again" is superseded by
+  that explicit ruling.
+- **Credential note (step 5)** — the shared key is the v1 auth path (not a
+  deprecated fallback); the manual credential note rides the next
+  `platform-manual-drive.mjs` change (editing a manual page outside the driver
+  breaks its drift guard).
+
+Net: T14.8 lands as the fail-closed hardening (done, deploy-safe) with per-agent
+attribution deferred post-v1 per Wolf. T14.9 proceeds on the shared-key model.
+
 ## Session 2026-07-26 (T14.7 — fix wave; findings log fully dispositioned)
 
 Worked `w14-findings.md` by severity. Every finding is now accounted for

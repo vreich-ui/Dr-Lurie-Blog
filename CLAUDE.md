@@ -1,5 +1,49 @@
 # Dr-Lurie-Blog — CLAUDE.md
 
+> **Repo note:** the repository is now `vreich-ui/platform` (renamed W14). The
+> title above is historical. Never write the literal `owner/name` repo string
+> into committed content — it is `GITHUB_REPOSITORY`'s value and the secrets
+> scanner fails the build on it (see Known gotchas).
+
+## W14 PLATFORM REALITY — read this framing first (2026-07-27, V1)
+
+The project is a **white-label agentic publishing fleet**, not one blog. The
+layout that governs every path below:
+
+- **`packages/core/` is fleet law** — the engine (object store, verbs,
+  validation, publish/release, MCP server) **and** the Astro app shell live
+  here. One implementation, upgraded fleet-wide from one place. The hard-
+  constraint and guardrail files that older sections below place under
+  `netlify/lib/…` or `src/…` now live under `packages/core/server/lib/…`,
+  `packages/core/server/functions/…`, and `packages/core/app/…` (the W11/W14
+  relocation). Where a path below says `src/schema/…`, `netlify/lib/…`, or
+  `src/components/admin-ui/…`, read it as its `packages/core/…` counterpart —
+  those sections are pre-relocation and describe behavior, not current paths.
+- **`sites/<client>/` is per-client data + bindings + a thin build entry** —
+  config bundle, seeds, committed exports, function shims. Joined to core at the
+  `SiteBinding` seam. Three today: `sites/drlurie` (the worked example),
+  `sites/platform` (the core/agency site — documents the system through its own
+  `/mcp`), `sites/fernwell` (the synthetic repeatability proof, T14.9).
+- **Each site is its own Netlify project** whose base directory selects that
+  site's `netlify.toml` + entry + shims, and **its own `/mcp` endpoint** over
+  the same core (per-client endpoints, one engine), auth-gated by its own
+  `MCP_HTTP_AUTH_TOKEN` (fail-closed in a production runtime since W14 F1).
+- **Per-site machine truth is that site's `object_inventory` / `object_contract`**,
+  never a committed doc. `object-inventory.md` / `conversion-map.md` describe
+  Dr-Lurie's worked example; a new client's reality is its own store.
+- The monorepo stands for V1; per-client-repo/domain separation is designed (not
+  built) in `docs/cms-architecture/13-separation-plan.md`.
+
+**Wolf's governing W14 rulings** (full list + supersessions:
+`docs/cms-architecture/decisions/2026-07-26-platform-site-ruling.md`). R8, the
+finish-line directive, verbatim:
+
+> **R8 — V1 FINISH-LINE DIRECTIVE (governing):** no more blockers or questions
+> parked for later. Agents make reasonable decisions, record them, and keep
+> moving; the only permissible halts are genuine account-authority gates
+> (Netlify token, GitHub admin clicks). The project crosses the line as a solid
+> V1.
+
 ## Definition of "converted" — NO HALF MEASURES (Wolf, 2026-07-10, GOVERNING)
 
 The entire project goal is: **agents can change objects on every page — add
@@ -26,141 +70,141 @@ hold (full definition + recipe: [`docs/cms-architecture/conversion-playbook.md`]
 - **After EVERY session, update the documentation.** An object does not count as
   converted without a written record of it (inventory row + session-log entry).
 - Reality as of 2026-07-15: **forty-seven objects are converted** (the 37 below
-  + the 3 W5 pages, credentialed run 2026-07-13 + the FIRST ARTICLE OBJECT,
-  W7.9 run 2026-07-13 + the 5 SECTION TEMPLATES and the DEFAULT THEME, W8.4
-  run 2026-07-14 with the application-verb production proofs completed
-  2026-07-15; see the W8 paragraph below) — the 3 nav
-  objects, all 12 page objects (home + about + the 8 W1 interior/system pages +
-  page_contact + page_thank_you), the 12 shared sections under home/about, the
-  3 templates (tpl_interior/landing/legal), the `tax_drlurie` taxonomy
-  registry (W3 — curated agent-editable vocabulary, 5 categories + 26 tags;
-  `resolveTaxonomyTerm` is live), and the `site_drlurie` SITE SINGLETON (W4,
-  credentialed run 2026-07-11: the layout renders brandTokens/logo/chrome/
-  metadataDefaults/defaultNavigation from its export via `set_site_fields`;
-  urls/blog carried, config.yaml stays authoritative for routing — Wolf B2).
-  All proven by credentialed `--production --release` runs on 2026-07-11.
-  **No page renders from an unbacked export anymore — the rendered-stub
-  backlog is empty.** The section-type palette is fully generic (no bespoke
-  per-page types: `about`/`contact` decomposed, `thank_you` →
-  `form_confirmation`). W3 step 2 SHIPPED (2026-07-11): the bounded
-  publish-article taxonomy-enforcement hook (the sanctioned additive exception
-  — registry-gated, skips when no registry) + the one-time frontmatter
-  normalization of all 93 posts + registry display labels in the blog
-  renderer. The 28-invisible-posts caveat is CLOSED (2026-07-11: 10 junk posts
-  deleted, 18 real ones stamped with `published_time`; 167 pages, topics hub
-  live). **Agent-CREATED pages are live end-to-end (2026-07-11, B1 closed)**:
-  the object-page catch-all (`src/pages/[...objectPage].astro` +
-  `src/utils/object-page-routes.ts`) serves any published Page object whose
-  route no file owns — create → publish → release → live, zero code.
-  **Write-time guardrails (2026-07-11, traps 5+14 closed)**: `validateObject`
-  now blocks, at patch/create/publish, content that would break the deploy
-  (protected env values in any encoding; repo-file hotlink URLs) or the build
-  (per-component rich-text vocabulary, checked with the real splitters) — an
-  agent can no longer publish something that dead-ends the pipeline.
-  **W6 CONVERTED (2026-07-12, credentialed run same day)**: the
-  `listing`/`content_detail` PageTypes are defined law (all five implemented;
-  content_detail publishes with zero sections via `minVisibleSections: 0`),
-  and six page objects (page_library, page_topics_index, page_topic_detail,
-  page_category, page_tag, page_article) make the listing surfaces'
-  headings/copy/SEO agent-editable — first lede = the header block, extra
-  sections render after the list/article, per-term objects carry `%term%`
-  pattern copy — while the query machinery stays the audited build-time
-  derivation. Byte-identical cutover; all six store-backed, round-tripped,
-  published, released (store === seed === export). Hidden sections are now
-  filtered at the resolver on every render path (never-render-private).
-  W5 was RE-GROUNDED in the shop module
-  (`docs/cms-architecture/06-shop-module-plan.md` — Stripe-only v1 plan;
-  /pricing renders from product objects, /services awaits a copy-or-delete
-  call; the shop build runs in its own session).
-  **W7 CONVERTED (2026-07-13: W7.3 + W7.8 built; W7.9 credentialed run the
-  same day via the session MCP connection — the type's five criteria all
-  hold)**: `content_item` joined the governed set — the
-  annotated-node article model (every block carries `private.strategy`
-  hook/agitation/…/resolution + `intent`, the original architecture's
-  semantic layer, imported verbatim; envelope claims/sources/compliance/
-  scores/lineage; `public.body` = plain text or `rich_text.v1`), six node
-  ops with exact inverses, `create_variant` (+ MCP tool, `dry_run`),
-  validation (one slug space with committed posts; the reader-projection
-  leak scan; renderable rich-text grammar), materializer →
-  `src/data/site/articles/`, and the render path: published article objects
-  join `fetchPosts()` as first-class posts with per-node canvas chips
-  (pencil + node-scoped Ask-AI) on the standard EditSession →
-  `update_node` → publish/release path. **Wolf's 2026-07-13 ruling
-  (SUPERSEDED same day): the 83 committed .md posts were "mostly junk … needs
-  rewriting" — WIPED, not kept.** All 83 `src/data/post/*.md` deleted; the
-  `post` collection is now permanently empty (a benign build-log warning; all
-  articles are content_item OBJECTS). Replaced by a TEN-ARTICLE corpus (two
-  per registry category — skin-health/skincare/skin-after-40/ingredients/
-  reflections; `scripts/lib/articles-corpus-seed-data.mjs`) created via the
-  credentialed run. The first-article W7.9 seed
-  (`scripts/lib/articles-seed-data.mjs`) remains as the demo at
-  `/object-model-demo`. Unpublish remains
-  unsupported (OQ-2) — a released article stays live until edited. The W7.9
-  run (2026-07-13): create → all six node ops drilled byte-identical →
-  validate clean → `create_variant` dry-run → publish (export commit
-  `60cd213`) → release (deploy ready) — the demo article is LIVE at
-  `/object-model-demo` with per-node canvas chips; found+fixed en route: the
-  seed's taxonomy terms didn't exist in the production registry (now
-  `reflections`/`reflections`). **Wolf's 2026-07-13 ruling (supersedes
-  OQ-W7-1): reverse support is NOT required** — the legacy article tools
-  need no alias layer; MCP tools and functions may be updated, changed, or
-  retired as the remaining W7 phases land, provided the functionality
-  (drafting workflow, publish safety stack, admin editor) survives on the
-  object substrate. Still open: W7.2 (sections onto rich text), W7.5
-  (re-point internal surfaces; reduced — no aliases), W7.7 (admin editor +
-  annotation panel + document-body canvas editing), OQ-W7-3 (strategy
-  registry go/no-go).
-  **W8 CONVERTED (2026-07-14 run + 2026-07-15 application-verb production
-  proofs, both via the session MCP connection)**: the RECIPE FAMILY —
-  `section_template` (stpl_hero_landing /
-  stpl_audience_grid / stpl_related_articles / stpl_newsletter_cta /
-  stpl_cta_banner) and `theme` (thm_drlurie_default, the
-  canonical palette — live again since Wolf's ordered restore, 2026-07-15,
-  see the drift incident below) — completing the
-  TEN governed types (`objectTypes` in `src/schema/object-record-v1.ts` is
-  the authoritative list; older session logs' "ninth/tenth/eleventh
-  governed type" labels over-count by one) — plus
-  `object_instantiate_section_template` (stamp a section from a recipe,
-  standalone or page mode), `site_apply_theme` (exact-replace token apply
-  with stale-key nulls), template `blueprintRef` composition, CSS-token
-  injection safety on theme AND site, and W8.3b's recipe metadata
-  (description/whenToUse/scope REQUIRED TO PUBLISH), creation-policy seam
-  (committed config; default open; humans always), and reuse-first
-  surfacing (inventory recipe summaries + REUSE-FIRST contract workflow +
-  editor.useWhen ×19). Step 0 backfilled the trio onto the 3 live tpl_*
-  (published rev 20; exports content-identical to the W8.3b
-  pre-materialization). All 9 objects: created/reconciled → every
-  permitted patch op drilled with exact inverses → published → released
-  (deploy ready 2026-07-14T16:23Z); store === seed === export verified.
-  APPLICATION-VERB PROOFS (2026-07-15, after a connector reset exposed the
-  W8 tools): instantiate_section dry_run BOTH modes × EACH of the 5 stpl
-  records (10/10 eligible, zero blockers) + apply_theme dry_run + ONE REAL
-  default apply end-to-end (atomic op, applied_theme in history, publish,
-  release). **The real apply exposed LIVE-PALETTE DRIFT:** the site's
-  brandTokens had been rebranded in production on 2026-07-13 (teal/
-  terracotta, Source Serif heading) AFTER the seeds were written, so the
-  "no-op" apply actually put the old palette live for ~6 minutes (09:30:57–09:37:13Z); restored
-  byte-exact (export commit `eba0c42`) and re-released. RESOLVED SAME DAY
-  (Wolf's ruling): the 2026-07-13 palette change was an agent's casual
-  color edit, NOT a sanctioned rebrand — Wolf ordered the ORIGINAL palette
-  restored (real `site_apply_theme` of thm_drlurie_default, publish
-  `2f88ef6`, released 10:35:46Z). thm_drlurie_default IS the live palette
-  again and the seed's brandTokens match production — the PALETTE
-  follow-ups are closed, and `site-seed-data.mjs` was RESYNCED to the live
-  "Skincare" branding 2026-07-15 (`scripts/sync-site-seed.mjs`; a site-seed
-  drift-guard test keeps it in lockstep) — the site family is safe to
-  reconcile again. THEME-ONLY PALETTE GOVERNANCE SHIPPED (Wolf 2026-07-15
-  directive): `brandTokens` is no longer patchable via `set_site_fields`
-  (grammar refusal, 400 `invalid_op`); the palette changes ONLY through
-  `site_apply_theme`, which emits the privileged tool-authored
-  `set_site_brand_tokens` op (the exact `set_product_fields`⇸`set_product_price`
-  funnel, applied to the site). The reconcile driver's site branch now
-  excludes brandTokens. Still available as one-line config flips: maker-agent
-  restriction on theme creation (`src/config/creation-policy.ts`) and the
-  optional human-approval pin (`src/config/approval-policy.ts`); agent-
-  approves-agent review is not built (M-6 approvals are human-only). tpl_fieldtest (the
-  2026-07-08 fieldtest leftover) still lacks the metadata trio — patching
-  it 422s until backfilled or retired.
+  - the 3 W5 pages, credentialed run 2026-07-13 + the FIRST ARTICLE OBJECT,
+    W7.9 run 2026-07-13 + the 5 SECTION TEMPLATES and the DEFAULT THEME, W8.4
+    run 2026-07-14 with the application-verb production proofs completed
+    2026-07-15; see the W8 paragraph below) — the 3 nav
+    objects, all 12 page objects (home + about + the 8 W1 interior/system pages +
+    page*contact + page_thank_you), the 12 shared sections under home/about, the
+    3 templates (tpl_interior/landing/legal), the `tax_drlurie` taxonomy
+    registry (W3 — curated agent-editable vocabulary, 5 categories + 26 tags;
+    `resolveTaxonomyTerm` is live), and the `site_drlurie` SITE SINGLETON (W4,
+    credentialed run 2026-07-11: the layout renders brandTokens/logo/chrome/
+    metadataDefaults/defaultNavigation from its export via `set_site_fields`;
+    urls/blog carried, config.yaml stays authoritative for routing — Wolf B2).
+    All proven by credentialed `--production --release` runs on 2026-07-11.
+    **No page renders from an unbacked export anymore — the rendered-stub
+    backlog is empty.** The section-type palette is fully generic (no bespoke
+    per-page types: `about`/`contact` decomposed, `thank_you` →
+    `form_confirmation`). W3 step 2 SHIPPED (2026-07-11): the bounded
+    publish-article taxonomy-enforcement hook (the sanctioned additive exception
+    — registry-gated, skips when no registry) + the one-time frontmatter
+    normalization of all 93 posts + registry display labels in the blog
+    renderer. The 28-invisible-posts caveat is CLOSED (2026-07-11: 10 junk posts
+    deleted, 18 real ones stamped with `published_time`; 167 pages, topics hub
+    live). **Agent-CREATED pages are live end-to-end (2026-07-11, B1 closed)**:
+    the object-page catch-all (`src/pages/[...objectPage].astro` +
+    `src/utils/object-page-routes.ts`) serves any published Page object whose
+    route no file owns — create → publish → release → live, zero code.
+    **Write-time guardrails (2026-07-11, traps 5+14 closed)**: `validateObject`
+    now blocks, at patch/create/publish, content that would break the deploy
+    (protected env values in any encoding; repo-file hotlink URLs) or the build
+    (per-component rich-text vocabulary, checked with the real splitters) — an
+    agent can no longer publish something that dead-ends the pipeline.
+    **W6 CONVERTED (2026-07-12, credentialed run same day)**: the
+    `listing`/`content_detail` PageTypes are defined law (all five implemented;
+    content_detail publishes with zero sections via `minVisibleSections: 0`),
+    and six page objects (page_library, page_topics_index, page_topic_detail,
+    page_category, page_tag, page_article) make the listing surfaces'
+    headings/copy/SEO agent-editable — first lede = the header block, extra
+    sections render after the list/article, per-term objects carry `%term%`
+    pattern copy — while the query machinery stays the audited build-time
+    derivation. Byte-identical cutover; all six store-backed, round-tripped,
+    published, released (store === seed === export). Hidden sections are now
+    filtered at the resolver on every render path (never-render-private).
+    W5 was RE-GROUNDED in the shop module
+    (`docs/cms-architecture/06-shop-module-plan.md` — Stripe-only v1 plan;
+    /pricing renders from product objects, /services awaits a copy-or-delete
+    call; the shop build runs in its own session).
+    **W7 CONVERTED (2026-07-13: W7.3 + W7.8 built; W7.9 credentialed run the
+    same day via the session MCP connection — the type's five criteria all
+    hold)**: `content_item` joined the governed set — the
+    annotated-node article model (every block carries `private.strategy`
+    hook/agitation/…/resolution + `intent`, the original architecture's
+    semantic layer, imported verbatim; envelope claims/sources/compliance/
+    scores/lineage; `public.body` = plain text or `rich_text.v1`), six node
+    ops with exact inverses, `create_variant` (+ MCP tool, `dry_run`),
+    validation (one slug space with committed posts; the reader-projection
+    leak scan; renderable rich-text grammar), materializer →
+    `src/data/site/articles/`, and the render path: published article objects
+    join `fetchPosts()` as first-class posts with per-node canvas chips
+    (pencil + node-scoped Ask-AI) on the standard EditSession →
+    `update_node` → publish/release path. **Wolf's 2026-07-13 ruling
+    (SUPERSEDED same day): the 83 committed .md posts were "mostly junk … needs
+    rewriting" — WIPED, not kept.** All 83 `src/data/post/*.md` deleted; the
+    `post` collection is now permanently empty (a benign build-log warning; all
+    articles are content_item OBJECTS). Replaced by a TEN-ARTICLE corpus (two
+    per registry category — skin-health/skincare/skin-after-40/ingredients/
+    reflections; `scripts/lib/articles-corpus-seed-data.mjs`) created via the
+    credentialed run. The first-article W7.9 seed
+    (`scripts/lib/articles-seed-data.mjs`) remains as the demo at
+    `/object-model-demo`. Unpublish remains
+    unsupported (OQ-2) — a released article stays live until edited. The W7.9
+    run (2026-07-13): create → all six node ops drilled byte-identical →
+    validate clean → `create_variant` dry-run → publish (export commit
+    `60cd213`) → release (deploy ready) — the demo article is LIVE at
+    `/object-model-demo` with per-node canvas chips; found+fixed en route: the
+    seed's taxonomy terms didn't exist in the production registry (now
+    `reflections`/`reflections`). **Wolf's 2026-07-13 ruling (supersedes
+    OQ-W7-1): reverse support is NOT required** — the legacy article tools
+    need no alias layer; MCP tools and functions may be updated, changed, or
+    retired as the remaining W7 phases land, provided the functionality
+    (drafting workflow, publish safety stack, admin editor) survives on the
+    object substrate. Still open: W7.2 (sections onto rich text), W7.5
+    (re-point internal surfaces; reduced — no aliases), W7.7 (admin editor +
+    annotation panel + document-body canvas editing), OQ-W7-3 (strategy
+    registry go/no-go).
+    **W8 CONVERTED (2026-07-14 run + 2026-07-15 application-verb production
+    proofs, both via the session MCP connection)**: the RECIPE FAMILY —
+    `section_template` (stpl_hero_landing /
+    stpl_audience_grid / stpl_related_articles / stpl_newsletter_cta /
+    stpl_cta_banner) and `theme` (thm_drlurie_default, the
+    canonical palette — live again since Wolf's ordered restore, 2026-07-15,
+    see the drift incident below) — completing the
+    TEN governed types (`objectTypes` in `src/schema/object-record-v1.ts` is
+    the authoritative list; older session logs' "ninth/tenth/eleventh
+    governed type" labels over-count by one) — plus
+    `object_instantiate_section_template` (stamp a section from a recipe,
+    standalone or page mode), `site_apply_theme` (exact-replace token apply
+    with stale-key nulls), template `blueprintRef` composition, CSS-token
+    injection safety on theme AND site, and W8.3b's recipe metadata
+    (description/whenToUse/scope REQUIRED TO PUBLISH), creation-policy seam
+    (committed config; default open; humans always), and reuse-first
+    surfacing (inventory recipe summaries + REUSE-FIRST contract workflow +
+    editor.useWhen ×19). Step 0 backfilled the trio onto the 3 live tpl*\*
+    (published rev 20; exports content-identical to the W8.3b
+    pre-materialization). All 9 objects: created/reconciled → every
+    permitted patch op drilled with exact inverses → published → released
+    (deploy ready 2026-07-14T16:23Z); store === seed === export verified.
+    APPLICATION-VERB PROOFS (2026-07-15, after a connector reset exposed the
+    W8 tools): instantiate_section dry_run BOTH modes × EACH of the 5 stpl
+    records (10/10 eligible, zero blockers) + apply_theme dry_run + ONE REAL
+    default apply end-to-end (atomic op, applied_theme in history, publish,
+    release). **The real apply exposed LIVE-PALETTE DRIFT:** the site's
+    brandTokens had been rebranded in production on 2026-07-13 (teal/
+    terracotta, Source Serif heading) AFTER the seeds were written, so the
+    "no-op" apply actually put the old palette live for ~6 minutes (09:30:57–09:37:13Z); restored
+    byte-exact (export commit `eba0c42`) and re-released. RESOLVED SAME DAY
+    (Wolf's ruling): the 2026-07-13 palette change was an agent's casual
+    color edit, NOT a sanctioned rebrand — Wolf ordered the ORIGINAL palette
+    restored (real `site_apply_theme` of thm_drlurie_default, publish
+    `2f88ef6`, released 10:35:46Z). thm_drlurie_default IS the live palette
+    again and the seed's brandTokens match production — the PALETTE
+    follow-ups are closed, and `site-seed-data.mjs` was RESYNCED to the live
+    "Skincare" branding 2026-07-15 (`scripts/sync-site-seed.mjs`; a site-seed
+    drift-guard test keeps it in lockstep) — the site family is safe to
+    reconcile again. THEME-ONLY PALETTE GOVERNANCE SHIPPED (Wolf 2026-07-15
+    directive): `brandTokens` is no longer patchable via `set_site_fields`
+    (grammar refusal, 400 `invalid_op`); the palette changes ONLY through
+    `site_apply_theme`, which emits the privileged tool-authored
+    `set_site_brand_tokens` op (the exact `set_product_fields`⇸`set_product_price`
+    funnel, applied to the site). The reconcile driver's site branch now
+    excludes brandTokens. Still available as one-line config flips: maker-agent
+    restriction on theme creation (`src/config/creation-policy.ts`) and the
+    optional human-approval pin (`src/config/approval-policy.ts`); agent-
+    approves-agent review is not built (M-6 approvals are human-only). tpl_fieldtest (the
+    2026-07-08 fieldtest leftover) still lacks the metadata trio — patching
+    it 422s until backfilled or retired.
 
 ## Core structure — read [`docs/cms-architecture/core-structure.md`](docs/cms-architecture/core-structure.md) FIRST
 
