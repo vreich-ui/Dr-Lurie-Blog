@@ -10,7 +10,24 @@ export const setLocalBlobsRootForTesting = (root?: string) => {
   localBlobsRootForTesting = root;
 };
 
-const getLocalBlobsRoot = () => localBlobsRootForTesting ?? join(process.cwd(), '.netlify', 'local-blobs');
+/**
+ * Under `node --test` each test FILE gets its own process but they all share the
+ * repo's working directory, so every file that does not call
+ * `setLocalBlobsRootForTesting` lands on the same on-disk store and concurrent
+ * files clobber each other's keys. That surfaced as a genuinely flaky suite —
+ * a different artifact test failed on each run with "expected N bytes/<sha>,
+ * stored N bytes/<other sha>" (same size, different content: another file's
+ * write at the same key). Scoping the DEFAULT root by pid isolates them
+ * automatically, so a test file no longer has to remember.
+ *
+ * Test-context only: `netlify dev` and any other local run keeps the stable
+ * path, or its blobs would vanish on every restart. Production never reaches
+ * here at all — the lambda guard in blob-store.ts fails closed first.
+ */
+const isTestRun = process.env.NODE_TEST_CONTEXT !== undefined;
+
+const getLocalBlobsRoot = () =>
+  localBlobsRootForTesting ?? join(process.cwd(), '.netlify', isTestRun ? `local-blobs-${process.pid}` : 'local-blobs');
 
 const toPath = (storeName: string, key: string) => join(getLocalBlobsRoot(), storeName, key);
 
