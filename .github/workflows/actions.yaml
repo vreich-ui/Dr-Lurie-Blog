@@ -76,6 +76,12 @@ jobs:
       # named, independently-attributable gate step rather than burying
       # this check inside the full suite's pass/fail count.
       - run: node scripts/ci/schema-migration-gate.mjs
+      # W14 T14.7 (finding F8): the opt-in netlify suite compiles the netlify/
+      # tree under its OWN stricter tsconfig (the direct @netlify/blobs types,
+      # not the looser module wrapper `npm test` sees) and runs the e2e tests
+      # that guard genesis + blob paths. It was never in CI, so it silently
+      # stopped compiling. Gate it here so it can't rot out again.
+      - run: npm run test:opt-in
 
   # --- W11 T11.8: fleet matrix discovery ---
   # Discovers sites/*/site.config.ts dynamically (adding a client is a zero

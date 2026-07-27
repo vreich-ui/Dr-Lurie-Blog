@@ -7,6 +7,142 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-26 (T14.7 — fix wave; findings log fully dispositioned)
+
+Worked `w14-findings.md` by severity. Every finding is now accounted for
+(disposition table at the top of that file):
+
+- **FIXED + verified (4):** F2 (create-site emits the right export form per
+  function generation — the v2 artifact-upload shim 502'd at init; commit
+  `de89b79`), F4 (reader-safety scan stops blocking `private`/`strategy` in
+  ordinary prose; `431186d`), F5 (publish deliberately keeps the lock — a
+  pinned-test contract, not a bug; documented it + told callers to checkin;
+  `3f5965f`), F8 (opt-in netlify suite compiles again — two real type holes —
+  and is now gated in CI so it can't rot; `09fb09d`).
+- **F1 (CRITICAL) → T14.8.** The fix is one line (fail-closed on an undefined
+  `MCP_HTTP_AUTH_TOKEN` in a lambda), but landing it CLOSES Dr-Lurié's live
+  `/mcp` on deploy, breaking any connector currently sending no token. That must
+  land in lockstep with setting Dr-Lurié's token and updating its connector's
+  bearer — exactly T14.8's per-site-key scope. Highest priority; flagged to Wolf,
+  not silently changed.
+- **F3 (platform chrome) → dedicated pass.** Root-caused (header Logo renders
+  empty though the site object carries `logo.text`; footer content present but
+  unrendered; prose link/list typography missing). Cosmetic on a placeholder
+  site; needs live Astro-build debugging. A speculative nav-brand seed change was
+  tried and reverted — the header wordmark reads `site.logo.text` via Logo.astro,
+  not the header nav's brand.
+- **F6 (no delete verb) → dedicated verb task.** A governed
+  `object_retire`/delete is real fleet-law surface (archive-vs-hard-delete,
+  restore, live-export interaction, review-state, inventory default) that should
+  be designed, not rushed. The `archived` status infra is half-present already.
+  Not wontfix — worth doing in its own change.
+- **F7 (get↔patch version drift) → wontfix-v1.** The documented eventual-
+  consistency constraint; mitigation is read-version-under-lock-and-retry (the
+  T14.5 driver does this). The lock-library / strong-read upgrade is already
+  tracked.
+
+Gates green throughout: 1711 core + 89 script, opt-in 1304, eslint + prettier
+clean. One commit per cluster; no PR. Discovered en route: the sandbox's global
+`tsc` is 6.0.3 (stricter, phantom errors) while the project pins 5.8.3 — always
+use `node_modules/.bin/tsc` / `npm test` for accurate results.
+
+## Session 2026-07-26 (T14.6 — test plan executed live on both sites; findings log committed)
+
+Full findings log: **`w14-findings.md`** (this directory). Ran the authz
+matrix, MCP connectivity/parity, layout audit, and agent E2E against both
+production sites. Headline results:
+
+- **F1 CRITICAL — Dr-Lurié's `/mcp` is fully unauthenticated.** No key and a
+  wrong key both return 200 with production data, and the mutating path is
+  reachable (an anonymous `object_checkout` reaches a real 404 lookup). Cause:
+  `MCP_HTTP_AUTH_TOKEN` is unset on `drluriescience`, and the gate
+  (`mcp.ts` ~L1938) **fails OPEN** on `undefined`. Platform is correctly gated
+  (token set → 401 for wrong/no key, both `tools/list` and `tools/call`). The
+  fix is T14.8's per-site keys pulled forward, PLUS making the gate fail closed
+  in a lambda runtime. Closing it on Dr-Lurié needs its live connector's bearer
+  set in lockstep — flagged to Wolf, not silently changed.
+- **F2 HIGH — every create-site client's `artifact-upload` is dead at init.**
+  It is a Netlify v2 function (`export const config = { path }`) needing
+  `export default`, but the generated `functionShimTemplate` emits
+  `export const handler`. Platform 502s on every request incl. GET; Dr-Lurié's
+  hand shim (`export default`) works. T14.7 fix in `create-site.mjs`.
+- **F3–F8** (medium/low): platform chrome renders bare vs Dr-Lurié (invisible
+  brand, empty footer, unstyled prose links/bullets); the reader-safety scan
+  over-blocks the words "private"/"strategy" in all page prose fleet-wide;
+  publish/discard don't release the lock; no governed delete verb; get↔patch
+  version drift under eventual reads; the `tests/netlify` opt-in suite doesn't
+  compile on main (CI never runs it).
+
+**Confirmed GOOD:** MCP tool parity (platform 50/0-legacy, Dr-Lurié 62/12);
+platform `/mcp` and all non-MCP admin/object functions deny-by-default on both
+sites; legacy trio isolated (404 on platform, gated on Dr-Lurié); the T14.5
+drive stands as the platform agent E2E.
+
+**Gated (need Wolf's Identity login or a harness):** authenticated `/admin`
+screens both sites (the login GATE renders correctly — T14.0 fix live),
+governance-toggle flip/revert, per-agent key mint→use→revoke (T14.8),
+mobile-viewport audit (cloud browser is fixed-canvas). T14.7 is scoped from F2–F8;
+F1 goes to T14.8 (and wants doing sooner). No code changed this task.
+
+## Session 2026-07-26 (T14.5 SHIPPED — the manual IS the product; T14.4 CLOSED on Wolf's CI confirmation)
+
+**T14.4 is closed.** Wolf confirmed all checks GREEN on the merged PRs
+(#474–#477) — that was the last outstanding proof: the first live TWO-SITE
+`discover-fleet` matrix run through Actions, both sites building from one
+core change. With the platform MCP round-trip (this phase, live), the
+informational build-diff on Dr-Lurie (reviewed, no unintended change), and
+the refs recorded here, all four T14.4 proofs stand. PUBLISH_SECRET rotation:
+Wolf ruled "ignore it" — recorded, nothing rotated.
+
+**T14.5 — the platform site now documents itself through its own front
+door.** Fifteen `page` objects on `site_platform`: `/manual` (index),
+`/manual/lifecycle`, `/manual/roles`, `/manual/genesis`, and one reference
+page per governed type (×11). The reference half of every type page is
+GENERATED from that type's live `object_contract` — fields, patch ops,
+lifecycle verbs, publish policy — never hand-typed. Driver:
+`scripts/platform-manual-drive.mjs` (create/update/publish through `/mcp`;
+`--check` regenerates from the live contracts and diffs — ran CLEAN 15/15).
+All fifteen published + released; verified rendering live (index, lifecycle,
+genesis, content-item spot-checked 200 with correct copy). `page_home` also
+patched live via `set_page_meta` — title `Platform — home` +
+`navigationOverrides.footer` — publish green (the `structure_home_footer`
+422 is gone), and the fix is now BORN into every future site:
+`create-site`'s `bootstrapHomePageExport` carries the footer override, the
+committed platform stub matches, and the genesis e2e pins it.
+
+**What the drive surfaced (T14.6 seeds, each hit for real):**
+
+1. **Reader-safety keyword overreach.** `assertReaderSafe` forbids the
+   literal words `private` and `strategy` (word-boundary, case-insensitive)
+   in ALL page prose, fleet-wide — the content_item manual intro could not
+   say "private strategy metadata" about its own model. Reworded here, but
+   the real finding is that no site can publish ordinary copy containing
+   "strategy" on any page. Weigh scoping the scan to article projections.
+2. **Publish does NOT release the lock** (and neither does discard — both
+   observed). All 13 pages from pass one were still locked a full lease
+   later; the driver now calls `object_checkin` after publish. Lock hygiene
+   needs a ruling: should publish auto-checkin?
+3. **No deletion verb exists.** Three probe pages made during 422 bisection
+   could not be removed through the front door at all — removed via the
+   Blobs API back door (API store name is `site:site-objects`, literal key
+   paths, fleet token). An agent mistake is otherwise PERMANENT. The store
+   needs a governed retire/delete verb.
+4. **Version drift between `object_get` and patch** under eventual reads —
+   first patch attempt hit "Record version conflict" with a fresh get;
+   retry-under-lock with a re-get succeeded. Known consistency constraint,
+   now with a live reproduction.
+5. **`tests/netlify` opt-in suite does not COMPILE on main** (pre-existing,
+   verified on a clean tree: `admin-blob-manager.ts` + `blob-admin.ts` tsc
+   errors). CI never runs it, so it rotted. Fix or gate in T14.7.
+
+The 422 itself was diagnosed by reading the FULL structured `validation`
+array off the raw RPC response — the driver's 180-char error truncation had
+hidden the `reader_safety` criterion entirely.
+
+Gates: 1706/1706 core, 89/89 scripts, genesis e2e green, eslint + prettier
+clean; acme fixture regenerated (byte-identical — the dry-run plan lists
+filenames, not contents). Committed `T14.5: …`; no PR.
+
 ## Session 2026-07-26 (GENESIS SOLVED — the cycle was a mirage; the real defect was a silent test-store fallback in production)
 
 **Supersedes the "genesis is circular" reading in the T14.4 entry below.** It
@@ -119,13 +255,13 @@ Dr-Lurie's tool behavior is unchanged; the tool BODIES were not touched.
 **The plan's premise was wrong, and the correction is the interesting part.**
 The pre-work read said `mcp.ts` had exactly one coupling — the
 `sites/drlurie/config/policy-bindings` import — so the fix was "delete a line
-and move the file". That was true of the *obvious* coupling and missed the
+and move the file". That was true of the _obvious_ coupling and missed the
 structural one: **`mcp.ts` is a COMPOSITE.** It statically imports the
 `handler` of six sibling functions and invokes them in-process:
 
-| Sibling | What it is |
-| --- | --- |
-| `save-artifact`, `object-store`, `deploy-status` | per-site SHIMS, already bound to a SiteBinding |
+| Sibling                                                      | What it is                                                         |
+| ------------------------------------------------------------ | ------------------------------------------------------------------ |
+| `save-artifact`, `object-store`, `deploy-status`             | per-site SHIMS, already bound to a SiteBinding                     |
 | `save-json-blob`, `publish-article`, `verify-article-images` | the FROZEN legacy article path — Dr-Lurie's, repo-root, off-limits |
 
 A file move alone would have re-pointed the first three at the core factories
@@ -316,11 +452,11 @@ most of the real work was, see below.
 **build-diff vs `origin/main`: 71 of 74 pages byte-identical, 3 differences,
 all intended de-siting, each verified by hand:**
 
-| Difference | Why |
-| --- | --- |
-| `id="dr-lurie-login-modal"` → `id="cms-login-modal"` | internal DOM id; the whole `__drLurie*` / `dr-lurie:*` browser namespace (globals, custom events, controllers) is renamed to `__cms*` / `cms:*`. Client-name literals cannot ship in fleet law. |
-| `Search Dr. Lurié` → `Search Dr. Lurié Skincare` | the search dialog's heading hardcoded the client's name. Now `Search ${site.name}` from the site object, falling back to the logo wordmark, then to plain `Search`. The only VISIBLE copy change in the wave. |
-| minified inline script identifiers | the same namespace rename, as compiled. |
+| Difference                                           | Why                                                                                                                                                                                                           |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id="dr-lurie-login-modal"` → `id="cms-login-modal"` | internal DOM id; the whole `__drLurie*` / `dr-lurie:*` browser namespace (globals, custom events, controllers) is renamed to `__cms*` / `cms:*`. Client-name literals cannot ship in fleet law.               |
+| `Search Dr. Lurié` → `Search Dr. Lurié Skincare`     | the search dialog's heading hardcoded the client's name. Now `Search ${site.name}` from the site object, falling back to the logo wordmark, then to plain `Search`. The only VISIBLE copy change in the wave. |
+| minified inline script identifiers                   | the same namespace rename, as compiled.                                                                                                                                                                       |
 
 R3 makes byte-identity informational, so these were reviewed rather than
 blocked. Nothing else moved: `0 only-in-base, 0 only-in-head` — the injected
@@ -356,13 +492,12 @@ changed and stops being readable.
    the `-gotrue-user` SUFFIX: exactly as safe (a false positive costs one wasted
    chunk fetch, and `bootEditMode` re-verifies server-side), and tenant-free.
 4. **`tsconfig.test.json` excludes `packages/core/app/**`.** Its blanket
-   `packages/core/**/*.ts` include swept in shell modules that resolve `~/…`,
-   `@site/…`, and the `astrowind:config` virtual module — none of which `tsc`
-   can see. Excluding the shell restores the pre-T14.1 arrangement exactly: a
-   shell module a Node test actually imports is still compiled as a reachable
-   dependency. The corollary is a real constraint, now written into the move
-   map: shell `.ts` files must use RELATIVE cross-package imports, never the
-   aliases, because `tsc` emits the specifier verbatim and the test runtime has
+`packages/core/\*_/_.ts`include swept in shell modules that resolve`~/…`,
+`@site/…`, and the `astrowind:config`virtual module — none of which`tsc`can see. Excluding the shell restores the pre-T14.1 arrangement exactly: a
+shell module a Node test actually imports is still compiled as a reachable
+dependency. The corollary is a real constraint, now written into the move
+map: shell`.ts`files must use RELATIVE cross-package imports, never the
+aliases, because`tsc` emits the specifier verbatim and the test runtime has
    no resolver for them.
 5. **Dr-Lurie's `outDir` is pinned to the repo-root `dist`.** Every other site
    defaults to `sites/<client>/dist`. The live Netlify project publishes `dist`
@@ -406,15 +541,15 @@ triage found a healthy GoTrue, a healthy `admin-users`, and a rendering page.
 output, GoTrue and `admin-auth-state` stubbed at the network layer), three
 scenarios, before → after:
 
-| Scenario | Before | After |
-| --- | --- | --- |
-| Valid session in localStorage, cold load of `/admin` | "Admin login required" | workspace renders |
-| Sign in via the modal on an already-hydrated `/admin` | worked (island had registered the provider by click time) | works |
-| …then reload `/admin` | "Admin login required" again | workspace renders |
-| Sign in from the public header (no admin island on the page) | session never persisted at all, header stayed "Sign in" | persists, header shows "Account" |
+| Scenario                                                     | Before                                                    | After                            |
+| ------------------------------------------------------------ | --------------------------------------------------------- | -------------------------------- |
+| Valid session in localStorage, cold load of `/admin`         | "Admin login required"                                    | workspace renders                |
+| Sign in via the modal on an already-hydrated `/admin`        | worked (island had registered the provider by click time) | works                            |
+| …then reload `/admin`                                        | "Admin login required" again                              | workspace renders                |
+| Sign in from the public header (no admin island on the page) | session never persisted at all, header stayed "Sign in"   | persists, header shows "Account" |
 
 That middle row is why the bug read as intermittent: the one path that worked
-was signing in *after* an island had hydrated, and it never survived a reload.
+was signing in _after_ an island had hydrated, and it never survived a reload.
 
 **Fix:** one side-effect import (`import '~/config/policy-bindings';`) at the
 top of each of the five client script blocks — dynamic, in front of the editor
@@ -548,9 +683,9 @@ environment has no path to:
    real endpoint) and the agent MCP round-trip proof both require that
    real, deployed second site to exist and be reachable first.
 3. The fleet-propagation proof needs two real Netlify builds (Dr-Lurie's
-   + the new site's) actually running in CI/on Netlify — this sandbox has
-   no path to trigger or observe a live GitHub Actions run or a live
-   Netlify build (recorded the same way for every prior W11 CI task).
+   - the new site's) actually running in CI/on Netlify — this sandbox has
+     no path to trigger or observe a live GitHub Actions run or a live
+     Netlify build (recorded the same way for every prior W11 CI task).
 
 **What Wolf's action unblocks:** once a real second site exists (runbook
 §1–§2: `create-site --name <client>` for real, then `--netlify-token`, then
@@ -1283,7 +1418,7 @@ body, `npm run check` + `npm test` + `npm run build` green after every one,
 off-limits files proven byte-untouched throughout.
 
 - **STEP 1 (`eada6ed`)** — deleted `src/pages/admin/{publish,drafts,
-  library,agent-admin}.astro`, `review/[draftId].astro`,
+library,agent-admin}.astro`, `review/[draftId].astro`,
   `objects/[objectId].astro`, and `src/components/admin/AdminNav.astro`;
   removed the 5-item "Legacy" nav group from `AdminShell`; removed the dead
   `/admin/review/*` and `/admin/objects/*` redirects from `netlify.toml`.
@@ -1355,7 +1490,7 @@ off-limits files proven byte-untouched throughout.
   `nav_header.json`). Wolf to decide when to release; nothing breaks in the
   meantime, the dead links would only 404.
 - **Off-limits verification (all three groups + the merge):** `git diff
-  --stat` against `main` is empty for `netlify/functions/publish-article.ts`,
+--stat` against `main` is empty for `netlify/functions/publish-article.ts`,
   `netlify/functions/admin-workflow-lock.ts`, and
   `netlify/functions/save-json-blob.ts` (its MCP surface included) — checked
   after every commit and re-checked after merging `origin/main` in. The
@@ -1452,10 +1587,10 @@ article-settings scalar (slug/title/deck/description/taxonomy/seo).
 - Render: `src/utils/blog.ts` (`loadArticleObjectPosts` now carries
   `article.author` onto the shared `Post.author` field — already declared
   on the `Post` type, previously populated only by the legacy `.md` path)
-  + `src/components/blog/SinglePost.astro` (the article meta line renders
-  `By <author>` between the date and category when set; renders nothing
-  when absent — matches the existing typography exactly, no icon, no new
-  layout).
+  - `src/components/blog/SinglePost.astro` (the article meta line renders
+    `By <author>` between the date and category when set; renders nothing
+    when absent — matches the existing typography exactly, no icon, no new
+    layout).
 - Tests (all new, all green): schema additive-parse + max-length bound, and
   reader-safety leak-scan coverage
   (`tests/netlify/content-item-object.test.ts`); a `set_article_meta`

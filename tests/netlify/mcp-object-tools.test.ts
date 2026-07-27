@@ -287,6 +287,17 @@ test('object_publish documents the deferred-deploy model ([skip netlify], explic
   assert.match(description, /release_to_production/);
 });
 
+test('object_publish documents that it KEEPS the lock — the caller must checkin (W14 F5)', async () => {
+  // The publish stamp deliberately preserves the lock (object-publish.test.ts:
+  // "the stamp write must preserve the lock") so concurrent body drift is caught
+  // under the live lease. That surprised a drive; the contract now says so, and
+  // this pins it so the guidance can't quietly drop back out.
+  const tools = await listTools();
+  const description = getTool(tools, 'object_publish').description;
+  assert.match(description, /object_checkin/);
+  assert.match(description, /keeps your lock/i);
+});
+
 test('object_submit_review under a held lock opens a review through the proxy', async () => {
   await reset();
   await callTool('object_create', {
