@@ -7,6 +7,91 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-27 (F10 — every site is now its own OAuth 2.1 authorization server)
+
+Wolf's call on the F9 options: **build OAuth** (option 2), and keep the URL key
+so neither delivery is lost. Both ride one branch.
+
+**What landed.** One new core function (`mcp-oauth.ts`) and two libs
+(`oauth-store.ts`, `oauth-server.ts`) make each site an authorization server
+beside the MCP resource server it already runs:
+
+- RFC 9728 protected-resource metadata and RFC 8414 server metadata, both
+  served for the bare path AND the `/mcp`-suffixed probe clients try first.
+- RFC 7591 dynamic registration, so a client that has never seen this server
+  can obtain a `client_id` with no human pre-provisioning. Registration grants
+  NOTHING on its own.
+- `/oauth/authorize` validates and **parks the request server-side**; only an
+  opaque `request_id` travels through the browser, so nothing a user can edit
+  in the URL bar can widen what gets approved.
+- The consent screen is `/admin/authorize` — a shell route inside the admin
+  workspace, so the login is the Identity login the workspace already has
+  (Google included) and the approver is a named admin. Reader accounts 403.
+- `/oauth/token` (code + rotating refresh), `/oauth/revoke`.
+- `/mcp` became a resource server: OAuth bearer accepted as a third
+  independent path, and every 401 now carries
+  `WWW-Authenticate: Bearer … resource_metadata=…` — the header without which a
+  connector can never discover any of the above.
+
+**Security posture, deliberate:** tokens are opaque and store-backed (revoke
+means gone, not "wait for the JWT to expire"); one blob key per record, never a
+list doc (concurrent exchanges + eventual consistency would drop grants); raw
+tokens and codes are never persisted, only their sha256; PKCE S256 required and
+`plain` neither advertised nor accepted; redirect URIs matched exactly, with an
+unverified client refused IN PLACE rather than redirected; codes single-use,
+consumed before PKCE is checked; refresh tokens rotate. **F1 is not weakened** —
+OAuth is additive and the fail-closed behaviour is still pinned by its test.
+
+**Honest limit:** an OAuth token grants the SAME surface as the shared key.
+Per-client scope narrowing is dispatcher work and is post-V1. What this buys
+today is identity, expiry, and revocation.
+
+25 new tests drive the whole flow against the real handlers (register →
+authorize → consent → exchange → call `/mcp` → revoke → 401). Suites: 1761 core
+
+- 89 script + 1358 opt-in, and a platform build verified the consent route
+  renders.
+
+**Wolf's action:** in the connector's Advanced settings there is now nothing to
+paste — the URL alone (`https://drluriescience.netlify.app/mcp`) is enough once
+this deploys; claude.ai discovers the auth server, registers itself, and sends
+him to a consent screen he approves while signed in as owner. The `?key=` URL
+from F9 keeps working for anything that cannot do OAuth.
+
+## Session 2026-07-27 (F9 — the connector could not carry the token F1 started requiring)
+
+Wolf asked where to put Dr-Lurié's connector bearer. The honest answer was
+**nowhere**: claude.ai's custom-connector form takes a URL and OAuth
+credentials, and nothing else. No bearer field, no custom-header field. His
+connector had worked only because the endpoint was fail-open — and F1 closed
+that, correctly, without my checking who was calling.
+
+Rather than park it (R8), the shared token gained a third carrier:
+
+- `Authorization: Bearer <token>` — preferred, unchanged.
+- `X-MCP-Auth-Token: <token>` — preferred, unchanged.
+- **`/mcp?key=<token>`** (alias `?mcp_key=`) — new, last in the list, for
+  clients that cannot send headers at all.
+
+All three compare against the same `MCP_HTTP_AUTH_TOKEN` with the same
+constant-time `safeSecretsMatch`. The key is never logged: the 401 diagnostic
+gained `hasUrlKey` (presence only), alongside the two existing header flags.
+
+**F1 is not reopened, and that is pinned by a test:** with the shared token
+unset in a lambda runtime, `?key=anything` still 401s `mcp_auth_missing_token`.
+A URL key is a carrier for the secret, not a substitute for one. Six new tests
+in `tests/netlify/mcp-auth.test.ts` (correct key, alias, wrong key + no secret
+echo in body or log, whitespace-only key reads as absent, fail-closed).
+
+**The tradeoff is real and written down** in the finding and the runbook: query
+strings are logged by proxies and CDNs; the connector URL _is_ the secret.
+Headers stay the recommendation. The durable fix is an OAuth server on the site
+— post-V1, riding T14.8's per-agent keys.
+
+**Wolf's action:** in claude.ai → Settings → Connectors, edit the Dr-Lurié
+connector's URL to append `?key=<the token I minted>` (the token itself is in
+the chat message, not in this repo). Nothing else to change.
+
 ## Session 2026-07-27 (F6 PROVEN LIVE — the retire path, end to end on Fernwell)
 
 **The last unproven piece of V1 is proven.** F6 was built and unit-tested but had

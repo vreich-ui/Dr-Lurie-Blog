@@ -14,21 +14,25 @@ today) · **LOW** (constraint / infra).
 
 ## Disposition (T14.7 fix wave) — every finding accounted for
 
-| #   | Sev      | Disposition                                                                                                                                                                                                                                                                                                                                                                                                                              | Where              |
-| --- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ |
-| F1  | CRITICAL | **→ T14.8.** The one-line code fix (fail-closed) CLOSES Dr-Lurié's live `/mcp` on deploy, which breaks any connector currently sending no token. That must land in lockstep with setting Dr-Lurié's token AND updating its connector's bearer — exactly T14.8's per-site-key scope. Not deploy-safe alone; flagged to Wolf as top priority.                                                                                              | T14.8              |
-| F2  | HIGH     | **FIXED + verified.** create-site now picks the export form from each core function's generation; platform artifact-upload shim corrected; regression test.                                                                                                                                                                                                                                                                              | commit `de89b79`   |
-| F3  | MEDIUM   | **PARTLY FALSE, remainder FIXED + verified.** The "empty footer" was an artifact of the agent's own screenshot tool (hidden tab → zero rAF ticks → IntersectionObserver never fires → the fade-in never runs). A real browser renders it correctly. The real defects the proper render exposed: core's Footer hardcoded Dr-Lurié's descriptor as the fleet default, and a titleless nav group rendered as an empty dropdown. Both fixed. | commit `f3-chrome` |
-| F4  | MEDIUM   | **FIXED + verified.** Reader-safety scan no longer blocks `private`/`strategy` as ordinary prose outside the content_item annotation model; camelCase markers and JSON-key leaks still caught everywhere.                                                                                                                                                                                                                                | commit `431186d`   |
-| F5  | MEDIUM   | **wontfix-v1 (behavior) + documented.** Publish deliberately keeps the lock (pinned test: "the stamp write must preserve the lock") so concurrent drift is caught under the live lease. The contract now says so and tells callers to `object_checkin`; the surprise, not the behavior, was the defect.                                                                                                                                  | commit `3f5965f`   |
-| F6  | MEDIUM   | **BUILT + verified.** `object_retire` (archive → un-export → 301 redirect, in one commit) plus the export-deletion primitive it needed, `_redirects` emission at build, 404 alternatives, and the Owner-only 30-day `purge_archived` sweep. Wolf's rulings: archive then hard-delete after 30 days; retired means gone after a release; readers are always redirected.                                                                   | commit `f6-*`      |
-| F7  | LOW      | **wontfix-v1.** The get↔patch version drift is the documented eventual-consistency constraint (name-lookup blob path drops strong consistency fleet-wide). Mitigation is read-version-under-lock-and-retry (the T14.5 driver does this). The real remedy — the lock library / a blobs-scoped strong-read token — is already tracked for the genesis-entry decision; not a V1 blocker.                                                   | tracked            |
-| F8  | LOW      | **FIXED + verified.** Two real type holes repaired (string guard; cast the context-validated event); `npm run test:opt-in` now compiles and is gated in the CI `check` job so it can't rot again.                                                                                                                                                                                                                                        | commit `09fb09d`   |
+| #   | Sev      | Disposition                                                                                                                                                                                                                                                                                                                                                                                                                              | Where               |
+| --- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- |
+| F1  | CRITICAL | **→ T14.8.** The one-line code fix (fail-closed) CLOSES Dr-Lurié's live `/mcp` on deploy, which breaks any connector currently sending no token. That must land in lockstep with setting Dr-Lurié's token AND updating its connector's bearer — exactly T14.8's per-site-key scope. Not deploy-safe alone; flagged to Wolf as top priority.                                                                                              | T14.8               |
+| F2  | HIGH     | **FIXED + verified.** create-site now picks the export form from each core function's generation; platform artifact-upload shim corrected; regression test.                                                                                                                                                                                                                                                                              | commit `de89b79`    |
+| F3  | MEDIUM   | **PARTLY FALSE, remainder FIXED + verified.** The "empty footer" was an artifact of the agent's own screenshot tool (hidden tab → zero rAF ticks → IntersectionObserver never fires → the fade-in never runs). A real browser renders it correctly. The real defects the proper render exposed: core's Footer hardcoded Dr-Lurié's descriptor as the fleet default, and a titleless nav group rendered as an empty dropdown. Both fixed. | commit `f3-chrome`  |
+| F4  | MEDIUM   | **FIXED + verified.** Reader-safety scan no longer blocks `private`/`strategy` as ordinary prose outside the content_item annotation model; camelCase markers and JSON-key leaks still caught everywhere.                                                                                                                                                                                                                                | commit `431186d`    |
+| F5  | MEDIUM   | **wontfix-v1 (behavior) + documented.** Publish deliberately keeps the lock (pinned test: "the stamp write must preserve the lock") so concurrent drift is caught under the live lease. The contract now says so and tells callers to `object_checkin`; the surprise, not the behavior, was the defect.                                                                                                                                  | commit `3f5965f`    |
+| F6  | MEDIUM   | **BUILT + verified.** `object_retire` (archive → un-export → 301 redirect, in one commit) plus the export-deletion primitive it needed, `_redirects` emission at build, 404 alternatives, and the Owner-only 30-day `purge_archived` sweep. Wolf's rulings: archive then hard-delete after 30 days; retired means gone after a release; readers are always redirected.                                                                   | commit `f6-*`       |
+| F7  | LOW      | **wontfix-v1.** The get↔patch version drift is the documented eventual-consistency constraint (name-lookup blob path drops strong consistency fleet-wide). Mitigation is read-version-under-lock-and-retry (the T14.5 driver does this). The real remedy — the lock library / a blobs-scoped strong-read token — is already tracked for the genesis-entry decision; not a V1 blocker.                                                   | tracked             |
+| F8  | LOW      | **FIXED + verified.** Two real type holes repaired (string guard; cast the context-validated event); `npm run test:opt-in` now compiles and is gated in the CI `check` job so it can't rot again.                                                                                                                                                                                                                                        | commit `09fb09d`    |
+| F9  | HIGH     | **FIXED + verified.** F1's fail-closed gate locked out the one client that cannot send headers — claude.ai's custom connector. The shared token now also rides the URL (`/mcp?key=<token>`), same constant-time compare, same secret, never logged. Header carriers stay preferred and documented as such.                                                                                                                               | commit `f9-url-key` |
+| F10 | HIGH     | **BUILT + verified.** Wolf's call: implement OAuth, keep the URL key too. Every site is now its own OAuth 2.1 authorization server — RFC 9728/8414 metadata, RFC 7591 registration, PKCE S256, a human consent screen inside `/admin`, rotating refresh tokens, RFC 7009 revocation — and `/mcp` validates those tokens as a resource server, challenge header included. 25 tests.                                                       | commit `f10-oauth`  |
 
-Net: four fixed-and-verified (F2, F4, F5-doc, F8), one CRITICAL assigned to its
-designated task (F1 → T14.8), two scoped to dedicated follow-ups (F3 chrome, F6
-retire verb), one wontfix-v1 (F7). Suite green throughout (1711 core + 89 script;
-opt-in 1304). No PR.
+Net: six fixed-and-verified (F2, F4, F5-doc, F8, F9, F10), one CRITICAL assigned
+to its designated task (F1 → T14.8), two scoped to dedicated follow-ups (F3
+chrome, F6 retire verb), one wontfix-v1 (F7). F9 and F10 were found and built
+AFTER the wave, when F1's closed gate met the connector it locked out: F9 is the
+carrier fix, F10 the authorization model. Suite green throughout (1761 core + 89
+script + 1358 opt-in). No PR.
 
 ---
 
@@ -223,6 +227,103 @@ CI never runs this suite, so it rotted. The e2e tests it guards (including the
 new `site-genesis.e2e.test.ts`) currently only run via ad-hoc `tsx`. **Fix
 (T14.7):** repair the two type errors and wire the suite into CI so it can't rot
 again silently.
+
+---
+
+## F9 — HIGH — F1's fix locked out the only connector Wolf actually uses
+
+**Found:** 2026-07-27, after F1 was verified closed live. Not a defect in the
+test plan's sense — a **consequence of a fix**, recorded here because the wave's
+findings log is where the fleet's auth posture is reasoned about.
+
+**Surface:** Dr-Lurié's `/mcp`, reached from a claude.ai **custom connector**.
+
+**What happened:** F1 closed the fail-open gate. The connector had been working
+_because_ the endpoint was unauthenticated — it never sent a token, because
+claude.ai's custom-connector form gives it no way to. That form takes a URL and,
+under Advanced settings, an OAuth client id/secret. There is no field for a
+static bearer, and no field for a custom header. So the moment the gate closed,
+the only supported way back in was to stand up an OAuth server.
+
+**Fix (this commit):** the shared `MCP_HTTP_AUTH_TOKEN` gains a third carrier —
+`?key=<token>` (alias `?mcp_key=`) — checked with the same constant-time
+`safeSecretsMatch` as the two header carriers, after them, and never written to
+a log line (the rejection diagnostic records `hasUrlKey` presence only). It is
+NOT a second gate: with the shared token unset in a lambda runtime, a URL key
+still 401s `mcp_auth_missing_token`, so F1's fail-closed posture is intact
+(pinned by a test).
+
+**The tradeoff, stated plainly:** a query string is recorded by proxies, CDN
+access logs, and browser history in a way an `Authorization` header is not. The
+connector URL therefore _is_ the secret and should be handled as one. Every
+client that can send headers should send headers; the docs and the code comment
+both say so. The durable answer is an OAuth authorization server on the site
+(then the connector's own Advanced-settings fields do the work and no secret
+touches a URL) — post-V1, and per-agent keys (T14.8) are the natural vehicle.
+
+**Lesson, and it is mine:** I hardened an auth gate without first checking how
+the one live consumer authenticates. "Fail closed" is correct; shipping it
+without tracing the caller is how a correct fix becomes an outage.
+
+---
+
+## F10 — the durable answer to F9: the site is its own OAuth server
+
+**Wolf's call, 2026-07-27:** implement OAuth (option 2), and keep F9 — the URL
+key — in the same delivery rather than trading one for the other.
+
+**What exists now.** Every site runs an OAuth 2.1 authorization server beside
+the MCP resource server it protects, over one new core function
+(`mcp-oauth.ts`) and two libs (`oauth-store.ts`, `oauth-server.ts`):
+
+| Endpoint                                  | What it does                                        |
+| ----------------------------------------- | --------------------------------------------------- |
+| `/.well-known/oauth-protected-resource`   | RFC 9728 — names this origin as its own auth server |
+| `/.well-known/oauth-authorization-server` | RFC 8414 — endpoints + `S256` only                  |
+| `/oauth/register`                         | RFC 7591 dynamic registration                       |
+| `/oauth/authorize`                        | validates, parks the request, sends to consent      |
+| `/admin/authorize`                        | the consent SCREEN (shell route, Identity-gated)    |
+| `/oauth/consent`                          | the human's decision → authorization code           |
+| `/oauth/token`                            | code → token; refresh → rotated token               |
+| `/oauth/revoke`                           | RFC 7009                                            |
+
+**The design decisions worth arguing about, and why they went this way:**
+
+- **The site is the authorization server, not a client of one.** An external
+  IdP would mean another account, another secret, another thing to provision
+  per client. The MCP spec explicitly allows the AS to be co-hosted with the
+  resource server, and a fleet that adds a tenant in 13 minutes cannot also add
+  an IdP tenancy.
+- **The user is authenticated by Netlify Identity, reusing `/admin`'s login.**
+  The consent screen is a shell route (`/admin/authorize`), so whatever
+  providers a site has enabled — including Google — work with no second login
+  surface, and no password ever reaches this code.
+- **Tokens are opaque and store-backed, not JWTs.** Statelessness would buy a
+  signing key, a rotation policy, and a JWKS endpoint; store-backed tokens die
+  the instant the record is deleted, which is what "revoke" should mean.
+- **One record per blob key, never a list document.** Two exchanges can land in
+  the same second, and the name-lookup blob path is eventually consistent
+  (F7/T14.4) — a read-modify-write over a shared doc would drop grants.
+- **Registration is open; consent is the gate.** RFC 7591 registration with no
+  human in it grants nothing at all: no client reads a byte until an admin
+  approves it by name at the consent screen.
+- **F1 is not weakened.** OAuth is a THIRD independent path in `getAuthResult`,
+  checked before the shared secret and only when the bearer is not the shared
+  secret (no extra blob read on the common path). Unset shared token in a
+  lambda runtime still fails closed.
+
+Spec MUSTs each carry a test that fails if the property is removed: PKCE S256
+required (`plain` is not advertised and not accepted), exact redirect-URI match
+(a prefix probe is refused **in place**, never redirected), single-use codes
+consumed before PKCE is even checked, `resource` audience validated at
+authorize AND on every resource request, rotating refresh tokens, and the
+`WWW-Authenticate: Bearer … resource_metadata=…` challenge on every 401.
+
+**What this does NOT do, stated so nobody assumes it:** an OAuth token grants
+the SAME surface as the shared key. Per-client scope narrowing (a connector
+that may read but not publish) is real work on the tool dispatcher and is
+post-V1. Today the win is identity, expiry, and revocation — not least
+privilege.
 
 ---
 

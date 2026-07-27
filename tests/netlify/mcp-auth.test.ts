@@ -24,11 +24,16 @@ test.afterEach(() => {
   }
 });
 
-const mcpRequest = async (method: string, headers: Record<string, string> = {}) => {
+const mcpRequest = async (
+  method: string,
+  headers: Record<string, string> = {},
+  queryStringParameters?: Record<string, string>
+) => {
   const logs: Array<Record<string, unknown>> = [];
   const response = await handler({
     httpMethod: 'POST',
     headers: { 'content-type': 'application/json', ...headers },
+    ...(queryStringParameters ? { queryStringParameters } : {}),
     body: JSON.stringify({ jsonrpc: '2.0', id: 1, method }),
     log: (payload) => logs.push(payload),
   });
@@ -80,6 +85,7 @@ test('MCP_HTTP_AUTH_TOKEN set without Authorization returns 401 with safe diagno
     hasMcpHttpAuthToken: true,
     hasMcpAuthTokenHeader: false,
     hasAuthorizationHeader: false,
+    hasUrlKey: false,
     reason: 'mcp_auth_missing_authorization',
   });
 });
@@ -142,4 +148,66 @@ test('wrong x-mcp-auth-token returns 401 with safe diagnostic data', async () =>
   assert.equal(authLog?.reason, 'mcp_auth_invalid_authorization');
   assert.equal(JSON.stringify(authLog).includes('expected-token'), false);
   assert.equal(JSON.stringify(authLog).includes('wrong-token'), false);
+});
+
+// W14 F9: the URL-key carrier. claude.ai's custom-connector form has no field
+// for a bearer token or a custom header, so a header-less client reaches the
+// shared secret through `?key=` or it does not reach it at all.
+test('correct ?key= allows initialize and tools/list (W14 F9)', async () => {
+  process.env.MCP_HTTP_AUTH_TOKEN = 'expected-token';
+
+  const initialize = await mcpRequest('initialize', {}, { key: 'expected-token' });
+  assert.equal(initialize.response.statusCode, 200);
+  assert.equal((initialize.body.result?.serverInfo as { name?: string } | undefined)?.name, 'Dr_Lurie_MCP_Server');
+
+  const toolsList = await mcpRequest('tools/list', {}, { key: 'expected-token' });
+  assert.equal(toolsList.response.statusCode, 200);
+  assert.ok(Array.isArray(toolsList.body.result?.tools));
+});
+
+test('?mcp_key= is accepted as an alias for ?key=', async () => {
+  process.env.MCP_HTTP_AUTH_TOKEN = 'expected-token';
+
+  const { response } = await mcpRequest('initialize', {}, { mcp_key: 'expected-token' });
+
+  assert.equal(response.statusCode, 200);
+});
+
+test('wrong ?key= returns 401 and never echoes either secret', async () => {
+  process.env.MCP_HTTP_AUTH_TOKEN = 'expected-token';
+
+  const { response, body, logs } = await mcpRequest('initialize', {}, { key: 'wrong-token' });
+
+  assert.equal(response.statusCode, 401);
+  assert.equal(body.error?.data?.reason, 'mcp_auth_invalid_authorization');
+  assert.doesNotMatch(response.body, /expected-token|wrong-token/);
+
+  const authLog = logs.find((log) => log.event === 'mcp_auth_rejected');
+  assert.equal(authLog?.hasUrlKey, true);
+  assert.equal(authLog?.hasMcpAuthTokenHeader, false);
+  assert.equal(authLog?.hasAuthorizationHeader, false);
+  // Presence only: the key value itself must never appear in a log line.
+  assert.equal(JSON.stringify(authLog).includes('expected-token'), false);
+  assert.equal(JSON.stringify(authLog).includes('wrong-token'), false);
+});
+
+test('an empty ?key= is treated as absent, not as a wrong key', async () => {
+  process.env.MCP_HTTP_AUTH_TOKEN = 'expected-token';
+
+  const { response, body } = await mcpRequest('initialize', {}, { key: '   ' });
+
+  assert.equal(response.statusCode, 401);
+  assert.equal(body.error?.data?.reason, 'mcp_auth_missing_authorization');
+});
+
+test('?key= does NOT open the gate when the shared token is unset in a lambda runtime', async () => {
+  // F1 stays closed: the URL key is another carrier for the shared secret, not
+  // a second gate. With nothing to compare against, a key proves nothing.
+  delete process.env.MCP_HTTP_AUTH_TOKEN;
+  process.env.LAMBDA_TASK_ROOT = '/var/task';
+
+  const { response, body } = await mcpRequest('initialize', {}, { key: 'anything' });
+
+  assert.equal(response.statusCode, 401);
+  assert.equal(body.error?.data?.reason, 'mcp_auth_missing_token');
 });

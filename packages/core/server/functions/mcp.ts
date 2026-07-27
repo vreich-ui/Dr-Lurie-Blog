@@ -147,6 +147,13 @@ import {
 import { getAdminStateFromEvent, type LambdaContext } from '../lib/admin-auth.js';
 import { getGovernanceBlobStore } from '../lib/governance-store.js';
 import { getAgentKeysDoc, resolveVerifiedAgentName, type AgentKeysBlobStore } from '../lib/agent-keys.js';
+import {
+  buildWwwAuthenticate,
+  resolveOAuthPrincipal,
+  resolveRequestOrigin,
+  type ResolvedOAuthPrincipal,
+} from '../lib/oauth-server.js';
+import type { OAuthBlobStore } from '../lib/oauth-store.js';
 import { allowedAgentNames, workflowStatuses } from '../../schema/workflow-contract.js';
 import {
   artifactKindValues,
@@ -291,6 +298,28 @@ const getBearerToken = (authorization: string | undefined) => {
   const match = authorization?.match(/^Bearer\s+(.+)$/i);
 
   return match?.[1]?.trim() || undefined;
+};
+
+/**
+ * The URL-borne shared token (W14 F9). Reason it exists: claude.ai's custom-
+ * connector form takes a URL and OAuth credentials — there is NO field for a
+ * static bearer or a custom header — so once F1 closed the fail-open gate,
+ * every header-less client (Wolf's connector included) was locked out with no
+ * way back in short of implementing an OAuth server. `?key=<token>` is the
+ * standard workaround for exactly this shape of client and is what the other
+ * Netlify-hosted MCP endpoints in this account already use.
+ *
+ * It is deliberately the WEAKEST of the three paths and is documented as such:
+ * a URL query string is recorded by proxies, CDN access logs, and browser
+ * history in a way an `Authorization` header is not. Any client that can send
+ * headers should send headers. The value is compared with the same constant-
+ * time `safeSecretsMatch` as the header paths, and is never logged — the
+ * rejection diagnostic records only WHETHER a key was present.
+ */
+const getUrlKeyToken = (event: LambdaEvent) => {
+  const params = event.queryStringParameters ?? {};
+
+  return toNonEmptyString(params.key) ?? toNonEmptyString(params.mcp_key);
 };
 
 const hasValidNetlifyPublishSecret = (event: LambdaEvent) => {
@@ -1915,8 +1944,46 @@ const parseBody = (event: LambdaEvent) => {
 };
 
 type AuthResult =
-  | { ok: true; verifiedAgentName?: string }
+  | { ok: true; verifiedAgentName?: string; oauthPrincipal?: ResolvedOAuthPrincipal }
   | { ok: false; reason: 'missing_token' | 'missing_authorization' | 'invalid_authorization' };
+
+/** The audience this deployment issues and accepts tokens for (W14 F10). */
+const mcpRequestOrigin = (event: LambdaEvent): string =>
+  resolveRequestOrigin({
+    ...(event.headers ? { headers: event.headers } : {}),
+    ...(process.env.URL ? { fallbackUrl: process.env.URL } : {}),
+  });
+
+/**
+ * W14 F10: the OAuth resource-server check. A bearer token that resolves to a
+ * live, unexpired, correctly-audienced access token in THIS site's store
+ * satisfies the gate on its own — that is the whole point of the authorization
+ * server: a client a human approved no longer needs the shared secret.
+ *
+ * Failure is silent by design (null, never a throw): a store outage must read
+ * as "this token does not authorize you", which falls through to the shared-
+ * secret gate below and, absent that, to a 401. The alternative — 500ing —
+ * would turn a blob hiccup into an outage for shared-key callers who never
+ * needed OAuth at all.
+ */
+const resolveOAuthPrincipalForRequest = async (
+  event: LambdaEvent,
+  token: string
+): Promise<ResolvedOAuthPrincipal | undefined> => {
+  try {
+    const store = (await getGovernanceBlobStore(event)) as unknown as OAuthBlobStore;
+    return (
+      (await resolveOAuthPrincipal(store, {
+        token,
+        site: getSiteIdentity().siteId,
+        resourceUri: `${mcpRequestOrigin(event)}/mcp`,
+        nowMs: Date.now(),
+      })) ?? undefined
+    );
+  } catch {
+    return undefined;
+  }
+};
 
 /**
  * W11 T11.10: resolves a verified per-agent identity from the Authorization
@@ -1945,31 +2012,49 @@ const resolveVerifiedAgentNameForRequest = async (event: LambdaEvent, token: str
  * call in this request. An unresolved/absent/revoked agent token changes
  * nothing: the shared-secret gate still runs exactly as it did before this
  * task (the deprecated fallback the brief keeps, not a forced cutover).
+ *
+ * W14 F10 adds a THIRD independent path, checked before the shared secret: an
+ * OAuth access token this site's own authorization server issued to a client a
+ * human approved. It stands alone — it works with the shared token set, unset,
+ * or rotated — because that is what makes OAuth an answer to F9 rather than
+ * another way to spell the same shared secret.
  */
 const getAuthResult = async (event: LambdaEvent): Promise<AuthResult> => {
   const authorization = toNonEmptyString(getHeader(event.headers, 'authorization'));
   const bearerToken = getBearerToken(authorization);
   const verifiedAgentName = bearerToken ? await resolveVerifiedAgentNameForRequest(event, bearerToken) : undefined;
+  if (verifiedAgentName) return { ok: true, verifiedAgentName };
 
   const token = toNonEmptyString(process.env.MCP_HTTP_AUTH_TOKEN);
+
+  // Try OAuth only when the bearer is not simply the shared secret — the
+  // common case must not pay a second blob read.
+  if (bearerToken && !(token && safeSecretsMatch(bearerToken, token))) {
+    const oauthPrincipal = await resolveOAuthPrincipalForRequest(event, bearerToken);
+    if (oauthPrincipal) return { ok: true, oauthPrincipal };
+  }
+
   if (!token) {
     // W14 F1: an UNSET shared token opens the gate ONLY in a non-lambda dev/test
     // runtime. In a production function runtime it must FAIL CLOSED — a verified
-    // per-agent token is then the only way through — so a site that ships with
-    // no MCP_HTTP_AUTH_TOKEN (as drluriescience did) is never wide open. Same
-    // lambda-detection posture as the blob-store fail-closed guard. An
-    // explicitly-empty token ('') already fails closed below, unchanged.
+    // per-agent token or an OAuth token (both returned above) is then the only
+    // way through — so a site that ships with no MCP_HTTP_AUTH_TOKEN (as
+    // drluriescience did) is never wide open. Same lambda-detection posture as
+    // the blob-store fail-closed guard. An explicitly-empty token ('') already
+    // fails closed below, unchanged.
     const inLambdaRuntime = Boolean(process.env.LAMBDA_TASK_ROOT || process.env.AWS_LAMBDA_FUNCTION_NAME);
     if (process.env.MCP_HTTP_AUTH_TOKEN === undefined && !inLambdaRuntime) {
-      return { ok: true, verifiedAgentName };
+      return { ok: true };
     }
-    return verifiedAgentName ? { ok: true, verifiedAgentName } : { ok: false, reason: 'missing_token' };
+    return { ok: false, reason: 'missing_token' };
   }
 
-  if (verifiedAgentName) return { ok: true, verifiedAgentName };
-
   const dedicatedToken = toNonEmptyString(getHeader(event.headers, 'x-mcp-auth-token'));
-  const providedTokens = [dedicatedToken, bearerToken].filter((provided): provided is string => Boolean(provided));
+  // Header paths first, URL key last: same secret, three carriers, ordered by
+  // how safe the carrier is (see getUrlKeyToken).
+  const providedTokens = [dedicatedToken, bearerToken, getUrlKeyToken(event)].filter((provided): provided is string =>
+    Boolean(provided)
+  );
 
   if (providedTokens.length === 0) return { ok: false, reason: 'missing_authorization' };
 
@@ -4640,15 +4725,43 @@ export const handler = async (rawEvent: LambdaEvent, context?: LambdaContext) =>
       hasMcpHttpAuthToken: Boolean(toNonEmptyString(process.env.MCP_HTTP_AUTH_TOKEN)),
       hasMcpAuthTokenHeader: Boolean(toNonEmptyString(getHeader(event.headers, 'x-mcp-auth-token'))),
       hasAuthorizationHeader: Boolean(toNonEmptyString(getHeader(event.headers, 'authorization'))),
+      // Presence only — the key itself never reaches a log line.
+      hasUrlKey: Boolean(getUrlKeyToken(event)),
       reason: diagnosticReason,
     });
 
-    return response(401, rpcError(null, -32001, 'Unauthorized', { reason: diagnosticReason }));
+    // W14 F10 / RFC 9728 §5.1: this challenge is how an OAuth-capable client
+    // DISCOVERS the authorization server. Without it a connector has no way to
+    // start a flow — it just reports "unauthorized" forever, which is exactly
+    // the dead end F1's hardening left Wolf's connector in.
+    return response(401, rpcError(null, -32001, 'Unauthorized', { reason: diagnosticReason }), {
+      ...jsonHeaders,
+      'Access-Control-Expose-Headers': 'mcp-session-id, WWW-Authenticate',
+      'WWW-Authenticate': buildWwwAuthenticate({
+        origin: mcpRequestOrigin(event),
+        realm: getSiteIdentity().siteSlug,
+        ...(authResult.reason === 'invalid_authorization' ? { error: 'invalid_token' } : {}),
+      }),
+    });
   }
   // W11 T11.10: a verified per-agent bearer token overrides self-declared
   // `agent_name` for every tool call in this request — see callTool's use
   // of `event.verifiedAgentName` below.
   if (authResult.verifiedAgentName) event.verifiedAgentName = authResult.verifiedAgentName;
+  if (authResult.oauthPrincipal) {
+    // Attribution, not authority: the log now names the CLIENT and the HUMAN
+    // who approved it. The token grants exactly the same surface as the shared
+    // key — narrowing per client is post-V1 scope work, and pretending
+    // otherwise here would be worse than saying so.
+    event.log?.({
+      event: 'mcp_oauth_authorized',
+      rpcMethod: null,
+      slug: null,
+      clientId: authResult.oauthPrincipal.client_id,
+      clientName: authResult.oauthPrincipal.client_name,
+      subject: authResult.oauthPrincipal.subject_email,
+    });
+  }
 
   let body: JsonRpcRequest | JsonRpcRequest[];
 
