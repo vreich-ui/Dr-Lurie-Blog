@@ -373,9 +373,18 @@ const netlifyTomlTemplate = (ids) => `# Per-site Netlify config. The redirects h
 # directory (the shell's astro config, tailwind config, and config.yaml lookups
 # are all absolute for exactly this reason).
 
+# The build command self-heals the workspace install. Netlify runs this with
+# the BASE DIRECTORY as cwd, and on a site's FIRST build (no warm cache) it does
+# not necessarily install the monorepo ROOT — so \`astro\` is absent from
+# node_modules, plain \`npx astro\` silently DOWNLOADS the latest astro from the
+# registry, and that version rejects NODE_VERSION 20 ("not supported by Astro").
+# That is exactly how fernwell's first build failed (W14 T14.9). So: resolve the
+# workspace astro or install the root, then run astro with --no-install, which
+# makes a missing binary a loud error instead of a silent wrong-version fetch.
+# The check short-circuits on warm builds, so this costs nothing once cached.
 [build]
   publish = "dist"
-  command = "npx astro build --config astro.config.ts"
+  command = "(npx --no-install astro --version > /dev/null 2>&1 || npm ci --prefix ../.. --no-audit --no-fund) && npx --no-install astro build --config astro.config.ts"
 [build.environment]
   NODE_VERSION = "20"
 
