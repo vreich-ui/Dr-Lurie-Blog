@@ -7,6 +7,44 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-27 (F6 PROVEN LIVE — the retire path, end to end on Fernwell)
+
+**The last unproven piece of V1 is proven.** F6 was built and unit-tested but had
+never run against a real site; Fernwell's genesis had already shown that live
+runs surface what tests do not. Drilled on the synthetic site, in order:
+
+1. Created `page_drill_retire` at `/drill-retire` through `/mcp`, published,
+   released → **live, 200**.
+2. `object_checkout` → **`object_retire`** (`redirect_to: '/'`). Response carried
+   `export_removed`, the `redirect` record, the commit sha, and the honest
+   `production.live_until_release: true`.
+3. Verified the commit ITSELF (`0e73764b`): one atomic change, `D` on
+   `sites/fernwell/data/site/pages/page_drill_retire.json` and `A` on
+   `sites/fernwell/data/site/redirects.json`. The export leaves and the
+   forwarding rule arrives together — there is no window in which the URL 404s,
+   which is the whole point of ruling 3.
+4. `release_to_production` → deploy ready on that commit.
+5. **Reader check:** `GET /drill-retire` → **301 → `/`**, following it lands
+   200 on the Fernwell home page. Wolf's "we can't lose readers" holds in
+   production, not just in a test.
+6. **Store check:** the record is `status: archived` with `retire` as its last
+   history action — recoverable for the 30-day grace window, exactly as ruled.
+7. **404 check:** a URL that never existed (`/no-such-page-xyz`) returns 404
+   **with** the alternatives block ("Try one of these instead") built from
+   Fernwell's own navigation.
+
+**One honest discrepancy, recorded rather than quietly fixed:** during design I
+said archived objects would be hidden from `object_inventory` by default; that
+change was never implemented, so `page_drill_retire` still appears in the
+inventory listing (carrying `status: archived`). On reflection the current
+behavior is arguably better — during the 30-day window an operator can SEE what
+is pending purge and restore it — so it stands, but as a deliberate choice now
+rather than an unnoticed gap.
+
+The drill artifacts are left in place on Fernwell as the live demonstration: the
+`/drill-retire` → `/` redirect is permanent by design, and the archived record
+ages out on the first `purge_archived` run past 30 days.
+
 ## Session 2026-07-27 (F6 CLOSED — governed removal exists: retire → redirect → purge)
 
 **The last open V1 finding is built.** There was no front-door removal at all:
