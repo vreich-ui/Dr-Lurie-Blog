@@ -17,6 +17,14 @@
  * never reaches reader-facing HTML (docs/agents/article-content-structure.md,
  * leak rules). Nothing consumes this module yet; W7.2 wires sections in.
  */
+// `@contentful/rich-text-*` are dual CJS/ESM packages. The ESM-native named
+// import below is correct for bundlers; for astro's SSR/static generation it is
+// made safe by `ssr.noExternal`-ing these packages in the shared astro config
+// (packages/core/app/site-astro-config.ts) so vite BUNDLES their ESM build into
+// the server output instead of letting Node 20 `require()` the CJS build — which
+// otherwise throws "Named export not found" (documentToHtmlString) on Netlify's
+// NODE_VERSION. Hit on fernwell's first production build; the article render path
+// pulls this module in.
 import { documentToHtmlString, type Options } from '@contentful/rich-text-html-renderer';
 import { BLOCKS, MARKS, type Document } from '@contentful/rich-text-types';
 

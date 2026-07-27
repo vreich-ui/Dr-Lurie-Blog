@@ -159,6 +159,15 @@ export const defineSiteAstroConfig = (options: SiteAstroConfigOptions) => {
     },
 
     vite: {
+      ssr: {
+        // Dual CJS/ESM packages: let vite BUNDLE their ESM build into the SSR
+        // output rather than letting Node 20 (Netlify's NODE_VERSION) require()
+        // the CJS build, whose named exports its ESM loader cannot see —
+        // `documentToHtmlString` otherwise throws "Named export not found" and
+        // fails the production build (W14, fernwell's first build; the article
+        // render path in packages/core/lib/richtext/render-html.ts pulls them in).
+        noExternal: ['@contentful/rich-text-html-renderer', '@contentful/rich-text-types'],
+      },
       resolve: {
         // Array form (ordered, regex-capable) because ONE prefix is split by
         // ownership: `~/assets/**` is the site's media — and that spelling is
