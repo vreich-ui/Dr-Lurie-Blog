@@ -51,6 +51,7 @@ import {
   type ObjectValidationContext,
 } from './object-validate.js';
 import { retireObject } from './object-retire.js';
+import { purgeArchivedObjects } from './object-purge.js';
 import { loadSiteRedirects } from './site-redirects.js';
 import { validateObjectIdForType } from '../../lib/object-ids.js';
 import { mintId, MintIdError } from '../../lib/object-ids-mint.js';
@@ -267,6 +268,13 @@ export const objectVerbRequestSchema = z.discriminatedUnion('action', [
     lock_token: z.string().min(1),
     // Exactly what each rejected op's history entry stores (T0.6, C§2.4).
     entries: z.array(z.object({ op: z.unknown(), capture: z.unknown() })).min(1),
+  }),
+  z.object({
+    // W14 F6 ruling 1: hard delete only AFTER the 30-day archive grace period.
+    // A sweep, not a per-object verb — see object-purge.ts for why.
+    action: z.literal('purge_archived'),
+    dry_run: z.boolean().optional(),
+    grace_days: z.number().int().positive().optional(),
   }),
   z.object({
     // W14 F6: the governed removal verb. `redirect_to` exists because a retired
@@ -1405,6 +1413,22 @@ export const handleObjectVerb = async (
 
       await store.setJSON(key, result.record);
       return ok({ ...result.body, version: result.record.version, content_revision: result.record.content_revision });
+    }
+
+    case 'purge_archived': {
+      // Owner-only: this is the one irreversible verb in the system.
+      if (!(options.roles ?? []).includes('owner')) {
+        return err(403, { error: 'Purging archived objects requires the owner role.' });
+      }
+      const result = await purgeArchivedObjects(
+        store as unknown as Parameters<typeof purgeArchivedObjects>[0],
+        {
+          ...(request.dry_run !== undefined ? { dry_run: request.dry_run } : {}),
+          ...(request.grace_days !== undefined ? { grace_days: request.grace_days } : {}),
+        },
+        { nowMs: ts }
+      );
+      return ok(result as unknown as Record<string, unknown>);
     }
 
     case 'retire': {

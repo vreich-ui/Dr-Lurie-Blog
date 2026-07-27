@@ -1,0 +1,63 @@
+---
+/**
+ * NOT-FOUND ALTERNATIVES (W14 F6, Wolf's ruling 3).
+ *
+ * "even a default 404 needs to have alternatives to what was not found."
+ *
+ * A retired route never reaches this component — `object_retire` writes a 301
+ * for it, so those readers are forwarded. This is the OTHER kind of miss: a
+ * mistyped URL, a stale external link, a page that never existed. On a DTC
+ * sales-and-publishing site, showing such a reader a dead end and nothing else
+ * is a lost reader, so the 404 offers somewhere to go.
+ *
+ * The alternatives are the site's OWN primary navigation, read from the same
+ * published navigation object the header renders — so they are per-tenant and
+ * correct by construction, with no hardcoded fleet copy (the mistake F3 caught
+ * in the footer).
+ */
+import { getEntry } from 'astro:content';
+
+import { getSiteObject } from '~/utils/site-object';
+import { getBlogPermalink, getHomePermalink } from '~/utils/permalinks';
+import { createNavTargetResolver, navigationToHeaderProps, parseNavigationExport } from '~/utils/navigation-data';
+
+const site = getSiteObject();
+const headerNavId = site?.defaultNavigation?.header ?? 'nav_header';
+
+const resolve = createNavTargetResolver({ blogPermalink: getBlogPermalink() });
+let links: Array<{ text?: string; href?: string }> = [];
+try {
+  const entry = await getEntry('navigationObject', headerNavId);
+  if (entry) {
+    // Flattened top-level entries (post-F3) already carry text+href; a dropdown
+    // group contributes its children instead, so the reader gets real
+    // destinations rather than an unclickable menu label.
+    links = navigationToHeaderProps(parseNavigationExport(entry.data), resolve).links.flatMap((link) =>
+      link.links?.length ? link.links : [link]
+    );
+  }
+} catch {
+  // A site without a header navigation still gets the home link below.
+  links = [];
+}
+
+const suggestions = links.filter((link) => link.href && link.text).slice(0, 6);
+---
+
+<nav class="mt-8 not-prose" aria-label="Suggested pages">
+  <p class="text-sm text-muted">Try one of these instead:</p>
+  <ul class="mt-3 flex flex-wrap gap-x-6 gap-y-2 text-base">
+    <li>
+      <a class="text-link underline underline-offset-4 hover:opacity-80" href={getHomePermalink()}>Home</a>
+    </li>
+    {
+      suggestions.map((link) => (
+        <li>
+          <a class="text-link underline underline-offset-4 hover:opacity-80" href={link.href}>
+            {link.text}
+          </a>
+        </li>
+      ))
+    }
+  </ul>
+</nav>
