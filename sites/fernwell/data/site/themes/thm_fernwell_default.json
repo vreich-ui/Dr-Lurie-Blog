@@ -1,0 +1,30 @@
+{
+  "__generated": {
+    "at": "2026-07-27T08:48:51.147Z",
+    "from": "objects/theme/by-id/thm_fernwell_default.json",
+    "record_version": 2
+  },
+  "description": "The starter palette, verbatim from the site seed — applying it to the untouched site is a no-op.",
+  "name": "Default",
+  "scope": "evergreen",
+  "tokens": {
+    "colors": {
+      "accent": "rgb(197 122 74)",
+      "bg-page": "rgb(252 251 247)",
+      "bg-page-dark": "rgb(14 20 17)",
+      "bg-surface": "rgb(240 244 238)",
+      "gold": "rgb(182 148 66)",
+      "primary": "rgb(38 92 66)",
+      "secondary": "rgb(24 64 46)",
+      "text-default": "rgb(38 48 42)",
+      "text-heading": "rgb(22 33 28)",
+      "text-muted": "rgb(58 72 64 / 78%)"
+    },
+    "fonts": {
+      "heading": "Georgia, serif",
+      "sans": "system-ui, sans-serif",
+      "serif": "Georgia, serif"
+    }
+  },
+  "whenToUse": "Apply to restore the starter palette after theme experiments, or copy as the starting point for a real brand palette."
+}
