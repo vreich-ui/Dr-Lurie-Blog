@@ -19,7 +19,7 @@ export const siteBody = {
   },
   urls: {
     base: '/',
-    canonicalHost: 'https://fernwell.netlify.app',
+    canonicalHost: 'https://kugel-fernwell.netlify.app',
   },
   metadataDefaults: {
     description: 'Fernwell — calm, practical houseplant care for people who have killed a few.',
