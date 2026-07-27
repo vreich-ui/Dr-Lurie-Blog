@@ -1,39 +1,32 @@
 {
   "__generated": {
-    "at": "1970-01-01T00:00:00.000Z",
-    "from": "create-site:bootstrap (not store-backed — replaced by the seed drive)",
-    "record_version": 0
+    "at": "2026-07-27T08:48:36.020Z",
+    "from": "objects/site/by-id/site_fernwell.json",
+    "record_version": 2
   },
-  "name": "Fernwell",
-  "logo": {
-    "text": "FERNWELL"
-  },
-  "urls": {
-    "base": "/",
-    "canonicalHost": "https://fernwell.netlify.app"
-  },
-  "metadataDefaults": {
-    "description": "Fernwell — a starter site, ready for real content.",
-    "ogImage": "/Social/og-default.jpg",
-    "titleTemplate": "%s - Fernwell"
+  "blog": {
+    "categoryBase": "category",
+    "listPath": "learn/library",
+    "postsPerPage": 6,
+    "tagBase": "tag"
   },
   "brandTokens": {
     "colors": {
-      "primary": "rgb(51 102 204)",
-      "secondary": "rgb(38 77 153)",
-      "accent": "rgb(0 150 136)",
-      "gold": "rgb(191 155 48)",
-      "text-heading": "rgb(20 24 28)",
-      "text-default": "rgb(38 43 48)",
-      "text-muted": "rgb(60 67 75 / 76%)",
-      "bg-page": "rgb(255 255 255)",
-      "bg-surface": "rgb(245 246 248)",
-      "bg-page-dark": "rgb(10 12 20)"
+      "accent": "rgb(197 122 74)",
+      "bg-page": "rgb(252 251 247)",
+      "bg-page-dark": "rgb(14 20 17)",
+      "bg-surface": "rgb(240 244 238)",
+      "gold": "rgb(182 148 66)",
+      "primary": "rgb(38 92 66)",
+      "secondary": "rgb(24 64 46)",
+      "text-default": "rgb(38 48 42)",
+      "text-heading": "rgb(22 33 28)",
+      "text-muted": "rgb(58 72 64 / 78%)"
     },
     "fonts": {
+      "heading": "Georgia, serif",
       "sans": "system-ui, sans-serif",
-      "serif": "Georgia, serif",
-      "heading": "Georgia, serif"
+      "serif": "Georgia, serif"
     }
   },
   "chrome": {
@@ -41,13 +34,20 @@
     "showThemeToggle": true
   },
   "defaultNavigation": {
-    "header": "nav_header",
-    "footer": "nav_footer"
+    "footer": "nav_footer",
+    "header": "nav_header"
   },
-  "blog": {
-    "listPath": "learn/library",
-    "postsPerPage": 6,
-    "categoryBase": "category",
-    "tagBase": "tag"
+  "logo": {
+    "text": "FERNWELL"
+  },
+  "metadataDefaults": {
+    "description": "Fernwell — calm, practical houseplant care for people who have killed a few.",
+    "ogImage": "/Social/og-default.jpg",
+    "titleTemplate": "%s - Fernwell"
+  },
+  "name": "Fernwell",
+  "urls": {
+    "base": "/",
+    "canonicalHost": "https://fernwell.netlify.app"
   }
 }
