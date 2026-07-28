@@ -24,6 +24,7 @@ import {
 } from '../../packages/core/lib/object-patch-apply.js';
 import { buildObjectContract } from '../../packages/core/lib/registry/object-contract.js';
 import {
+  carriesTrackingAttribute,
   TRACKABLE_ACTIVITIES_BY_TYPE,
   trackingAttributeSchema,
 } from '../../packages/core/schema/bodies/tracking-attribute-v1.js';
@@ -36,10 +37,16 @@ import { siteBodySchema } from '../../packages/core/schema/bodies/site-v1.js';
 import { taxonomyBodySchema } from '../../packages/core/schema/bodies/taxonomy-v1.js';
 import { templateBodySchema } from '../../packages/core/schema/bodies/template-v1.js';
 import { themeBodySchema } from '../../packages/core/schema/bodies/theme-v1.js';
+import { editorialVoiceBodySchema } from '../../packages/core/schema/bodies/editorial-voice-v1.js';
 import { productBodySchema } from '../../packages/core/schema/bodies/product-v1.js';
 import { trackingConfigBodySchema } from '../../packages/core/schema/bodies/tracking-config-v1.js';
 import { patchOpSchema, patchOpNamesByObjectType } from '../../packages/core/schema/object-patch-ops.js';
-import { objectTypes, type ObjectRecord, type ObjectType, type Principal } from '../../packages/core/schema/object-record-v1.js';
+import {
+  objectTypes,
+  type ObjectRecord,
+  type ObjectType,
+  type Principal,
+} from '../../packages/core/schema/object-record-v1.js';
 import { siteBody } from '../../sites/drlurie/seeds/site-seed-data.mjs';
 
 const ACTOR: Principal = { kind: 'agent', agent_name: 'tracking-test', auth: 'publish_key' };
@@ -72,7 +79,7 @@ const TRACKING = {
   goals: [{ goal: 'opt_in', on: 'form_submit', provider_conversions: [{ provider: 'google_ads', label: 'AbCd-123' }] }],
 };
 
-// Minimal schema-valid bodies for all ten types (apply-engine tests only
+// Minimal schema-valid bodies for every governed type (apply-engine tests only
 // need shape, not the full validation pipeline).
 const minimalNav = {
   role: 'header',
@@ -105,9 +112,12 @@ const BODIES: Record<ObjectType, { schema: { safeParse: (v: unknown) => { succes
   // tracking_config does NOT carry the attribute (schema-level) and does not
   // get set_tracking — covered by its own T13.2 test set.
   tracking_config: { schema: trackingConfigBodySchema, body: null },
+  // editorial_voice likewise carries no tracking attribute (D1): a voice is
+  // authoring law, never a tracked surface. Covered by editorial-voice.test.ts.
+  editorial_voice: { schema: editorialVoiceBodySchema, body: null },
 };
 
-test('the tracking shape parses on all ten bodies; bodies without it still parse (additive guarantee)', () => {
+test('the tracking shape parses on every attribute-carrying body; bodies without it still parse (additive guarantee)', () => {
   for (const objectType of objectTypes) {
     const fixture = BODIES[objectType];
     if (fixture.body === null) continue; // product: covered by the schema-level parse below
@@ -128,11 +138,15 @@ test('the tracking shape parses on all ten bodies; bodies without it still parse
   );
 });
 
-test('set_tracking is allowlisted on all ten attribute-carrying types — and NOT on tracking_config', () => {
+test('set_tracking is allowlisted on every attribute-carrying type — and NOT on the two that carry no attribute', () => {
+  // tracking_config is the registry the attribute's goals resolve against;
+  // editorial_voice (D1) is authoring law and never a tracked surface. Both
+  // omit the attribute at the schema level, so allowlisting set_tracking there
+  // would be a false promise.
   for (const objectType of objectTypes) {
     const allowed = (patchOpNamesByObjectType[objectType] as readonly string[]).includes('set_tracking');
-    if (objectType === 'tracking_config') {
-      assert.equal(allowed, false, 'the registry singleton does not carry the attribute');
+    if (!carriesTrackingAttribute(objectType)) {
+      assert.equal(allowed, false, `${objectType} does not carry the attribute`);
     } else {
       assert.ok(allowed, `${objectType} allows set_tracking`);
     }
@@ -140,7 +154,7 @@ test('set_tracking is allowlisted on all ten attribute-carrying types — and NO
 });
 
 test('apply + exact inverse on every type: first-set inverts to removal', () => {
-  for (const objectType of objectTypes.filter((type) => type !== 'tracking_config')) {
+  for (const objectType of objectTypes.filter(carriesTrackingAttribute)) {
     const body = { plain: 'body' }; // engine is shape-agnostic; schema gating is the verb layer's job
     const forward = apply(objectType, body, [{ op: 'set_tracking', fields: TRACKING }]);
     const applied = forward.record.body as Record<string, unknown>;
@@ -271,14 +285,15 @@ test('validation criterion: valid goals complete; non-collectable activity warns
   );
   assert.equal(absent, undefined);
 
-  // The matrix table covers all ten types (renderer + validation share it).
+  // The matrix table covers EVERY governed type (renderer + validation share
+  // it) — including the exempt ones, which map to [] rather than being absent.
   for (const objectType of objectTypes) {
     assert.ok(objectType in TRACKABLE_ACTIVITIES_BY_TYPE, `matrix covers ${objectType}`);
   }
 });
 
-test('the contract lists set_tracking on all ten attribute-carrying types and carries the funnel constraint', () => {
-  for (const objectType of objectTypes.filter((type) => type !== 'tracking_config')) {
+test('the contract lists set_tracking on every attribute-carrying type and carries the funnel constraint', () => {
+  for (const objectType of objectTypes.filter(carriesTrackingAttribute)) {
     const contract = buildObjectContract(objectType) as unknown as {
       patch_ops: { op: string }[];
       constraints: { id: string; description: string }[];
