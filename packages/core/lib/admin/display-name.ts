@@ -11,12 +11,7 @@
  * Pure, dependency-free, and unit-tested against real seed bodies so the
  * derivation cannot silently drift from the shapes on disk.
  */
-import type {
-  ObjectRecord,
-  ObjectType,
-  HistoryEntry,
-  Principal,
-} from '../../schema/object-record-v1.js';
+import type { ObjectRecord, ObjectType, HistoryEntry, Principal } from '../../schema/object-record-v1.js';
 
 /** Human label for each object type — used for fallbacks and type badges. */
 export const OBJECT_TYPE_LABELS: Record<ObjectType, string> = {
@@ -31,13 +26,14 @@ export const OBJECT_TYPE_LABELS: Record<ObjectType, string> = {
   product: 'Product',
   content_item: 'Article',
   tracking_config: 'Tracking config',
+  editorial_voice: 'Editorial voice',
 };
 
 export function objectTypeLabel(type: ObjectType): string {
   return OBJECT_TYPE_LABELS[type] ?? titleCase(String(type).replace(/_/g, ' '));
 }
 
-// ─── generic helpers ──────────────────────────────────────────────────────────
+// ─── generic helpers ─────────────────────────────────────────────────
 
 type Bag = Record<string, unknown>;
 
@@ -76,7 +72,7 @@ function firstHeadingText(html: string | undefined): string | undefined {
   return text || undefined;
 }
 
-// ─── object display name ──────────────────────────────────────────────────────
+// ─── object display name ──────────────────────────────────────────────
 
 /**
  * A human title for an object, derived from its body. Never returns a raw
@@ -137,7 +133,7 @@ function fallback(record: Pick<ObjectRecord, 'object_type'>): string {
   return `Untitled ${objectTypeLabel(record.object_type).toLowerCase()}`;
 }
 
-// ─── principals + history phrasing ────────────────────────────────────────────
+// ─── principals + history phrasing ───────────────────────────────────────
 
 /** A human name for a principal — person's email local-part, or agent name. */
 export function principalName(principal: Principal | undefined): string {
@@ -206,7 +202,7 @@ export function verbToPhrase(entry: Pick<HistoryEntry, 'action' | 'actor' | 'det
   return `${principalName(entry.actor)} ${verb}`;
 }
 
-// ─── id tooltip ───────────────────────────────────────────────────────────────
+// ─── id tooltip ──────────────────────────────────────────────────────
 
 /** Frames a raw id for a title/tooltip — the only sanctioned place an id shows. */
 export function idTooltip(id: string | undefined): string {

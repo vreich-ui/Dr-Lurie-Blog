@@ -47,5 +47,14 @@ export const approvalPolicyConfig = {
   // Commerce is the deliberate exception to the autonomous dev posture
   // (06-shop-module-plan §0.4): an agent PROPOSING a product change is fine;
   // a price/availability change going live without a human eye is not.
-  overrides: { product: 'require-approval' },
+  overrides: {
+    product: 'require-approval',
+    // D1 (2026-07-28): the declared editorial voice governs every future
+    // article on this site, so a voice edit going live unseen is the same class
+    // of risk as a price going live unseen — one silent change moves all
+    // downstream output at once. Agents PROPOSE voice changes; a human pins the
+    // approval. (Disputable: this is a posture, not a law — flipping it is a
+    // one-line edit here.)
+    editorial_voice: 'require-approval',
+  },
 } satisfies ApprovalPolicyConfig;
