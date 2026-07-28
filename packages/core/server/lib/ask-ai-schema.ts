@@ -36,6 +36,7 @@ import { taxonomyBodySchema } from '../../schema/bodies/taxonomy-v1.js';
 import { templateBodySchema } from '../../schema/bodies/template-v1.js';
 import { trackingConfigBodySchema } from '../../schema/bodies/tracking-config-v1.js';
 import { themeBodySchema } from '../../schema/bodies/theme-v1.js';
+import { editorialVoiceShapeSchema } from '../../schema/bodies/editorial-voice-v1.js';
 import type { ObjectType } from '../../schema/object-record-v1.js';
 
 export type JsonSchema = Record<string, unknown>;
@@ -69,6 +70,7 @@ export const ASK_AI_BODY_SCHEMAS = {
   product: productBodySchema,
   content_item: contentItemBodySchema,
   tracking_config: trackingConfigBodySchema,
+  editorial_voice: editorialVoiceShapeSchema,
 } satisfies Record<AskAiObjectType, z.ZodType>;
 
 export const isAskAiObjectType = (value: string): value is AskAiObjectType =>
