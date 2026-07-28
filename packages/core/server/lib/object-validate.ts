@@ -66,6 +66,8 @@ import { productBodySchema } from '../../schema/bodies/product-v1.js';
 import { sectionBodySchema, type SectionInstance, type SectionType } from '../../schema/bodies/section-v1.js';
 import { sectionTemplateBodySchema } from '../../schema/bodies/section-template-v1.js';
 import { themeBodySchema } from '../../schema/bodies/theme-v1.js';
+import { editorialVoiceBodySchema } from '../../schema/bodies/editorial-voice-v1.js';
+import { findPromptFormattedText } from '../../lib/registry/voice-prose.js';
 import { isStandalonePlaceableSectionType } from '../../lib/registry/components/registered-types.js';
 import {
   checkBrandTokenValue,
@@ -252,6 +254,7 @@ const BODY_SCHEMAS: Partial<Record<ObjectType, { safeParse: (v: unknown) => { su
     product: productBodySchema,
     content_item: contentItemBodySchema,
     tracking_config: trackingConfigBodySchema,
+    editorial_voice: editorialVoiceBodySchema,
   };
 
 // Mirrors node-renderer.ts TIPTAP_ALLOWED (A§1.5): the only tags TipTap emits.
@@ -1315,6 +1318,92 @@ export const checkTheme = (body: unknown, atPublish: boolean): ReadinessCriterio
   return criteria;
 };
 
+/**
+ * Editorial-voice structural rules (D1, 2026-07-28).
+ *
+ * `voice_not_a_prompt` is the one that matters and it BLOCKS AT WRITE (status
+ * 'missing' regardless of atPublish): a governed voice is third-person data
+ * about how a publication sounds, never instructions to a model. Prompt text
+ * inside an approved object is an injection the approval silently covered, so
+ * it must never land in the store — warning at publish would be too late,
+ * because the body is already committed and readable by any agent that fetched
+ * it. The marker catalog lives in lib/registry/voice-prose.ts and is the SAME
+ * array the object contract publishes, so the rule an agent reads is the rule
+ * that rejects it.
+ *
+ * `voice_frameworks_declared` is the coverage half: a framework set is only
+ * useful to a chooser if each entry says when to pick it over its siblings
+ * (the recipe types' whenToUse idiom). Warns while drafting, blocks publish.
+ */
+export const checkEditorialVoice = (body: unknown, atPublish: boolean): ReadinessCriterion[] => {
+  if (!isRecord(body)) {
+    return [
+      crit(
+        'voice_not_a_prompt',
+        'Voice is data, not a prompt',
+        'optional',
+        'Voice body shape not recognized (see schema check).'
+      ),
+    ];
+  }
+
+  const criteria: ReadinessCriterion[] = [];
+
+  const promptFindings = findPromptFormattedText(body);
+  if (promptFindings.length === 0) {
+    criteria.push(crit('voice_not_a_prompt', 'Voice is data, not a prompt', 'complete', ''));
+  } else {
+    criteria.push(
+      crit(
+        'voice_not_a_prompt',
+        'Voice is data, not a prompt',
+        'missing',
+        `Prompt-formatted text is not storable in a governed voice — state the voice as a fact about the publication, ` +
+          `not as an instruction to a model: ` +
+          promptFindings
+            .slice(0, 3)
+            .map((finding) => `${finding.path} contains ${finding.markerLabel} ("${finding.excerpt}")`)
+            .join('; ') +
+          (promptFindings.length > 3 ? ` (+${promptFindings.length - 3} more)` : '')
+      )
+    );
+  }
+
+  const frameworks = Array.isArray(body.frameworks) ? body.frameworks : [];
+  const undecidable = frameworks
+    .map((framework, index) =>
+      isRecord(framework) && typeof framework.when_to_use === 'string' && framework.when_to_use.trim().length > 0
+        ? undefined
+        : isRecord(framework) && typeof framework.framework_id === 'string'
+          ? framework.framework_id
+          : `#${index}`
+    )
+    .filter((id): id is string => id !== undefined);
+  if (frameworks.length === 0) {
+    criteria.push(
+      crit(
+        'voice_frameworks_declared',
+        'Frameworks are choosable',
+        atPublish ? 'missing' : 'warning',
+        'No frameworks declared — an agent has nothing to choose from and no default to fall back to.'
+      )
+    );
+  } else if (undecidable.length === 0) {
+    criteria.push(crit('voice_frameworks_declared', 'Frameworks are choosable', 'complete', ''));
+  } else {
+    criteria.push(
+      crit(
+        'voice_frameworks_declared',
+        'Frameworks are choosable',
+        atPublish ? 'missing' : 'warning',
+        `Framework(s) without when_to_use: ${undecidable.join(', ')} — a set of shapes with no selection rule is a coin flip.`
+      )
+    );
+  }
+
+  return criteria;
+};
+
 // ─── check 6c: navigation layout rules (T2.1, C§2.3-Navigation) ──────────────
 
 /** Canonical identity of a NavTarget for duplicate detection (key-order-free). */
@@ -2095,6 +2184,7 @@ const checkStructuralInvariantsByType = (
   if (objectType === 'template') return checkTemplate(body, context, atPublish);
   if (objectType === 'section_template') return checkSectionTemplate(body, atPublish);
   if (objectType === 'theme') return checkTheme(body, atPublish);
+  if (objectType === 'editorial_voice') return checkEditorialVoice(body, atPublish);
   if (objectType === 'navigation') return checkNavigationStructure(body, context, atPublish);
   if (objectType === 'product') return checkProduct(body, context, atPublish);
   if (objectType === 'content_item') return checkContentItemStructure(body, context, atPublish);
