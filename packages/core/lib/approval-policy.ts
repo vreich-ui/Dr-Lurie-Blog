@@ -50,6 +50,7 @@ export const governedObjectTypes = [
   'product',
   'content_item',
   'tracking_config',
+  'editorial_voice',
 ] as const;
 export type GovernedObjectType = (typeof governedObjectTypes)[number];
 
@@ -76,6 +77,7 @@ export const approvalPolicyConfigSchema = z.strictObject({
     product: z.enum(['require-approval', 'autonomous']).optional(),
     content_item: z.enum(['require-approval', 'autonomous']).optional(),
     tracking_config: z.enum(['require-approval', 'autonomous']).optional(),
+    editorial_voice: z.enum(['require-approval', 'autonomous']).optional(),
   }),
 });
 
@@ -129,7 +131,7 @@ export const setActiveApprovalPolicyProvider = (provider: () => ApprovalPolicy):
 export const activeApprovalPolicy = (): ApprovalPolicy => {
   if (!activeApprovalPolicyProvider) {
     throw new Error(
-      'Active approval policy provider not configured — import the site policy bindings (src/config/policy-bindings) before calling activeApprovalPolicy().',
+      'Active approval policy provider not configured — import the site policy bindings (src/config/policy-bindings) before calling activeApprovalPolicy().'
     );
   }
   return activeApprovalPolicyProvider();

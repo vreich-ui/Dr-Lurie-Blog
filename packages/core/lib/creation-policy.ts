@@ -61,6 +61,7 @@ export const creationPolicyConfigSchema = z.strictObject({
     product: creationRuleSchema.optional(),
     content_item: creationRuleSchema.optional(),
     tracking_config: creationRuleSchema.optional(),
+    editorial_voice: creationRuleSchema.optional(),
   }),
 });
 
@@ -112,7 +113,7 @@ export const setActiveCreationPolicyProvider = (provider: () => CreationPolicy):
 export const activeCreationPolicy = (): CreationPolicy => {
   if (!activeCreationPolicyProvider) {
     throw new Error(
-      'Active creation policy provider not configured — import the site policy bindings (src/config/policy-bindings) before calling activeCreationPolicy().',
+      'Active creation policy provider not configured — import the site policy bindings (src/config/policy-bindings) before calling activeCreationPolicy().'
     );
   }
   return activeCreationPolicyProvider();
