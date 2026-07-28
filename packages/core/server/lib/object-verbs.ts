@@ -633,14 +633,27 @@ export const handleObjectVerb = async (
       // site/taxonomy convention, but engine-enforced): creating a second
       // active registry is refused regardless of its id — edit the existing
       // one via set_tracking_config_fields instead.
-      if (objectType === 'tracking_config') {
+      // D1 (2026-07-28): editorial_voice is the same shape of singleton — one
+      // declared voice per site, edited via set_voice_fields. A second voice
+      // would make "the site's voice" ambiguous at exactly the moment an agent
+      // needs an unambiguous answer.
+      const SINGLETON_TYPES: Partial<Record<typeof objectType, { label: string; editOp: string; noun: string }>> = {
+        tracking_config: {
+          label: 'tracking_config',
+          editOp: 'set_tracking_config_fields',
+          noun: 'tracker registry',
+        },
+        editorial_voice: { label: 'editorial_voice', editOp: 'set_voice_fields', noun: 'declared editorial voice' },
+      };
+      const singleton = SINGLETON_TYPES[objectType];
+      if (singleton) {
         const existing = await collectBlobListItems(
-          await store.list({ prefix: objectStatusIndexPrefix('tracking_config', 'active') })
+          await store.list({ prefix: objectStatusIndexPrefix(objectType, 'active') })
         );
         if (existing.length > 0) {
           const existingId = existing[0]!.key.split('/').at(-1);
           return err(409, {
-            error: `A tracking_config singleton already exists (${existingId}) — edit it via set_tracking_config_fields; a site has exactly one tracker registry.`,
+            error: `A ${singleton.label} singleton already exists (${existingId}) — edit it via ${singleton.editOp}; a site has exactly one ${singleton.noun}.`,
             object_id: existingId,
             singleton: true,
           });

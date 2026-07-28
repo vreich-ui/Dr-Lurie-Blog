@@ -9,5 +9,9 @@ import type { CreationPolicyConfig } from '../../../packages/core/lib/creation-p
 
 export const creationPolicyConfig = {
   master: 'open',
-  overrides: { tracking_config: { agents: ['object-conversion-roundtrip'] } },
+  overrides: {
+    tracking_config: { agents: ['object-conversion-roundtrip'] },
+    // D1: seed-minted singleton — agents edit the declared voice, never mint one.
+    editorial_voice: { agents: ['object-conversion-roundtrip'] },
+  },
 } satisfies CreationPolicyConfig;

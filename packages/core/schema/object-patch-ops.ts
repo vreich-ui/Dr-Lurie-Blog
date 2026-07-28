@@ -625,6 +625,24 @@ const setTrackingConfigFieldsSchema = z.strictObject({
   ...guard,
 });
 
+// ——— Editorial voice (D1, 2026-07-28) ———
+
+// The tracking_config idiom for the voice singleton: ONE open deep-merge op
+// over the whole body (null unsets), no forbidKeys. A voice has no repeated
+// child collection needing stable ids the way taxonomy terms or nav items do —
+// `frameworks[]` is a small declared set that replaces wholesale, so upsert/
+// move/remove ops would be ceremony without a guarantee. The body schema
+// (strict shape, fw_ id regex, default_framework ∈ frameworks[]) and the
+// voice_not_a_prompt constraint gate the MERGED result, so a partial edit can
+// never leave the voice pointing at a framework it no longer declares.
+// Inverse = the captured before-tree. Agent-submittable; the type's publish
+// gate still applies.
+const setVoiceFieldsSchema = z.strictObject({
+  op: z.literal('set_voice_fields'),
+  fields: fieldsSchema,
+  ...guard,
+});
+
 // ——— The grammar ———
 
 // Union members stay plain object schemas (a zod discriminated-union
@@ -674,6 +692,7 @@ export const patchOpUnionSchema = z.discriminatedUnion('op', [
   setThemeFieldsSchema,
   setTrackingSchema,
   setTrackingConfigFieldsSchema,
+  setVoiceFieldsSchema,
 ]);
 
 const requireMergedIntoOnlyWhenDeprecated = (term: TermPayload, ctx: z.RefinementCtx, path: (string | number)[]) => {
@@ -774,6 +793,9 @@ export const patchOpNamesByObjectType: Record<ObjectType, readonly PatchOpName[]
     'set_tracking',
   ],
   tracking_config: ['set_tracking_config_fields'],
+  // No set_tracking: a voice is authoring law, never a tracked surface (the
+  // tracking_config precedent).
+  editorial_voice: ['set_voice_fields'],
 };
 
 export const isPatchOpAllowedForObjectType = (objectType: ObjectType, opName: PatchOpName): boolean =>

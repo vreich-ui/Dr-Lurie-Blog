@@ -67,6 +67,8 @@ import { productBodySchema } from '../../schema/bodies/product-v1.js';
 import { sectionBodySchema, sectionTypes, type SectionType } from '../../schema/bodies/section-v1.js';
 import { sectionTemplateBodySchema } from '../../schema/bodies/section-template-v1.js';
 import { themeBodySchema } from '../../schema/bodies/theme-v1.js';
+import { editorialVoiceBodySchema } from '../../schema/bodies/editorial-voice-v1.js';
+import { promptMarkerSummary } from './voice-prose.js';
 import { trackingConfigBodySchema } from '../../schema/bodies/tracking-config-v1.js';
 import { navigationBodySchema } from '../../schema/bodies/navigation-v1.js';
 import { siteBodySchema } from '../../schema/bodies/site-v1.js';
@@ -98,6 +100,7 @@ const BODY_SCHEMA: Partial<Record<ObjectType, z.ZodType>> = {
   product: productBodySchema,
   content_item: contentItemBodySchema,
   tracking_config: trackingConfigBodySchema,
+  editorial_voice: editorialVoiceBodySchema,
 };
 
 // ─── section-type editor hints (only the component-bound types carry them) ───
@@ -645,7 +648,7 @@ const perTypeConstraints = (objectType: ObjectType): Constraint[] => {
           enforced_live: true,
           description:
             'THE SAFETY LAW (the checkBrandTokenValue analogue): agents flip typed switches and supply regex-pinned ' +
-            'IDs — no script text or URL field exists anywhere in the body. The own tracker\u2019s endpoint/auth are ' +
+            'IDs — no script text or URL field exists anywhere in the body. The own tracker’s endpoint/auth are ' +
             'env-var NAMES (A-Z0-9_, never values or URLs); plausible.api_host is a bare-https origin. Code-owned ' +
             'adapter templates re-assert every regex at render. GTM is permanently OUT (OQ-W13-3): the key exists ' +
             'for shape stability but can never be enabled.',
@@ -658,7 +661,7 @@ const perTypeConstraints = (objectType: ObjectType): Constraint[] => {
             'One tracker registry per site (trk_<project>, the site_/tax_ convention) — creating a second active ' +
             'tracking_config is refused (409); edit the existing one via set_tracking_config_fields. Creation is ' +
             'human/seed-only ({agents: []} in the creation policy); agents EDIT the singleton, they never mint one. ' +
-            'Publish ships AUTONOMOUS under the master approval policy (OQ-W13-2, 2026-07-19) \u2014 the posture ' +
+            'Publish ships AUTONOMOUS under the master approval policy (OQ-W13-2, 2026-07-19) — the posture ' +
             'gains an owner UI toggle (T13.12); flipping to require-approval stays a one-line lever.',
         },
         {
@@ -669,6 +672,51 @@ const perTypeConstraints = (objectType: ObjectType): Constraint[] => {
             'Publish readiness: every enabled provider carries its regex-pinned id; banner copy (headline + body) ' +
             'must exist whenever any advertising-class provider is enabled under a posture other than us-first; ' +
             'restricted_regions must be non-empty under geo-adaptive. Warns while drafting.',
+        },
+      ];
+    case 'editorial_voice':
+      return [
+        {
+          id: 'voice_not_a_prompt',
+          severity: 'blocks_write',
+          enforced_live: true,
+          description:
+            'THE VOICE LAW: a governed voice is DATA — third-person facts about how this publication sounds — never ' +
+            'instructions to a model. A write carrying prompt-formatted text is REFUSED (not warned at publish): an ' +
+            'approval that covered "the voice" would otherwise have silently covered an injection into whichever agent ' +
+            'reads it next. Refused markers: ' +
+            promptMarkerSummary() +
+            '. Ordinary imperative style guidance ("Use short sentences", "Never promise a cure") is legitimate voice ' +
+            'prose and passes — only unambiguous prompt scaffolding is matched.',
+        },
+        {
+          id: 'voice_default_framework',
+          severity: 'blocks_write',
+          enforced_live: true,
+          description:
+            'frameworks[] is PLURAL (a site publishes more than one article shape) with a declared default_framework ' +
+            'that must name one of the declared framework_ids; framework_ids are fw_<lowercase> and unique. Enforced ' +
+            'by the body schema, so a partial set_voice_fields merge can never leave the default pointing at a ' +
+            'framework the voice no longer declares.',
+        },
+        {
+          id: 'voice_frameworks_declared',
+          severity: 'blocks_publish',
+          enforced_live: true,
+          description:
+            'Every framework needs a when_to_use — the field that makes the set decidable by an agent choosing ' +
+            'between siblings. Warns while drafting, blocks publish.',
+        },
+        {
+          id: 'voice_singleton',
+          severity: 'blocks_write',
+          enforced_live: true,
+          description:
+            'One voice per site (voice_<project>, the site_/tax_/trk_ singleton convention) — creating a second ' +
+            'active editorial_voice is refused (409); edit the existing one via set_voice_fields. Read it with the ' +
+            'ordinary object surface: object_contract("editorial_voice") then object_get("voice_<project>"). No ' +
+            'private side-channel exists, deliberately — a voice an engine can only learn out-of-band is a voice ' +
+            'nobody can review.',
         },
       ];
     default:
@@ -867,7 +915,11 @@ const auxiliaryInputs = (objectType: ObjectType): AuxiliaryInput[] => {
       how: 'From object_checkout; also gives record_version for expected_record_version.',
     },
   ];
-  inputs.push({ input: 'site', when: 'object_create', how: `The owning site object id, e.g. ${getSiteIdentity().siteId}.` });
+  inputs.push({
+    input: 'site',
+    when: 'object_create',
+    how: `The owning site object id, e.g. ${getSiteIdentity().siteId}.`,
+  });
   if (objectType === 'content_item') {
     inputs.push(
       {
@@ -883,7 +935,7 @@ const auxiliaryInputs = (objectType: ObjectType): AuxiliaryInput[] => {
       {
         input: 'image artifacts',
         when: 'node public.media {type:"image"}, public.images[], hero body.image',
-        how: 'Generate through pdf-tool under the site\'s storage grant (get_pdf_tool_storage_grant), then set src to the PUBLIC path of the returned blobKey: image/{id}/{sha256}.{ext} → /img/{id}/{sha256}.{ext}. Raw blobKeys, data URIs, and src/assets paths are rejected; remote https URLs warn (ungoverned). The hero must be an IMAGE — a PDF there fails the whole build.',
+        how: "Generate through pdf-tool under the site's storage grant (get_pdf_tool_storage_grant), then set src to the PUBLIC path of the returned blobKey: image/{id}/{sha256}.{ext} → /img/{id}/{sha256}.{ext}. Raw blobKeys, data URIs, and src/assets paths are rejected; remote https URLs warn (ungoverned). The hero must be an IMAGE — a PDF there fails the whole build.",
       },
       {
         input: 'PDF artifacts',
@@ -897,7 +949,7 @@ const auxiliaryInputs = (objectType: ObjectType): AuxiliaryInput[] => {
     inputs.push({
       input: 'artifact ref',
       when: 'any *AssetRef field',
-      how: 'Generate/store the asset through pdf-tool under the site\'s storage grant (get_pdf_tool_storage_grant — the sanctioned artifact transfer path), then use the returned Major-Key ref (image|pdf/{id}/{sha256}.{ext}). URLs/data:/src/assets are rejected; refs are checked against the artifact index at publish.',
+      how: "Generate/store the asset through pdf-tool under the site's storage grant (get_pdf_tool_storage_grant — the sanctioned artifact transfer path), then use the returned Major-Key ref (image|pdf/{id}/{sha256}.{ext}). URLs/data:/src/assets are rejected; refs are checked against the artifact index at publish.",
     });
   }
   if (objectType === 'page' || objectType === 'navigation' || objectType === 'site') {
@@ -912,7 +964,7 @@ const auxiliaryInputs = (objectType: ObjectType): AuxiliaryInput[] => {
       {
         input: 'fulfillment artifact ref',
         when: 'fulfillment.kind "download"',
-        how: 'Produce the deliverable through pdf-tool under the site\'s storage grant (get_pdf_tool_storage_grant) so it lands in the artifacts store, then use the returned Major-Key ref. It is delivered only through token-gated purchase links, never a public URL.',
+        how: "Produce the deliverable through pdf-tool under the site's storage grant (get_pdf_tool_storage_grant) so it lands in the artifacts store, then use the returned Major-Key ref. It is delivered only through token-gated purchase links, never a public URL.",
       },
       {
         input: 'long-form page',
@@ -967,16 +1019,23 @@ export const buildObjectContract = (
             ? 'A brandTokens preset (W8.3, design-principles rule 5 — NOT taxonomy): named color/font token values plus the bounded layout/shape/type design axes (T10.1) agents draft and validate, then apply to the site singleton via site_apply_theme (exact-replace; stale keys and omitted axes unset — defaults win). Applied by COPY — the site never live-inherits from a theme, and a theme renders nothing itself.'
             : objectType === 'tracking_config'
               ? 'The per-project tracker registry singleton (W13, 12-plan §3): fixed-key provider blocks with regex-pinned IDs (never script/URLs), the consent posture (geo-adaptive seed per OQ-W13-1), and the per-type collection defaults matrix. Publishing it is the site-wide script switch: the export (the site export root plus tracking.json — W11 T11.6 parameterized the export root per site) decides which trackers execute on every page. Human/seed-minted; agents edit via set_tracking_config_fields.'
-              : `Everything an agent needs to create and edit a ${objectType} object: body schema, patch ops, constraints, publish policy, and required side-data.`,
+              : objectType === 'editorial_voice'
+                ? 'The site’s declared editorial identity as governed data (D1, 2026-07-28) — one per site (voice_<project>): audience, tone, cadence, lexicon (prefer/avoid), claim policy, CTA policy, reader-safety boundaries, and the PLURAL frameworks[] this publication publishes with a declared default_framework. Read it the ordinary way — object_contract then object_get — so no engine needs a private side-channel to learn a client’s voice; agents edit via set_voice_fields. It is DATA, never a prompt: prompt-formatted text is refused at write (voice_not_a_prompt). Materializes to <exportRoot>/voice/ as an audit trail; no route renders it.'
+                : `Everything an agent needs to create and edit a ${objectType} object: body schema, patch ops, constraints, publish policy, and required side-data.`,
     body_schema: schema ? toJson(schema) : { note: `${objectType} has no generic body schema.` },
     ...(includesSections ? { section_types: listSectionTypeContracts() } : {}),
     ...(objectType === 'page' ? { page_types: listPageTypeDefinitions() } : {}),
     patch_ops: patchOpContracts(objectType),
-    // tracking_config does not carry the per-object tracking attribute
-    // (schema-level) — the shared constraint would be a false promise there.
+    // tracking_config and editorial_voice do not carry the per-object tracking
+    // attribute (schema-level) — the shared constraint would be a false promise
+    // there. A voice is authoring law, never a tracked surface.
     constraints: [
       ...COMMON_CONSTRAINTS.filter(
-        (constraint) => !(objectType === 'tracking_config' && constraint.id === 'tracking_attribute')
+        (constraint) =>
+          !(
+            (objectType === 'tracking_config' || objectType === 'editorial_voice') &&
+            constraint.id === 'tracking_attribute'
+          )
       ),
       ...perTypeConstraints(objectType),
     ],

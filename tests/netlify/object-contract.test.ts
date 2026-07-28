@@ -157,6 +157,7 @@ test('anti-drift coverage guard: contract types match objectTypes exactly', () =
         'product',
         'content_item',
         'tracking_config',
+        'editorial_voice',
       ] as ObjectType[]),
     ].sort()
   );
@@ -206,13 +207,13 @@ test('W8.3b: creation_policy is served on every contract and reflects the inject
   for (const type of OBJECT_CONTRACT_TYPES) {
     const open = buildObjectContract(type).creation_policy;
     assert.equal(open.humans, 'always_allowed');
-    if (type === 'tracking_config') {
-      // W13: human/seed-only — the conversion-factory driver is the one
-      // named seed identity (T13.10); casual agents stay excluded.
+    if (type === 'tracking_config' || type === 'editorial_voice') {
+      // W13/D1: human/seed-only singletons — the conversion-factory driver is
+      // the one named seed identity (T13.10); casual agents stay excluded.
       assert.deepEqual(
         open.agents,
         { allowlist: ['object-conversion-roundtrip'] },
-        'tracking_config allows only the seed driver'
+        `${type} allows only the seed driver`
       );
     } else {
       assert.equal(open.agents, 'open', `${type} is open under the committed default`);

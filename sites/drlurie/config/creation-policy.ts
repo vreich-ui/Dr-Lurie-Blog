@@ -32,5 +32,10 @@ export const creationPolicyConfig = {
   // the ruling's "seeds mint" needs a name, and the conversion-factory
   // driver is the seed machinery (self-declared until verified — T11.10 —
   // proves it). Casual agents remain excluded.
-  overrides: { tracking_config: { agents: ['object-conversion-roundtrip'] } },
+  overrides: {
+    tracking_config: { agents: ['object-conversion-roundtrip'] },
+    // D1 (2026-07-28): editorial_voice follows the same rule — seed/human-minted
+    // singleton, agents edit it via set_voice_fields.
+    editorial_voice: { agents: ['object-conversion-roundtrip'] },
+  },
 } satisfies CreationPolicyConfig;

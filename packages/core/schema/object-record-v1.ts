@@ -16,6 +16,10 @@ export const objectTypes = [
   'product',
   'content_item',
   'tracking_config',
+  // D1 (2026-07-28): the site's declared editorial identity as governed data —
+  // one per site, read by agents through the ordinary object surface, never
+  // rendered. See schema/bodies/editorial-voice-v1.ts.
+  'editorial_voice',
 ] as const;
 export type ObjectType = (typeof objectTypes)[number];
 

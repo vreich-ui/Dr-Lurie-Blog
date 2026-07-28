@@ -1049,6 +1049,12 @@ const applyOp = (objectType: ObjectType, body: UnknownRecord, op: PatchOp): Patc
     case 'set_tracking_config_fields':
       return applyFieldsOp(op, body, op.fields as UnknownRecord);
 
+    // D1 (2026-07-28): the editorial-voice singleton — same open deep-merge
+    // idiom. `frameworks[]` is an array, so it replaces wholesale (no stale-key
+    // trap), which is exactly the semantics a declared set wants.
+    case 'set_voice_fields':
+      return applyFieldsOp(op, body, op.fields as UnknownRecord);
+
     // ——— tracking (W13, 12-plan §2) ———
     // The uniform writer of the shared `tracking` block on all ten types.
     // Captures are WHOLE-BLOCK ({tracking: <tree|null>} on both sides, null =
@@ -1265,6 +1271,7 @@ export const derivePatchInverse = (op: PatchOp, capture: PatchOpCapture): PatchO
     case 'set_section_template_meta':
     case 'update_blueprint_data':
     case 'set_tracking_config_fields':
+    case 'set_voice_fields':
     case 'set_theme_fields': {
       const fieldsCapture = expectCaptureKind(op, capture, 'fields');
       return patchOpSchema.parse({ op: op.op, fields: fieldsCapture.before, ...guardOf(fieldsCapture.after) });
