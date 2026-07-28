@@ -1,0 +1,12 @@
+---
+// OAuth consent screen (W14 F10) — where a human approves an MCP client's
+// connection request. It lives inside /admin so the Identity login and the
+// admin gate are the ones the workspace already has; the real authority check
+// runs server-side in the /oauth/consent endpoint.
+import AdminLayout from '~/layouts/AdminLayout.astro';
+import OAuthConsent from '~/admin/OAuthConsent';
+---
+
+<AdminLayout title="Admin — Connection request">
+  <OAuthConsent client:load />
+</AdminLayout>

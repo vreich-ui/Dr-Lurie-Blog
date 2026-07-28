@@ -30,6 +30,9 @@ const ROUTES_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), 'rout
 export const SHELL_ROUTES: ReadonlyArray<{ pattern: string; entry: string }> = [
   { pattern: '/admin', entry: 'admin/index.astro' },
   { pattern: '/admin/agents', entry: 'admin/agents.astro' },
+  // W14 F10: the OAuth consent screen. Inside /admin because the decision needs
+  // an authenticated admin, and that login already lives here.
+  { pattern: '/admin/authorize', entry: 'admin/authorize.astro' },
   { pattern: '/admin/content', entry: 'admin/content/index.astro' },
   { pattern: '/admin/content/[objectId]', entry: 'admin/content/[objectId].astro' },
   { pattern: '/admin/kit', entry: 'admin/kit.astro' },

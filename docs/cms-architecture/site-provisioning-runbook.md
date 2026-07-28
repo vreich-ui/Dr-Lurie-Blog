@@ -86,6 +86,23 @@ For everything NOT auto-generated in step 2:
   then update `sites/<client>/site.config.ts`'s `canonicalHost` and
   `data/site/site.json`'s `urls.canonicalHost` to match once the domain
   resolves.
+- **Connecting an agent to this site's `/mcp`** — the endpoint is fail-closed,
+  and there are now three ways in, in order of preference:
+  1. **OAuth** (W14 F10, nothing to provision): the site IS its own
+     authorization server. Point any OAuth-capable MCP client — a claude.ai
+     custom connector included — at `https://<site>/mcp` and leave the client
+     id/secret blank. It discovers the metadata, registers itself, and sends
+     the user to `https://<site>/admin/authorize`, where a signed-in **admin or
+     owner** approves it. Approval is per client and revocable; access tokens
+     last an hour and refresh automatically. Nothing is pasted, nothing is
+     stored on the client's side that a rotation invalidates.
+  2. **Header carriers**, for scripts and SDKs: `Authorization: Bearer <token>`
+     or `X-MCP-Auth-Token: <token>` with the site's `MCP_HTTP_AUTH_TOKEN`.
+  3. **The URL key** (W14 F9), only for clients that can do neither:
+     `https://<site>/mcp?key=<token>`. Treat that URL as the secret it contains
+     — query strings land in proxy and CDN logs — and note that rotating
+     `MCP_HTTP_AUTH_TOKEN` means re-pasting it everywhere.
+
 - **Secret rotation**: `PUBLISH_SECRET`'s rotation runbook is standing debt
   tracked at T11.10 — this scaffold mints an initial value but does not
   automate rotation.

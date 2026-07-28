@@ -353,6 +353,15 @@ export const siteConfig: SiteConfig = siteConfigSchema.parse({
     { from: '/pdf/*', to: '/.netlify/functions/get-public-pdf?blobKey=pdf/:splat', status: 200 },
     { from: '/img/*', to: '/.netlify/functions/get-public-image?blobKey=image/:splat', status: 200 },
     { from: '/mcp', to: '/.netlify/functions/mcp', status: 200 },
+    { from: '/.well-known/oauth-protected-resource', to: '/.netlify/functions/mcp-oauth?oauth_endpoint=protected-resource-metadata', status: 200 },
+    { from: '/.well-known/oauth-protected-resource/*', to: '/.netlify/functions/mcp-oauth?oauth_endpoint=protected-resource-metadata', status: 200 },
+    { from: '/.well-known/oauth-authorization-server', to: '/.netlify/functions/mcp-oauth?oauth_endpoint=authorization-server-metadata', status: 200 },
+    { from: '/.well-known/oauth-authorization-server/*', to: '/.netlify/functions/mcp-oauth?oauth_endpoint=authorization-server-metadata', status: 200 },
+    { from: '/oauth/register', to: '/.netlify/functions/mcp-oauth?oauth_endpoint=register', status: 200 },
+    { from: '/oauth/authorize', to: '/.netlify/functions/mcp-oauth?oauth_endpoint=authorize', status: 200 },
+    { from: '/oauth/consent', to: '/.netlify/functions/mcp-oauth?oauth_endpoint=consent', status: 200 },
+    { from: '/oauth/token', to: '/.netlify/functions/mcp-oauth?oauth_endpoint=token', status: 200 },
+    { from: '/oauth/revoke', to: '/.netlify/functions/mcp-oauth?oauth_endpoint=revoke', status: 200 },
     { from: '/api/t', to: '/.netlify/functions/track-ingest', status: 200 },
     { from: '/admin/content/*', to: '/admin/content/__workspace', status: 200 },
   ],
@@ -407,6 +416,67 @@ const netlifyTomlTemplate = (ids) => `# Per-site Netlify config. The redirects h
 [[redirects]]
   from = "/mcp"
   to = "/.netlify/functions/mcp"
+  status = 200
+  force = true
+
+# W14 F10 — the site's own OAuth 2.1 authorization server, beside the MCP
+# resource server it protects. One function serves every endpoint; each rule
+# names its endpoint explicitly rather than relying on a splat, so the routing
+# is readable here instead of inferred there. The two well-known splats exist
+# because MCP clients probe both the bare metadata path and the
+# resource-path-suffixed form.
+
+[[redirects]]
+  from = "/.well-known/oauth-protected-resource"
+  to = "/.netlify/functions/mcp-oauth?oauth_endpoint=protected-resource-metadata"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/.well-known/oauth-protected-resource/*"
+  to = "/.netlify/functions/mcp-oauth?oauth_endpoint=protected-resource-metadata"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/.well-known/oauth-authorization-server"
+  to = "/.netlify/functions/mcp-oauth?oauth_endpoint=authorization-server-metadata"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/.well-known/oauth-authorization-server/*"
+  to = "/.netlify/functions/mcp-oauth?oauth_endpoint=authorization-server-metadata"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/oauth/register"
+  to = "/.netlify/functions/mcp-oauth?oauth_endpoint=register"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/oauth/authorize"
+  to = "/.netlify/functions/mcp-oauth?oauth_endpoint=authorize"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/oauth/consent"
+  to = "/.netlify/functions/mcp-oauth?oauth_endpoint=consent"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/oauth/token"
+  to = "/.netlify/functions/mcp-oauth?oauth_endpoint=token"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/oauth/revoke"
+  to = "/.netlify/functions/mcp-oauth?oauth_endpoint=revoke"
   status = 200
   force = true
 
