@@ -25,6 +25,10 @@ import {
 } from '../../packages/core/lib/object-patch-apply.js';
 import { trackingConfigBodySchema } from '../../packages/core/schema/bodies/tracking-config-v1.js';
 import { objectTypes, type ObjectType, type Principal } from '../../packages/core/schema/object-record-v1.js';
+import {
+  carriesTrackingAttribute,
+  TRACKING_ATTRIBUTE_EXEMPT_TYPES,
+} from '../../packages/core/schema/bodies/tracking-attribute-v1.js';
 
 const ACTOR: Principal = { kind: 'agent', agent_name: 'object-conversion-roundtrip', auth: 'publish_key' };
 const AT = '2026-07-20T00:00:00.000Z';
@@ -44,7 +48,7 @@ const record = (objectType: ObjectType, body: unknown) => ({
   content_revision: 1,
 });
 
-// ═══ the seed ═════════════════════════════════════════════════════════════════
+// ═══ the seed ══════════════════════════════════════════════════════════
 
 test('trk_drlurie seed: schema-parses as the ratified posture (OQ-W13-1/-3/-6, §6 matrix)', () => {
   const parsed = trackingConfigBodySchema.parse(trackingConfigBody);
@@ -69,7 +73,7 @@ test('trk_drlurie seed: schema-parses as the ratified posture (OQ-W13-1/-3/-6, �
   ]);
 });
 
-// ═══ the singleton drill ══════════════════════════════════════════════════════
+// ═══ the singleton drill ════════════════════════════════════════════════
 
 test('tracking_config drill runs byte-identical through the real engine', () => {
   const { ops } = drillOpsForSeed(CONVERSION_SEEDS[0]!);
@@ -80,11 +84,18 @@ test('tracking_config drill runs byte-identical through the real engine', () => 
   assert.ok(deepEqualJson(result.record.body, trackingConfigBody), 'flip/flip-back ends byte-identical');
 });
 
-// ═══ the ten-type set_tracking drill ══════════════════════════════════════════
+// ═══ the ten-type set_tracking drill ═══════════════════════════════════════
 
 test('the T13.10 set→mutate→unset drill ends byte-identical on ALL ten types; every inverse exact', () => {
-  const targets = objectTypes.filter((type) => type !== 'tracking_config');
-  assert.equal(targets.length, 10, 'ten attribute-carrying types');
+  // DERIVED, never a restated count: the exemption list is the schema module's
+  // (TRACKING_ATTRIBUTE_EXEMPT_TYPES), so adding a 13th type cannot make this
+  // guard quietly wrong the way a hardcoded 10 did when editorial_voice landed.
+  const targets = objectTypes.filter(carriesTrackingAttribute);
+  assert.equal(
+    targets.length,
+    objectTypes.length - TRACKING_ATTRIBUTE_EXEMPT_TYPES.length,
+    'every attribute-carrying type is drilled'
+  );
   for (const objectType of targets) {
     // The engine is shape-agnostic (schema gating is the verb layer's job) —
     // a minimal body proves the drill on every type uniformly.
@@ -116,7 +127,7 @@ test('the T13.10 set→mutate→unset drill ends byte-identical on ALL ten types
   }
 });
 
-// ═══ reconcile ════════════════════════════════════════════════════════════════
+// ═══ reconcile ═════════════════════════════════════════════════════════
 
 test('reconcile heals a drifted trk_drlurie back to the seed (stray keys nulled — trap 2)', () => {
   const drifted = structuredClone(trackingConfigBody) as Record<string, never> & typeof trackingConfigBody;
