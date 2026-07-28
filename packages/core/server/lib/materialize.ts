@@ -18,6 +18,7 @@
  */
 import type { ObjectType } from '../../schema/object-record-v1.js';
 import { materializeContentItem } from './materializers/content-item.js';
+import { materializeEditorialVoice } from './materializers/editorial-voice.js';
 import { materializeNavigation } from './materializers/navigation.js';
 import { materializePage } from './materializers/page.js';
 import { materializeProduct } from './materializers/product.js';
@@ -56,6 +57,8 @@ export function materialize(
       return materializeTheme(objectId, body, meta);
     case 'tracking_config':
       return materializeTrackingConfig(objectId, body, meta);
+    case 'editorial_voice':
+      return materializeEditorialVoice(objectId, body, meta);
     case 'section':
       return materializeSection(objectId, body, meta);
     case 'product':
