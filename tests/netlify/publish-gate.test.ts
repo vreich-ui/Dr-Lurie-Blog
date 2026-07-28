@@ -69,6 +69,7 @@ const OBJECT_IDS: Record<GovernedObjectType, string> = {
   product: 'prod_barrier_repair_guide',
   content_item: 'req_agent_probe_20260713_01',
   tracking_config: 'trk_drlurie',
+  editorial_voice: 'voice_drlurie',
 };
 
 const approveDecision = (contentRevision: number, publishAction?: { published_time: string | null }) => ({
@@ -97,19 +98,24 @@ const baseRecord = (objectType: ObjectType, objectId: string, review?: ReviewSta
 
 // ─── the committed config: the dev-stage default posture, pinned ─────────────
 
-test('the committed config parses and is the dev-stage default: all-autonomous, product pinned to require-approval', () => {
+test('the committed config parses and is the dev-stage default: all-autonomous, product + editorial_voice pinned', () => {
   const policy = resolveApprovalPolicy(approvalPolicyConfig);
-  // Commerce never publishes without a human eye (06-shop-module-plan §0.4)
-  // — the ONE deliberate exception to the autonomous dev posture.
-  assert.deepEqual(policy, { master: 'all-autonomous', overrides: { product: 'require-approval' } });
+  // Commerce never publishes without a human eye (06-shop-module-plan §0.4).
+  // D1 (2026-07-28) adds the second deliberate exception: the declared
+  // editorial voice governs every future article on the site, so one silent
+  // change moves all downstream output at once — the same class of risk as a
+  // price going live unseen. Both are POSTURES, flippable in this one file.
+  const GATED: readonly GovernedObjectType[] = ['product', 'editorial_voice'];
+  assert.deepEqual(policy, {
+    master: 'all-autonomous',
+    overrides: { product: 'require-approval', editorial_voice: 'require-approval' },
+  });
   assert.deepEqual(activeApprovalPolicy(), policy);
   for (const objectType of governedObjectTypes) {
     assert.equal(
       publishRequiresApproval(objectType, policy),
-      objectType === 'product',
-      objectType === 'product'
-        ? 'product must require approval (the §0.4 commerce gate)'
-        : `${objectType} must default to autonomous`
+      GATED.includes(objectType),
+      GATED.includes(objectType) ? `${objectType} must require approval` : `${objectType} must default to autonomous`
     );
   }
 });
