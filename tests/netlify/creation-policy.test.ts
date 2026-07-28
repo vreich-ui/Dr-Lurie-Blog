@@ -40,15 +40,20 @@ const TEMPLATES_RESTRICTED: CreationPolicy = {
   overrides: { template: { agents: ['site-builder'] }, section_template: { agents: ['site-builder'] } },
 };
 
-// ═══ resolution ═══════════════════════════════════════════════════════════════
+// ═══ resolution ════════════════════════════════════════════════════════
 
-test('the committed config parses: open master, tracking_config human/seed-only (W13)', () => {
+test('the committed config parses: open master, the two singletons human/seed-only (W13, D1)', () => {
   const policy = resolveCreationPolicy(creationPolicyConfig);
   // T13.10: the conversion-factory driver is the ONE named seed identity —
   // "seeds mint" (OQ-W13-2) made concrete; casual agents stay excluded.
+  // D1 (2026-07-28): editorial_voice joins tracking_config on the same rule —
+  // agents EDIT the site's declared voice, they never mint a second one.
   assert.deepEqual(policy, {
     master: 'open',
-    overrides: { tracking_config: { agents: ['object-conversion-roundtrip'] } },
+    overrides: {
+      tracking_config: { agents: ['object-conversion-roundtrip'] },
+      editorial_voice: { agents: ['object-conversion-roundtrip'] },
+    },
   });
   assert.deepEqual(activeCreationPolicy(), policy);
 });
@@ -79,7 +84,7 @@ test('resolution: humans always; agents resolve override → master; ungoverned 
   assert.deepEqual(creationRuleFor('template', TEMPLATES_RESTRICTED), { agents: ['site-builder'] });
 });
 
-// ═══ verb-level enforcement ═══════════════════════════════════════════════════
+// ═══ verb-level enforcement ═════════════════════════════════════════════
 
 const createMemoryStore = () => {
   const blobs = new Map<string, string>();
