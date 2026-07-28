@@ -84,4 +84,21 @@ export const TRACKABLE_ACTIVITIES_BY_TYPE: Record<string, readonly TrackingGoalA
   // The registry singleton itself is configuration — no reader events, and it
   // does not carry the tracking attribute at all (schema-level).
   tracking_config: [],
+  // D1 (2026-07-28): a declared editorial voice is authoring law, never a
+  // reader-facing surface — same exemption, same reason.
+  editorial_voice: [],
 };
+
+/**
+ * The governed types that do NOT carry the shared `tracking` attribute at the
+ * schema level, and therefore get no `set_tracking` op and no
+ * `tracking_attribute` contract constraint.
+ *
+ * Exported so the coverage suites DERIVE the exemption instead of restating a
+ * count ("all ten types") that silently becomes wrong the next time a type is
+ * added. That restated count is exactly what broke when editorial_voice landed.
+ */
+export const TRACKING_ATTRIBUTE_EXEMPT_TYPES = ['tracking_config', 'editorial_voice'] as const;
+
+export const carriesTrackingAttribute = (objectType: string): boolean =>
+  !(TRACKING_ATTRIBUTE_EXEMPT_TYPES as readonly string[]).includes(objectType);
