@@ -450,7 +450,11 @@ const wipeBlobConfirmJsonSchema = stringSchema(
 );
 const wipeBlobPrefixesJsonSchema = arraySchema(
   { type: 'string', enum: ['workflows/', 'artifact-index/', ...artifactKindValues.map((kind) => `${kind}/`)] },
-  'Optional logical prefixes to wipe. Defaults to all app-managed prefixes.'
+  'REQUIRED, non-empty — no default. The artifact prefixes (image/, pdf/, etc.) and artifact-index/ are ' +
+    'shared with live CMS objects (a content_item article’s media lives at image/{objectRequestId}/{sha}.ext, ' +
+    'indistinguishable by prefix from a legacy workflow record’s artifacts) — wiping them can delete live, ' +
+    'published media. Pass exactly the prefixes you have verified are safe; workflows/ is the only prefix that ' +
+    'is unambiguously legacy-only.'
 );
 const artifactIncludeDeletedJsonSchema = {
   type: 'boolean',
@@ -741,12 +745,19 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: 'wipe_blob_stores',
     description:
-      'Admin-only MCP maintenance tool protected by server publish-key headers. Dry-runs by default; live mode deletes only allowlisted app-managed blob prefixes across workflow, artifact-index, and artifact blob stores.',
-    inputSchema: objectSchema({
-      dryRun: wipeBlobDryRunJsonSchema,
-      confirm: wipeBlobConfirmJsonSchema,
-      prefixes: wipeBlobPrefixesJsonSchema,
-    }),
+      'Admin-only MCP maintenance tool protected by server publish-key headers. Dry-runs by default; live mode ' +
+      'deletes ONLY the prefixes you explicitly pass — there is no default-to-everything mode. prefixes is ' +
+      'required and non-empty on every call, dry run included, so a caller can never wipe more than it verified ' +
+      'it meant to. See prefixes for which ones are safe to wipe unconditionally vs. which are shared with live ' +
+      'CMS object data and need a cross-reference first.',
+    inputSchema: objectSchema(
+      {
+        dryRun: wipeBlobDryRunJsonSchema,
+        confirm: wipeBlobConfirmJsonSchema,
+        prefixes: wipeBlobPrefixesJsonSchema,
+      },
+      ['prefixes']
+    ),
   },
   {
     name: 'reconcile_artifact_indexes',
@@ -2372,13 +2383,24 @@ const WIPE_BLOB_ARTIFACT_PREFIX_SET = new Set<string>(artifactKindValues.map((ki
 
 const isArtifactWipeBlobPrefix = (prefix: string) => WIPE_BLOB_ARTIFACT_PREFIX_SET.has(prefix);
 
+/**
+ * No default-to-everything mode: `prefixes` was silently defaulting to EVERY
+ * app-managed prefix (workflows/, artifact-index/, and every artifact kind),
+ * so an operator meaning to wipe only legacy workflow records could delete
+ * live object media with the same call shape. `prefixes` is now REQUIRED and
+ * non-empty on every call, dry run included.
+ */
 const normalizeWipeBlobPrefixes = (value: unknown) => {
-  if (value === undefined || value === null) {
-    return { prefixes: [...WIPE_BLOB_ALLOWED_PREFIXES], skipped: [] as string[] };
+  if (value === undefined || value === null || (Array.isArray(value) && value.length === 0)) {
+    return {
+      prefixes: [] as string[],
+      skipped: [] as string[],
+      missing: true as const,
+    };
   }
 
   if (!Array.isArray(value)) {
-    return { prefixes: [] as string[], skipped: ['prefixes must be an array of strings.'] };
+    return { prefixes: [] as string[], skipped: ['prefixes must be an array of strings.'], missing: false as const };
   }
 
   const prefixes: string[] = [];
@@ -2393,7 +2415,7 @@ const normalizeWipeBlobPrefixes = (value: unknown) => {
     if (!prefixes.includes(prefix)) prefixes.push(prefix);
   }
 
-  return { prefixes, skipped };
+  return { prefixes, skipped, missing: false as const };
 };
 
 const getWipeBlobTargets = async (event: LambdaEvent, prefixes: string[]): Promise<WipeBlobTarget[]> => {
@@ -2459,6 +2481,14 @@ const wipeBlobStores = async (event: LambdaEvent, input: Record<string, unknown>
   }
 
   const normalizedPrefixes = normalizeWipeBlobPrefixes(input.prefixes);
+  if (normalizedPrefixes.missing) {
+    return toolError(
+      'prefixes is required and must be a non-empty array — there is no default-to-everything mode. ' +
+        'Pass exactly the prefixes you have verified are safe to wipe (dry run included).',
+      { error_code: 'missing_prefixes', dryRun, deleted: 0, scanned: 0, skipped: 0, prefixes: [], sampleDeletedKeys: [] }
+    );
+  }
+
   const targets = await getWipeBlobTargets(event, normalizedPrefixes.prefixes);
   let scanned = 0;
   let deleted = 0;

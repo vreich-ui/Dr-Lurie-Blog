@@ -123,6 +123,28 @@ const withMockBlobStores = async (fn: (stores: Record<string, TestStore>) => Pro
   }
 };
 
+test('wipe_blob_stores rejects an omitted prefixes argument — no default-to-everything mode', async () => {
+  await withMockBlobStores(async (stores) => {
+    const body = await callWipeBlobStores({});
+
+    assert.equal(body.result.isError, true);
+    assert.match(String(body.result.structuredContent.error), /prefixes is required/i);
+    assert.deepEqual(stores.workflows.deleted, []);
+    assert.deepEqual(stores.artifacts.deleted, []);
+    assert.deepEqual(stores['artifact-index'].deleted, []);
+  });
+});
+
+test('wipe_blob_stores rejects an empty prefixes array the same way as an omitted one', async () => {
+  await withMockBlobStores(async (stores) => {
+    const body = await callWipeBlobStores({ prefixes: [] });
+
+    assert.equal(body.result.isError, true);
+    assert.match(String(body.result.structuredContent.error), /prefixes is required/i);
+    assert.deepEqual(stores.artifacts.deleted, []);
+  });
+});
+
 test('wipe_blob_stores dryRun returns counts and samples without deleting', async () => {
   await withMockBlobStores(async (stores) => {
     const body = await callWipeBlobStores({ prefixes: ['workflows/', 'image/', 'artifact-index/'] });
