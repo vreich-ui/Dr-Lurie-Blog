@@ -5,25 +5,27 @@
  * things bound it to that one client, and only the first was obvious:
  *
  *  1. it opened by importing `sites/drlurie/config/policy-bindings`, and
- *  2. it is a COMPOSITE — it dispatches to six sibling function handlers,
- *     imported statically from the same directory. Three of those
- *     (`save-artifact`, `object-store`, `deploy-status`) were that site's
- *     shims, already bound to its SiteBinding. The other three
- *     (`save-json-blob`, `publish-article`, `verify-article-images`) are the
- *     FROZEN legacy article path, which is Dr-Lurie's and stays at the repo
- *     root — core must never import it.
+ *  2. it is a COMPOSITE — it dispatches to sibling function handlers,
+ *     imported statically from the same directory.
  *
  * So the decoupling is dependency injection, not a file move. `configureMcp`
  * is the seam: each site's shim registers its own policy bindings, builds the
- * three governed handlers from the core factories with ITS SiteBinding, and
- * passes them in. The legacy trio is OPTIONAL — a client born after the object
- * substrate simply has no legacy article path, and the tools that need it are
- * absent from its tool list rather than present and broken (Wolf's 2026-07-13
- * ruling: reverse support is not required; the legacy dialect does not
- * propagate to the fleet).
+ * governed handlers from the core factories with ITS SiteBinding, and passes
+ * them in.
  *
- * The tool bodies below are untouched. No factory split of the legacy tools,
- * no change to the publish-safety stack.
+ * RETIRED (2026-07-29): the legacy `save_json_blob_*` article pipeline and its
+ * per-stage workflow tools are gone — module, publish path, tools and all
+ * (ruling OQ-W11-6; its last consumer, CMS-Agent's dr-lurie hook, moved to the
+ * object dialect first). Articles are `content_item` OBJECTS on every site in
+ * the fleet. The committed legacy posts under `src/data/post/` and their
+ * rendering are untouched: this retired the WRITE pipeline, not the published
+ * content.
+ *
+ * `verify-article-images` survives that retirement and is still injected
+ * rather than imported: it is a per-site function, and it serves the OBJECT
+ * path (post-release image verification) as much as it ever served the legacy
+ * one. It stays OPTIONAL — a site that injects no handler does not advertise
+ * the tool rather than advertising one that cannot run.
  *
  * FAILS CLOSED: calling into this module before `configureMcp` throws. A
  * silent fallback to another tenant's handlers is the one outcome worse than
@@ -31,7 +33,6 @@
  */
 import { randomUUID, timingSafeEqual } from 'node:crypto';
 
-import type { WorkflowRecord } from '../../schema/schema-v1.js';
 
 /**
  * A Netlify function handler, as invoked in-process by the tool bodies.
@@ -41,15 +42,13 @@ type SiblingResponse = { statusCode: number; body?: string; headers?: Record<str
 type SiblingHandler = (event: LambdaEvent, context?: LambdaContext) => Promise<SiblingResponse>;
 
 /**
- * The governed trio every site has, plus the legacy trio only a site with the
- * pre-object article path supplies.
+ * The governed trio every site has, plus the optional image-verification
+ * handler a site supplies when it deploys `verify-article-images`.
  */
 export interface McpSiblingHandlers {
   saveArtifactHandler: SiblingHandler;
   objectStoreHandler: SiblingHandler;
   deployStatusHandler: SiblingHandler;
-  saveJsonBlobHandler?: SiblingHandler;
-  publishArticleHandler?: SiblingHandler;
   verifyArticleImagesHandler?: SiblingHandler;
 }
 
@@ -71,41 +70,23 @@ const requireSiblings = (): McpSiblingHandlers => {
 };
 
 /**
- * Tools that cannot work without the legacy article path. A site that injects
- * no legacy handlers must not ADVERTISE these — listing a tool an agent cannot
- * call is worse than omitting it: the agent plans around it and fails mid-run,
- * and (Wolf, 2026-07-26) the legacy surface is meant to be frozen and
- * forgotten, not inherited by every new client.
+ * Tools that cannot work without a handler only some sites inject. A site that
+ * injects none must not ADVERTISE them — listing a tool an agent cannot call
+ * is worse than omitting it: the agent plans around it and fails mid-run.
  *
- * Caught by T14.4's live round-trip: injecting the handlers alone left all 12
- * of these in `tools/list` on a site with no legacy path.
+ * Caught by T14.4's live round-trip: injecting the handlers alone left every
+ * one of these in `tools/list` on a site that had none of them.
  */
-const LEGACY_ARTICLE_TOOLS = new Set([
-  'save_json_blob_create_request',
-  'save_json_blob_create_article_draft',
-  'save_json_blob_get_request',
-  'save_json_blob_list_pending_requests',
-  'save_json_blob_patch_agent_output',
-  'save_json_blob_mark_agent_complete',
-  'save_json_blob_checkout_request',
-  'save_json_blob_refresh_lock',
-  'save_json_blob_checkin_request',
-  'save_json_blob_publish_by_time',
-  'save_json_blob_patch_canonical_input',
-  'verify_article_images',
-]);
+const OPTIONAL_HANDLER_TOOLS = new Set(['verify_article_images']);
 
-/** True when this site supplied the legacy article handlers. */
-const hasLegacyArticlePath = (): boolean => Boolean(requireSiblings().saveJsonBlobHandler);
+/** True when this site supplied the article-image verification handler. */
+const hasVerifyArticleImages = (): boolean => Boolean(requireSiblings().verifyArticleImagesHandler);
 
-/** A legacy-only handler: present for a site with the pre-object article path. */
-const requireLegacy = (name: 'saveJsonBlobHandler' | 'publishArticleHandler' | 'verifyArticleImagesHandler') => {
+/** An optional handler: present only on a site that deploys the function. */
+const requireOptional = (name: 'verifyArticleImagesHandler') => {
   const handlerFn = requireSiblings()[name];
   if (!handlerFn) {
-    throw new Error(
-      `This site has no legacy article path, so '${name}' is unavailable. ` +
-        'Articles on this site are content_item objects — use the governed object tools.'
-    );
+    throw new Error(`This site does not deploy '${name}', so the tool is unavailable.`);
   }
   return handlerFn;
 };
@@ -113,11 +94,8 @@ const requireLegacy = (name: 'saveJsonBlobHandler' | 'publishArticleHandler' | '
 const saveArtifactHandler: SiblingHandler = (event, context) => requireSiblings().saveArtifactHandler(event, context);
 const objectStoreHandler: SiblingHandler = (event, context) => requireSiblings().objectStoreHandler(event, context);
 const deployStatusHandler: SiblingHandler = (event, context) => requireSiblings().deployStatusHandler(event, context);
-const saveJsonBlobHandler: SiblingHandler = (event, context) => requireLegacy('saveJsonBlobHandler')(event, context);
-const publishArticleHandler: SiblingHandler = (event, context) =>
-  requireLegacy('publishArticleHandler')(event, context);
 const verifyArticleImagesHandler: SiblingHandler = (event, context) =>
-  requireLegacy('verifyArticleImagesHandler')(event, context);
+  requireOptional('verifyArticleImagesHandler')(event, context);
 import {
   isNetlifyBuildHookConfigured,
   NetlifyBuildHookTriggerError,
@@ -154,7 +132,6 @@ import {
   type ResolvedOAuthPrincipal,
 } from '../lib/oauth-server.js';
 import type { OAuthBlobStore } from '../lib/oauth-store.js';
-import { allowedAgentNames, workflowStatuses } from '../../schema/workflow-contract.js';
 import {
   artifactKindValues,
   artifactReferenceLimits,
@@ -255,8 +232,6 @@ const PROTOCOL_VERSION = '2025-06-18';
 // and in the ping tool so slow first calls are attributable from client side.
 const INSTANCE_BOOTED_AT_MS = Date.now();
 let instanceInvocationCount = 0;
-const ALLOWED_AGENTS = allowedAgentNames;
-const ALLOWED_AGENT_SET = new Set<string>(ALLOWED_AGENTS);
 const ARTIFACT_LIST_DEFAULT_LIMIT = 50;
 const ARTIFACT_LIST_MAX_LIMIT = 100;
 const WIPE_BLOB_CONFIRMATION = 'WIPE_BLOBS';
@@ -354,80 +329,6 @@ const toolError = (message: string, payload: Record<string, unknown> = {}) => ({
   structuredContent: { error: message, ...payload },
 });
 
-const sanitizeWorkflowLock = (lock: unknown) => {
-  if (!lock || typeof lock !== 'object') return undefined;
-
-  const record = lock as Record<string, unknown>;
-  return {
-    owner_id: record.owner_id,
-    owner_label: record.owner_label,
-    acquired_at: record.acquired_at,
-    expires_at: record.expires_at,
-  };
-};
-
-const sanitizeWorkflowErrorPayload = (payload: Record<string, unknown>) => {
-  const sanitized: Record<string, unknown> = { ...payload };
-  const lock = sanitizeWorkflowLock(payload.lock);
-  if (lock) sanitized.lock = lock;
-  return sanitized;
-};
-
-const agentList = () => ALLOWED_AGENTS.join('|');
-
-const workflowLockInstruction =
-  'Agents must call checkout first to acquire a lock_token, then patch output with that lock_token, then mark complete with that lock_token, then check in when done or refresh the lock before it expires as needed.';
-
-const STAGE_TRANSITIONS: Record<
-  (typeof ALLOWED_AGENTS)[number],
-  { nextAgent: string | null; workflowStatus?: string }
-> = {
-  reader_insight: { nextAgent: 'research' },
-  research: { nextAgent: 'angle' },
-  angle: { nextAgent: 'draft' },
-  draft: { nextAgent: 'final_article' },
-  final_article: { nextAgent: null, workflowStatus: 'completed' },
-};
-
-const stageTransitionDescription = (agentName: (typeof ALLOWED_AGENTS)[number]) => {
-  const transition = STAGE_TRANSITIONS[agentName];
-  const nextAgent = transition.nextAgent === null ? 'null' : transition.nextAgent;
-  const workflowStatus = transition.workflowStatus ? ` with workflow_status: "${transition.workflowStatus}"` : '';
-
-  return `Common transition: ${agentName} → ${nextAgent}${workflowStatus}.`;
-};
-
-const normalizeAgentName = (value: unknown, fieldName: string) => {
-  if (value === null || value === undefined) return value;
-
-  if (typeof value !== 'string') {
-    throw new Error(`${fieldName} must be one of ${agentList()}.`);
-  }
-
-  const normalized = value
-    .trim()
-    .toLowerCase()
-    .replace(/[\s-]+/g, '_');
-
-  if (!ALLOWED_AGENT_SET.has(normalized)) {
-    throw new Error(`${fieldName} must be one of ${agentList()}.`);
-  }
-
-  return normalized;
-};
-
-const normalizeOptionalAgentName = (value: unknown, fieldName: string) => {
-  if (value === undefined || value === null) return value;
-
-  return normalizeAgentName(value, fieldName);
-};
-
-const missingRequestIdError = () =>
-  toolError(
-    'request_id is required and is not auto-generated. Supply a request_id matching req_<flow>_<topic>_<yyyymmdd>_<nn> (lowercase snake_case), e.g. req_publish_launch_20260703_01.',
-    { error_code: 'missing_request_id' }
-  );
-
 const stringSchema = (description?: string) => ({
   type: 'string',
   minLength: 1,
@@ -438,24 +339,6 @@ const nullableStringSchema = (description?: string) => ({
   anyOf: [{ type: 'string', minLength: 1 }, { type: 'null' }],
   ...(description ? { description } : {}),
 });
-const constStringSchema = (value: string, description?: string) => ({
-  type: 'string',
-  const: value,
-  ...(description ? { description } : {}),
-});
-
-const lockTokenSchema = stringSchema(
-  'Lock token returned by checkout_request; required for mutating workflow records.'
-);
-const ownerIdSchema = stringSchema('Stable owner id for the agent or process acquiring the workflow lock.');
-const ownerLabelSchema = stringSchema(
-  'Human-readable owner label for the agent or process acquiring the workflow lock.'
-);
-const leaseSecondsSchema = {
-  type: 'integer',
-  minimum: 1,
-  description: 'Optional lock lease duration in seconds; backend default applies when omitted.',
-};
 
 const objectSchema = (
   properties: Record<string, unknown>,
@@ -475,34 +358,12 @@ const arraySchema = (items: Record<string, unknown>, description?: string) => ({
   ...(description ? { description } : {}),
 });
 
-const stringArraySchema = (description?: string) => arraySchema({ type: 'string' }, description);
 const metadataBagSchema = (description: string) => ({
   type: 'object',
   description,
   properties: {},
   additionalProperties: true,
 });
-const agentNameJsonSchema = (description?: string) => ({
-  type: 'string',
-  enum: ALLOWED_AGENTS,
-  ...(description ? { description } : {}),
-});
-const nullableAgentNameJsonSchema = (description?: string) => ({
-  anyOf: [{ type: 'string', enum: ALLOWED_AGENTS }, { type: 'null' }],
-  ...(description ? { description } : {}),
-});
-const workflowStatusJsonSchema = (description?: string) => ({
-  type: 'string',
-  enum: workflowStatuses,
-  ...(description ? { description } : {}),
-});
-const adminPublishValidationModeSchema = {
-  type: 'string',
-  enum: ['admin_publish_draft'],
-  description:
-    'Required validation mode for MCP-created admin-publish article drafts. Use content.article_body with schema_version article_body.v1 and at least one reader-visible public node.',
-};
-
 const artifactKindJsonSchema = (description?: string) => ({
   type: 'string',
   enum: [...artifactKindValues],
@@ -615,352 +476,6 @@ const isoDateStringSchema = (description: string) => ({
   description,
 });
 
-const articleBodyNodeJsonSchema = objectSchema(
-  {
-    id: stringSchema('Stable opaque node id starting with n_; do not include strategy or commercial keywords.'),
-    kind: { type: 'string', enum: ['content', 'action', 'placement', 'interactive'] },
-    public: objectSchema(
-      {
-        eyebrow: stringSchema('Visible eyebrow text.'),
-        title: stringSchema('Visible node title.'),
-        body: stringSchema('Visible Markdown-capable body copy.'),
-        items: stringArraySchema('Visible list items.'),
-        ctaText: stringSchema('Visible CTA text.'),
-        ctaLink: stringSchema('Visible CTA URL.'),
-        label: stringSchema('Visible label.'),
-        media: objectSchema({
-          type: {
-            type: 'string',
-            enum: ['image', 'video', 'audio', 'embed', 'document'],
-            description:
-              "Media kind. Use 'image' for pictures and 'document' for PDFs; document media renders as a link, not an image.",
-          },
-          title: stringSchema('Visible media title; used as link text for document media.'),
-          contentType: stringSchema('Optional MIME type of the media bytes, e.g. image/png or application/pdf.'),
-          src: stringSchema(
-            'Media source. For images this MUST be an artifact pointer (image/{requestId}/{sha256}.{ext}) from an uploaded artifact — plain https:// URLs and data: URIs are rejected for image media. For documents use the PDF artifact blobKey (pdf/{requestId}/{sha256}.pdf).'
-          ),
-          alt: stringSchema('Accessible visible alt text.'),
-          caption: stringSchema('Visible media caption.'),
-        }),
-      },
-      [],
-      'Reader-visible node fields. Use these for visible copy.'
-    ),
-    private: metadataBagSchema(
-      'Internal-only strategy metadata for agents/editors. Never use node.private as reader-visible copy.'
-    ),
-    commercial: metadataBagSchema('Optional commercial metadata, disclosures, destinations, and offer details.'),
-    chat: objectSchema({
-      invitationText: stringSchema('Visible chat invitation text.'),
-      suggestedQuery: stringSchema('Suggested chat query.'),
-    }),
-    rendering: metadataBagSchema(
-      "Rendering hints controlling placement and presentation. REQUIRED if this node carries public.media: set placement to 'inline' so the image/media renders inside the article body. Without an explicit placement, a node image is NOT rendered in the published article body (the publish still succeeds, but the response includes an image_not_rendered warning). Valid placement values: 'inline', 'section', 'sidebar', 'afterParagraph', 'footer' (only 'inline' renders media in the body today). For the page hero image, give the node id 'n_hero' and reference the same artifact as the publish featuredImage — the hero image is emitted to the frontmatter image field, not the body, and needs no placement."
-    ),
-    visibility: { type: 'string', enum: ['public', 'internal', 'hidden'] },
-  },
-  ['id', 'kind', 'public'],
-  'One article_body.v1 node. Minimum useful article bodies include at least one public node with reader-facing public fields.'
-);
-
-const articleBodyV1JsonSchema = objectSchema(
-  {
-    schema_version: constStringSchema('article_body.v1'),
-    nodes: arraySchema(
-      articleBodyNodeJsonSchema,
-      'Structured article nodes. Minimum required body is one node; at least one node must be public or omit visibility.'
-    ),
-    chat: metadataBagSchema('Optional article-level chat configuration.'),
-    defaults: metadataBagSchema('Optional article-level rendering/default metadata.'),
-    metadata: metadataBagSchema('Optional article-level metadata.'),
-  },
-  ['schema_version', 'nodes'],
-  'Canonical structured article body for admin-publish drafts. Use content.article_body.schema_version = "article_body.v1" and content.article_body.nodes[].'
-);
-
-const contentBlockJsonSchema = objectSchema(
-  {
-    block_id: stringSchema('Stable block identifier.'),
-    block_type: stringSchema('Block kind such as markdown, image, cta, or quiz.'),
-    payload: { description: 'Block payload for the declared block_type; use metadata bags for non-contract fields.' },
-    section_id: stringSchema('Optional section id this block belongs to.'),
-  },
-  ['block_id', 'block_type']
-);
-
-const claimJsonSchema = objectSchema(
-  {
-    claim_id: stringSchema('Stable claim identifier.'),
-    claim_text: stringSchema('Verifiable claim text to fact-check or preserve.'),
-    claim_type: stringSchema('Claim category such as factual, medical, product, or comparative.'),
-    source_ids: stringArraySchema('Source ids that support or contextualize the claim.'),
-    confidence: { type: 'number', minimum: 0, maximum: 1, description: 'Agent confidence from 0 to 1.' },
-    status: stringSchema('Review status such as proposed, verified, needs_source, or rejected.'),
-    metadata: metadataBagSchema('Optional claim-specific extension data.'),
-  },
-  ['claim_text']
-);
-
-const complianceRequirementJsonSchema = objectSchema(
-  {
-    requirement_id: stringSchema('Stable compliance requirement identifier.'),
-    category: stringSchema('Requirement category such as medical_claim, disclosure, source_quality, or privacy.'),
-    description: stringSchema('Plain-language compliance requirement.'),
-    status: stringSchema('Compliance status such as pending, satisfied, needs_review, or blocked.'),
-    related_claim_ids: stringArraySchema('Claim ids this requirement applies to.'),
-    notes: stringSchema('Reviewer or agent notes.'),
-    metadata: metadataBagSchema('Optional compliance-specific extension data.'),
-  },
-  ['category', 'description']
-);
-
-const commercialOfferJsonSchema = objectSchema(
-  {
-    offer_id: stringSchema('Stable offer identifier.'),
-    name: stringSchema('Offer or product name.'),
-    url: stringSchema('Destination URL for the offer.'),
-    cta_text: stringSchema('CTA text associated with the offer.'),
-    disclosure: stringSchema('Commercial disclosure text.'),
-    placement: stringSchema('Suggested article placement or section id.'),
-    metadata: metadataBagSchema('Optional offer-specific extension data.'),
-  },
-  ['name']
-);
-
-const imagePromptJsonSchema = objectSchema(
-  {
-    prompt_id: stringSchema('Stable image prompt identifier.'),
-    prompt: stringSchema('Image-generation prompt text.'),
-    purpose: stringSchema('Use case such as hero, inline, diagram, or social.'),
-    status: stringSchema('Prompt status such as proposed, approved, generated, or rejected.'),
-    metadata: metadataBagSchema('Optional prompt-specific extension data.'),
-  },
-  ['prompt_id', 'prompt']
-);
-
-const imageAssetJsonSchema = objectSchema(
-  {
-    asset_id: stringSchema('Stable image asset identifier.'),
-    source: stringSchema('Asset source such as upload, generated, remote, or existing_repo.'),
-    url: stringSchema('Public or remote image URL when available.'),
-    repoPath: stringSchema('Repository path for publishable image assets.'),
-    alt: stringSchema('Accessible alt text.'),
-    caption: stringSchema('Optional display caption.'),
-    prompt_id: stringSchema('Image prompt id that produced this asset, if applicable.'),
-    status: stringSchema('Asset status such as proposed, approved, uploaded, or rejected.'),
-    metadata: metadataBagSchema('Optional asset-specific extension data.'),
-  },
-  ['asset_id']
-);
-
-const revisionRequestJsonSchema = objectSchema(
-  {
-    request_id: stringSchema('Stable revision request identifier.'),
-    requested_by_agent: agentNameJsonSchema('Agent requesting the revision.'),
-    target_section_id: stringSchema('Target content section id, if the request is section-specific.'),
-    priority: stringSchema('Priority such as low, normal, high, or blocking.'),
-    instruction: stringSchema('Concrete revision instruction.'),
-    status: stringSchema('Revision status such as open, accepted, rejected, or resolved.'),
-    metadata: metadataBagSchema('Optional revision-specific extension data.'),
-  },
-  ['request_id', 'instruction']
-);
-
-const contentSourceV1JsonSchema = objectSchema(
-  {
-    record_type: constStringSchema('content_source', 'Required discriminator for workflow content-source records.'),
-    schema_version: constStringSchema('content_source.v1', 'Required schema version discriminator.'),
-    ids: objectSchema({
-      content_id: stringSchema('Stable content id.'),
-      publication_id: stringSchema('Publication id.'),
-      source_version_id: stringSchema('Source version id.'),
-      parent_content_id: nullableStringSchema('Parent content id, if this record derives from another content item.'),
-      workflow_id: stringSchema('Workflow id associated with this content source.'),
-    }),
-    publication_context: objectSchema({
-      publication_name: stringSchema('Publication name.'),
-      domain: stringSchema('Publication domain.'),
-      topic_scope: stringSchema('Topic scope or editorial lane.'),
-    }),
-    content: objectSchema({
-      schema_version: constStringSchema('content_blocks.v1'),
-      title: stringSchema('Working or final article title agents should use for the content source.'),
-      deck: stringSchema('Short deck or subtitle.'),
-      description: stringSchema('Brief content description.'),
-      structure: objectSchema({
-        schema_version: constStringSchema('content_structure.v1'),
-        sections: arraySchema(
-          objectSchema(
-            {
-              section_id: stringSchema('Stable section identifier.'),
-              role: stringSchema('Section role, such as intro, body, or conclusion.'),
-              name: stringSchema('Human-readable section name.'),
-              block_refs: stringArraySchema('Block ids included in this section.'),
-            },
-            ['section_id']
-          )
-        ),
-      }),
-      article_body: articleBodyV1JsonSchema,
-      blocks: arraySchema(
-        contentBlockJsonSchema,
-        'Non-publishing structured content blocks. Publishing uses only content.article_body.'
-      ),
-    }),
-    taxonomy: objectSchema({
-      schema_version: constStringSchema('taxonomy.v1'),
-      tags: stringArraySchema('Taxonomy tags.'),
-    }),
-    seo: objectSchema({
-      schema_version: constStringSchema('seo.v1'),
-      meta_title: stringSchema('SEO meta title.'),
-      meta_description: stringSchema('SEO meta description.'),
-      canonical_url: stringSchema('Canonical URL.'),
-    }),
-    media: objectSchema({
-      schema_version: constStringSchema('media.v1'),
-      visual_strategy: objectSchema({
-        primary_image_goal: stringSchema('Primary image goal for the article.'),
-        tone: stringSchema('Visual tone or art direction.'),
-        constraints: stringArraySchema('Visual constraints agents should honor.'),
-        metadata: metadataBagSchema('Optional visual-strategy extension data.'),
-      }),
-      image_prompt_register: {
-        type: 'object',
-        description: 'Agent-generated image prompts keyed by prompt id.',
-        additionalProperties: imagePromptJsonSchema,
-      },
-      image_generation_runs: arraySchema(
-        objectSchema({
-          run_id: stringSchema('Stable generation run identifier.'),
-          prompt_id: stringSchema('Prompt id used for this run.'),
-          provider: stringSchema('Generation provider or tool.'),
-          status: stringSchema('Generation status.'),
-          asset_ids: stringArraySchema('Image asset ids produced by this run.'),
-          metadata: metadataBagSchema('Optional generation-run extension data.'),
-        }),
-        'Image generation run records.'
-      ),
-      image_asset_register: arraySchema(imageAssetJsonSchema, 'Concrete image asset records.'),
-      image_sets: arraySchema(
-        objectSchema({
-          set_id: stringSchema('Stable image set identifier.'),
-          purpose: stringSchema('Image set purpose such as article, social, or thumbnail.'),
-          asset_ids: stringArraySchema('Assets included in this set.'),
-          metadata: metadataBagSchema('Optional image-set extension data.'),
-        }),
-        'Image set records.'
-      ),
-      media_revision_summary: objectSchema({
-        summary: stringSchema('Summary of media revisions.'),
-        resolved_request_ids: stringArraySchema('Revision request ids resolved by this media pass.'),
-        metadata: metadataBagSchema('Optional media-revision extension data.'),
-      }),
-    }),
-    editorial: objectSchema({
-      schema_version: constStringSchema('editorial.v1'),
-      writer_notes: stringSchema('Notes for writers and editors.'),
-    }),
-    sources: objectSchema({
-      schema_version: constStringSchema('sources.v1'),
-      source_list: arraySchema(
-        objectSchema(
-          {
-            source_id: stringSchema('Stable source id.'),
-            name: stringSchema('Source name.'),
-            url: stringSchema('Source URL.'),
-            publisher: stringSchema('Source publisher.'),
-            accessed_at: stringSchema('Access timestamp.'),
-          },
-          ['name', 'url']
-        ),
-        'Cited sources.'
-      ),
-    }),
-    claims: objectSchema({
-      schema_version: constStringSchema('claims.v1'),
-      claim_list: arraySchema(claimJsonSchema, 'Fact claims extracted or checked by agents.'),
-      metadata: metadataBagSchema('Optional claims-section extension data.'),
-    }),
-    compliance: objectSchema({
-      schema_version: constStringSchema('compliance.v1'),
-      requirements: arraySchema(complianceRequirementJsonSchema, 'Concrete compliance requirements for the article.'),
-      metadata: metadataBagSchema('Optional compliance-section extension data.'),
-    }),
-    commercial: objectSchema({
-      schema_version: constStringSchema('commercial.v1'),
-      offers: arraySchema(commercialOfferJsonSchema, 'Commercial offer records.'),
-      metadata: metadataBagSchema('Optional commercial-section extension data.'),
-    }),
-    approvals: objectSchema({
-      schema_version: constStringSchema('approvals.v1'),
-      approval_status: stringSchema('Approval status.'),
-    }),
-    publication: objectSchema({
-      schema_version: constStringSchema('publication.v2'),
-      published_time: {
-        anyOf: [{ type: 'string', format: 'date-time' }, { type: 'null' }],
-        description:
-          'Only publication control field. Null/missing/invalid means not live and not scheduled; future ISO timestamp schedules; current or past ISO timestamp publishes/live.',
-      },
-    }),
-    workflow: objectSchema({
-      schema_version: constStringSchema('content_workflow.v1'),
-      workflow_id: stringSchema(
-        'Workflow identifier agents should preserve across handoffs and backend workflow records.'
-      ),
-      current_agent: agentNameJsonSchema('Agent currently responsible for this content-source handoff.'),
-      previous_agent: nullableAgentNameJsonSchema('Agent that handed off this content source, if any.'),
-      next_agent: nullableAgentNameJsonSchema('Agent expected to receive the next handoff, if any.'),
-      handoff_notes: stringSchema('Concise handoff notes for the next agent.'),
-      metadata: metadataBagSchema('Optional workflow-handoff extension data.'),
-    }),
-    revision_control: objectSchema({
-      schema_version: constStringSchema('revision_control.v1'),
-      audit_findings: arraySchema(
-        objectSchema({
-          finding_id: stringSchema('Stable audit finding identifier.'),
-          severity: stringSchema('Finding severity.'),
-          finding: stringSchema('Audit finding text.'),
-          metadata: metadataBagSchema('Optional audit-finding extension data.'),
-        }),
-        'Audit findings.'
-      ),
-      routing_decisions: arraySchema(
-        objectSchema({
-          decision_id: stringSchema('Stable routing decision identifier.'),
-          from_agent: agentNameJsonSchema('Agent making the routing decision.'),
-          to_agent: nullableAgentNameJsonSchema('Agent receiving the next route, or null when complete.'),
-          reason: stringSchema('Routing rationale.'),
-          metadata: metadataBagSchema('Optional routing-decision extension data.'),
-        }),
-        'Routing decisions.'
-      ),
-      revision_requests: arraySchema(revisionRequestJsonSchema, 'Concrete revision requests.'),
-      change_assessments: arraySchema(
-        objectSchema({
-          assessment_id: stringSchema('Stable change assessment identifier.'),
-          revision_request_id: stringSchema('Revision request id this assessment addresses.'),
-          outcome: stringSchema('Assessment outcome.'),
-          notes: stringSchema('Assessment notes.'),
-          metadata: metadataBagSchema('Optional change-assessment extension data.'),
-        }),
-        'Change assessments.'
-      ),
-    }),
-    versioning: objectSchema({
-      schema_version: constStringSchema('versioning.v1'),
-      record_version: intSchema(
-        'Content-source record version agents should increment or preserve for revision tracking.'
-      ),
-      previous_version_refs: stringArraySchema('Previous content-source version references.'),
-    }),
-  },
-  ['record_type', 'schema_version'],
-  'Structured content_source.v1 workflow input. For MCP admin-publish drafts, use content.article_body with schema_version article_body.v1 plus at least one reader-visible public node. Publication is controlled only by input.publication.published_time.'
-);
-
 // ── Object-verb tool schemas (T0.9). Additive; the article tool schemas above
 //    are untouched. ──
 // Single source of truth: the envelope's object-type vocabulary (was a
@@ -991,227 +506,6 @@ const publishActionInputSchema = (description: string) =>
   );
 
 const TOOL_DEFINITIONS: ToolDefinition[] = [
-  {
-    name: 'save_json_blob_create_request',
-    description:
-      'Create a save-json-blob workflow request and return its record. request_id is required and must match req_<flow>_<topic>_<yyyymmdd>_<nn> using lowercase snake_case (e.g. req_publish_launch_20260702_01); it is not auto-generated, and a non-conforming id breaks every later artifact operation for the request. MCP-created article drafts are validated as admin-publish drafts: use content.article_body (article_body.v1) with at least one reader-visible public node. Publication is controlled only by input.publication.published_time.',
-    inputSchema: objectSchema(
-      {
-        input: contentSourceV1JsonSchema,
-        request_id: stringSchema(
-          'Required. Must match req_<flow>_<topic>_<yyyymmdd>_<nn> using lowercase snake_case — e.g. req_publish_launch_20260702_01. Agents must supply this; it is not auto-generated. Use a date matching today and a 2-digit sequence number.'
-        ),
-        current_agent: agentNameJsonSchema(
-          'Optional initial current agent; defaults to input.workflow.current_agent or no current stage.'
-        ),
-        next_agent: nullableAgentNameJsonSchema(
-          'Optional initial next agent; defaults to input.workflow.next_agent or reader_insight.'
-        ),
-        validation_mode: adminPublishValidationModeSchema,
-      },
-      ['input', 'request_id', 'validation_mode']
-    ),
-  },
-
-  {
-    name: 'save_json_blob_create_article_draft',
-    description:
-      'Non-breaking helper for agents creating structured admin-publish drafts. Wraps save_json_blob_create_request with validation_mode: "admin_publish_draft". request_id is required and must match req_<flow>_<topic>_<yyyymmdd>_<nn> using lowercase snake_case (e.g. req_publish_launch_20260702_01); it is not auto-generated, and a non-conforming id breaks every later artifact operation for the request. Use input.content.article_body.schema_version = "article_body.v1" and input.content.article_body.nodes[] with at least one public node; node.private is internal only and never visible copy.',
-    inputSchema: objectSchema(
-      {
-        input: contentSourceV1JsonSchema,
-        request_id: stringSchema(
-          'Required. Must match req_<flow>_<topic>_<yyyymmdd>_<nn> using lowercase snake_case — e.g. req_publish_launch_20260702_01. Agents must supply this; it is not auto-generated. Use a date matching today and a 2-digit sequence number.'
-        ),
-        current_agent: agentNameJsonSchema(
-          'Optional initial current agent; defaults to input.workflow.current_agent or no current stage.'
-        ),
-        next_agent: nullableAgentNameJsonSchema(
-          'Optional initial next agent; defaults to input.workflow.next_agent or reader_insight.'
-        ),
-      },
-      ['input', 'request_id']
-    ),
-  },
-  {
-    name: 'save_json_blob_get_request',
-    description: `Fetch a save-json-blob workflow request record by request_id. ${mediaPortabilityWarning}`,
-    inputSchema: objectSchema({ request_id: stringSchema() }, ['request_id']),
-  },
-  {
-    name: 'save_json_blob_list_pending_requests',
-    description: `List pending save-json-blob workflow request records, optionally filtered by stage and status. ${mediaPortabilityWarning}`,
-    inputSchema: objectSchema({
-      stage: agentNameJsonSchema(),
-      status: workflowStatusJsonSchema(),
-      limit: { type: 'integer', minimum: 1, maximum: 1000 },
-    }),
-  },
-  {
-    name: 'save_json_blob_patch_agent_output',
-    description: `Patch one agent output for a save-json-blob workflow request and return its record. ${workflowLockInstruction}`,
-    inputSchema: objectSchema(
-      {
-        request_id: stringSchema(),
-        agent_name: agentNameJsonSchema(),
-        expected_agent_version: intSchema(),
-        lock_token: lockTokenSchema,
-        output: { description: 'Agent output payload.' },
-      },
-      ['request_id', 'agent_name', 'expected_agent_version', 'lock_token', 'output']
-    ),
-  },
-  {
-    name: 'save_json_blob_mark_agent_complete',
-    description: `Mark one agent complete for a save-json-blob workflow request and return its record. ${workflowLockInstruction}`,
-    inputSchema: objectSchema(
-      {
-        request_id: stringSchema(),
-        agent_name: agentNameJsonSchema(),
-        expected_record_version: intSchema(),
-        lock_token: lockTokenSchema,
-        current_stage: nullableAgentNameJsonSchema(),
-        next_agent: nullableAgentNameJsonSchema(),
-        workflow_status: workflowStatusJsonSchema(),
-        needs_review: { type: 'boolean' },
-        last_error: nullableStringSchema(),
-      },
-      ['request_id', 'agent_name', 'expected_record_version', 'lock_token']
-    ),
-  },
-  {
-    name: 'save_json_blob_checkout_request',
-    description: `Checkout a save-json-blob workflow request and acquire a lock_token before patching output. ${workflowLockInstruction}`,
-    inputSchema: objectSchema(
-      {
-        request_id: stringSchema(),
-        owner_id: ownerIdSchema,
-        owner_label: ownerLabelSchema,
-        lease_seconds: leaseSecondsSchema,
-      },
-      ['request_id', 'owner_id', 'owner_label']
-    ),
-  },
-  {
-    name: 'save_json_blob_refresh_lock',
-    description: `Refresh an active workflow lock before it expires when more time is needed. ${workflowLockInstruction}`,
-    inputSchema: objectSchema(
-      { request_id: stringSchema(), lock_token: lockTokenSchema, lease_seconds: leaseSecondsSchema },
-      ['request_id', 'lock_token']
-    ),
-  },
-  {
-    name: 'save_json_blob_checkin_request',
-    description: `Check in a workflow request to release the lock after patching output and marking complete. ${workflowLockInstruction}`,
-    inputSchema: objectSchema({ request_id: stringSchema(), lock_token: lockTokenSchema }, [
-      'request_id',
-      'lock_token',
-    ]),
-  },
-
-  {
-    name: 'save_json_blob_publish_by_time',
-    description:
-      'Set input.publication.published_time and run the article publisher. Omitted or current/past timestamps publish now (status "published"). A FUTURE timestamp also materializes media and commits the article file (status "time_set") — the page stays hidden by the published_time gate until that time passes and the site rebuilds. null unpublishes (status "unpublished"): the article is re-committed with published_time: null. In every mode the publisher validates and commits; a failed publish leaves published_time unchanged. Requires checkout lock_token.',
-    inputSchema: objectSchema(
-      {
-        request_id: stringSchema(),
-        lock_token: lockTokenSchema,
-        published_time: nullableStringSchema(
-          'Optional ISO timestamp. Omit to publish now. Future timestamps schedule; null clears publication time.'
-        ),
-      },
-      ['request_id', 'lock_token']
-    ),
-  },
-  {
-    name: 'save_json_blob_patch_canonical_input',
-    description: [
-      'Repair canonical input fields on an existing workflow record in place, under the normal checkout/lock/version discipline.',
-      'Use this BEFORE save_json_blob_publish_by_time when publish_by_time fails with 422 due to invalid image paths or missing publication fields.',
-      'Sequence: checkout_request → save_json_blob_patch_canonical_input → save_json_blob_publish_by_time → checkin_request.',
-      '',
-      'Supported repairs (at least one required):',
-      '  node_patches: replace or remove public.media.src/alt/caption on specific article_body nodes by node_id.',
-      '    public_media_src MUST be a trusted Major Key artifact reference (image/{id}/{sha256}.{ext}): an artifact',
-      '    uploaded for THIS request (visible via list_artifacts_for_request) or already saved in agent_outputs.',
-      '    Legacy repo paths (src/assets/...), remote URLs (https://...), and data URIs are always rejected.',
-      '  replace_image_asset_register: replace input.media.image_asset_register[] wholesale.',
-      '    Entries must pass ImageAssetRecord schema; url/repoPath that are Major Key refs must be trusted',
-      '    (uploaded for this request or in agent_outputs). Legacy paths, remote URLs, and data URIs are rejected.',
-      '  promote_publish_payload: set input.publication.publish_payload from a complete PublishPayload object.',
-      '    Image-bearing fields (featuredImage, existingFeaturedImagePath, images[].src/url/blobKey,',
-      '    mediaEntries[].src/url/blobKey, artifactReferences[].blobKey) must be trusted Major Key artifact refs.',
-      '  repair_workflow_status: reset workflow_status (e.g. "failed" → "pending" or "in_progress").',
-      '  clear_last_error: when true, clears last_error to null. Audited only if last_error was non-null.',
-      '  clear_failed_agents: when true, clears failed_agents to []. Audited only if list was non-empty.',
-      '  reset_needs_review: when true, sets needs_review to false. Audited only if it was true.',
-      '',
-      'All changes are recorded in workflow history with old/new value summaries.',
-      workflowLockInstruction,
-    ].join('\n'),
-    inputSchema: objectSchema(
-      {
-        request_id: stringSchema(),
-        lock_token: lockTokenSchema,
-        expected_record_version: intSchema(
-          'Record version the caller read. Rejected with 409 if the record has since advanced.'
-        ),
-        node_patches: arraySchema(
-          objectSchema(
-            {
-              node_id: stringSchema(
-                'Stable node ID (e.g. n_r1a2b3). Must already exist in input.content.article_body.nodes.'
-              ),
-              public_media_src: {
-                anyOf: [
-                  {
-                    type: 'string',
-                    minLength: 1,
-                    description:
-                      'New src — must be a Major Key artifact reference (image/{id}/{sha256}.{ext}) already in agent_outputs.',
-                  },
-                  { type: 'null', description: 'Null removes the media object entirely.' },
-                ],
-              },
-              public_media_alt: nullableStringSchema('New alt text, or null to remove.'),
-              public_media_caption: nullableStringSchema('New caption text, or null to remove.'),
-            },
-            ['node_id']
-          ),
-          'Patches to apply to specific nodes in input.content.article_body.nodes[].'
-        ),
-        replace_image_asset_register: arraySchema(
-          imageAssetJsonSchema,
-          'Full replacement for input.media.image_asset_register[]. Each entry must be a valid ImageAssetRecord. Major Key artifact refs in url/repoPath must be in agent_outputs.'
-        ),
-        promote_publish_payload: {
-          type: 'object',
-          description:
-            'Complete PublishPayload object (with slug and title) to set at input.publication.publish_payload. Image-bearing fields must reference trusted Major Key artifact refs.',
-          properties: {},
-          additionalProperties: true,
-        },
-        repair_workflow_status: workflowStatusJsonSchema(
-          'Reset workflow_status to this value (e.g. "pending" or "in_progress") after canonical repair.'
-        ),
-        clear_last_error: {
-          type: 'boolean',
-          description:
-            'When true, clears last_error to null. Useful when moving a failed record back to a retryable state.',
-        },
-        clear_failed_agents: {
-          type: 'boolean',
-          description: 'When true, clears failed_agents to []. Useful when retrying after a repaired canonical input.',
-        },
-        reset_needs_review: {
-          type: 'boolean',
-          description: 'When true, sets needs_review to false. Useful after resolving the issue that triggered review.',
-        },
-      },
-      ['request_id', 'lock_token', 'expected_record_version']
-    ),
-  },
   {
     name: 'deploy_status',
     description:
@@ -1257,7 +551,7 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: 'trigger_netlify_build',
     description:
-      "Manually trigger a Netlify build via the server-side build hook, without needing a new git commit. No input is required. This QUEUES a build asynchronously — it does not wait for the build to finish, so poll deploy_status afterward (the same way you already do after a normal publish) to know when the resulting deploy is actually ready. IMPORTANT — batch, do not spam: each triggered build consumes real Netlify build minutes, so use this to batch multiple publishes into a single build rather than triggering one build per publish. For example, after publishing several articles in a row, call this once at the end instead of calling it after every individual save_json_blob_publish_by_time call. Optional reason is recorded only in this function's own server-side logs for traceability of who triggered a build and why — it is never sent to Netlify and never included in the response.",
+      "Manually trigger a Netlify build via the server-side build hook, without needing a new git commit. No input is required. This QUEUES a build asynchronously — it does not wait for the build to finish, so poll deploy_status afterward (the same way you already do after a normal publish) to know when the resulting deploy is actually ready. IMPORTANT — batch, do not spam: each triggered build consumes real Netlify build minutes, so use this to batch multiple publishes into a single build rather than triggering one build per publish. For example, after publishing several articles in a row, call this once at the end instead of calling it after every individual object_publish call. Optional reason is recorded only in this function's own server-side logs for traceability of who triggered a build and why — it is never sent to Netlify and never included in the response.",
     inputSchema: objectSchema({
       reason: stringSchema(
         "Optional free-text reason for triggering this build, recorded only in this function's own server logs for traceability. Never sent to Netlify."
@@ -1861,54 +1155,6 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
       registry: { type: 'string', enum: ['component', 'page_type'], description: 'Optional registry name.' },
     }),
   },
-
-  ...ALLOWED_AGENTS.flatMap<ToolDefinition>((agentName) => [
-    {
-      name: `${agentName}_update_output`,
-      description:
-        agentName === 'final_article'
-          ? [
-              'Patch final_article output with a lock_token and default expected_agent_version to 0 for the first write.',
-              '',
-              'IMAGE ARTIFACT CONTRACT: Image artifacts MUST be supplied as a top-level output.artifactReferences: ArtifactReference[] array to be picked up by publish.',
-              'Alternatively, wire images into article_body.nodes[].public.media.src as an image/{requestId}/{sha256}.{ext} pointer.',
-              'Artifact references nested anywhere else — e.g. under output.metadata.artifactReferences, a singular output.artifactReference key, or inside output.images — are rejected with HTTP 400 (error_code "misplaced_artifact_references") instead of being silently dropped. Move them to the top-level output.artifactReferences array.',
-              'Each entry in output.artifactReferences must be a complete ArtifactReference (blobKey, sha256, sizeBytes, contentType, createdAtISO); malformed entries are rejected with HTTP 400.',
-              '',
-              workflowLockInstruction,
-            ].join('\n')
-          : `Patch ${agentName} output with a lock_token and default expected_agent_version to 0 for the first write. ${workflowLockInstruction}`,
-      inputSchema: objectSchema(
-        {
-          request_id: stringSchema(),
-          output: { description: 'Agent output payload.' },
-          expected_agent_version: intSchema(),
-          lock_token: lockTokenSchema,
-        },
-        ['request_id', 'output', 'lock_token']
-      ),
-    },
-    {
-      name: `${agentName}_mark_complete`,
-      description: `Mark ${agentName} complete with the agent name hardcoded and optional current_stage, next_agent, workflow_status, needs_review, last_error, and lock_token forwarded to the backend. ${stageTransitionDescription(agentName)} ${workflowLockInstruction}`,
-      inputSchema: objectSchema(
-        {
-          request_id: stringSchema(),
-          agent_name: agentNameJsonSchema(
-            'Optional for compatibility with save_json_blob_mark_agent_complete; stage helpers always use their hardcoded agent.'
-          ),
-          expected_record_version: intSchema(),
-          lock_token: lockTokenSchema,
-          current_stage: nullableAgentNameJsonSchema(),
-          next_agent: nullableAgentNameJsonSchema(),
-          workflow_status: workflowStatusJsonSchema(),
-          needs_review: { type: 'boolean' },
-          last_error: nullableStringSchema(),
-        },
-        ['request_id', 'expected_record_version', 'lock_token']
-      ),
-    },
-  ]),
 ];
 
 const response = (statusCode: number, body: unknown, headers: Record<string, string> = jsonHeaders) => ({
@@ -2116,7 +1362,7 @@ const withStructuredLogger = (event: LambdaEvent): LambdaEvent => {
   };
 };
 
-const createSaveJsonBlobHeaders = (event: LambdaEvent, publishSecret: string) => ({
+const createPublishKeyHeaders = (event: LambdaEvent, publishSecret: string) => ({
   ...(event.headers ?? {}),
   ...(getHeader(event.headers, 'x-nf-site-id') ? { 'x-nf-site-id': getHeader(event.headers, 'x-nf-site-id') } : {}),
   ...(getHeader(event.headers, 'x-nf-deploy-id')
@@ -2125,40 +1371,6 @@ const createSaveJsonBlobHeaders = (event: LambdaEvent, publishSecret: string) =>
   'x-publish-key': publishSecret,
   'content-type': 'application/json',
 });
-
-const invokeSaveJsonBlob = async (event: LambdaEvent, payload: Record<string, unknown>) => {
-  const publishSecret = process.env.PUBLISH_SECRET || process.env.NETLIFY_PUBLISH_SECRET;
-
-  if (!publishSecret) {
-    return toolError('Server-side workflow storage credentials are not configured.');
-  }
-
-  const saveResponse = await _mcpInternal.saveJsonBlobHandler({
-    httpMethod: 'POST',
-    headers: createSaveJsonBlobHeaders(event, publishSecret),
-    body: JSON.stringify(payload),
-  });
-
-  const bodyText = saveResponse.body ?? '';
-  let parsedBody: Record<string, unknown> = {};
-
-  if (bodyText) {
-    try {
-      parsedBody = JSON.parse(bodyText) as Record<string, unknown>;
-    } catch {
-      return toolError(`HTTP ${saveResponse.statusCode}: ${bodyText}`);
-    }
-  }
-
-  if (saveResponse.statusCode < 200 || saveResponse.statusCode >= 300) {
-    return toolError(
-      typeof parsedBody.error === 'string' ? parsedBody.error : `HTTP ${saveResponse.statusCode}: ${bodyText}`,
-      { statusCode: saveResponse.statusCode, ...sanitizeWorkflowErrorPayload(parsedBody) }
-    );
-  }
-
-  return parsedBody;
-};
 
 const invokeSaveArtifact = async (event: LambdaEvent, payload: Record<string, unknown>) => {
   const publishSecret = process.env.PUBLISH_SECRET || process.env.NETLIFY_PUBLISH_SECRET;
@@ -2169,7 +1381,7 @@ const invokeSaveArtifact = async (event: LambdaEvent, payload: Record<string, un
 
   const saveResponse = await saveArtifactHandler({
     httpMethod: 'POST',
-    headers: createSaveJsonBlobHeaders(event, publishSecret),
+    headers: createPublishKeyHeaders(event, publishSecret),
     body: JSON.stringify(payload),
     log: event.log,
     requestId: event.requestId,
@@ -2195,51 +1407,6 @@ const invokeSaveArtifact = async (event: LambdaEvent, payload: Record<string, un
   }
 
   return parsedBody;
-};
-
-const callPublishArticle = async (event: LambdaEvent, payload: Record<string, unknown>) => {
-  const publishSecret = process.env.PUBLISH_SECRET || process.env.NETLIFY_PUBLISH_SECRET;
-
-  if (!publishSecret) {
-    return {
-      ok: false as const,
-      statusCode: 500,
-      body: {
-        error: 'Article publishing is not configured on the server.',
-        error_code: 'article_publish_not_configured',
-      },
-    };
-  }
-
-  const publishResponse = await _mcpInternal.publishArticleHandler(
-    {
-      httpMethod: 'POST',
-      headers: {
-        ...(event.headers ?? {}),
-        ...(getHeader(event.headers, 'x-nf-site-id')
-          ? { 'x-nf-site-id': getHeader(event.headers, 'x-nf-site-id') }
-          : {}),
-        ...(getHeader(event.headers, 'x-nf-deploy-id')
-          ? { 'x-nf-deploy-id': getHeader(event.headers, 'x-nf-deploy-id') }
-          : {}),
-        'x-publish-key': publishSecret,
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify(payload),
-      log: event.log,
-      requestId: event.requestId,
-      rpcMethod: event.rpcMethod,
-      slug: event.slug,
-    },
-    {}
-  );
-  const body = parseJsonResponseBody(publishResponse.body);
-
-  if (publishResponse.statusCode < 200 || publishResponse.statusCode >= 300) {
-    return { ok: false as const, statusCode: publishResponse.statusCode, body };
-  }
-
-  return { ok: true as const, statusCode: publishResponse.statusCode, body };
 };
 
 const callDeployStatus = async (event: LambdaEvent, payload: Record<string, unknown>) => {
@@ -2428,542 +1595,6 @@ const callGetPdfToolStorageGrant = (event: LambdaEvent) => {
   return toolResult({ ...built.grant });
 };
 
-const hasReaderVisibleArticleBodyNode = (node: unknown) => {
-  const record = getRecordValue(node);
-  if (!record) return false;
-  if (record.visibility && record.visibility !== 'public') return false;
-
-  const publicFields = getRecordValue(record.public);
-  if (!publicFields) return false;
-  const media = getRecordValue(publicFields.media);
-  const textValues = [
-    publicFields.eyebrow,
-    publicFields.title,
-    publicFields.body,
-    ...(Array.isArray(publicFields.items) ? publicFields.items : []),
-    publicFields.ctaText,
-    publicFields.ctaLink,
-    publicFields.label,
-    media?.src,
-    media?.alt,
-    media?.caption,
-  ];
-
-  return textValues.some((value) => toNonEmptyString(value) !== undefined);
-};
-
-const countPublicArticleBodyNodes = (articleBody: Record<string, unknown> | undefined) => {
-  if (!Array.isArray(articleBody?.nodes)) return 0;
-  return (articleBody.nodes as unknown[]).filter(hasReaderVisibleArticleBodyNode).length;
-};
-
-// Copies agent media into canonical body nodes that currently have NO media, matching by node id.
-// Nodes that already have a canonical media src are left untouched — they may have been repaired
-// after the agent run and must not be overwritten. All other canonical content is preserved.
-const mergeAgentMediaIntoCanonicalBody = (
-  canonicalBody: Record<string, unknown>,
-  agentBody: Record<string, unknown>
-): Record<string, unknown> => {
-  if (!Array.isArray(canonicalBody?.nodes) || !Array.isArray(agentBody?.nodes)) return canonicalBody;
-
-  const agentNodeById = new Map<string, Record<string, unknown>>();
-  for (const n of agentBody.nodes as unknown[]) {
-    const node = getRecordValue(n);
-    const id = toNonEmptyString(node?.id);
-    if (id && node) agentNodeById.set(id, node);
-  }
-
-  const mergedNodes = (canonicalBody.nodes as unknown[]).map((n) => {
-    const canonical = getRecordValue(n);
-    const id = toNonEmptyString(canonical?.id);
-    const agentNode = id ? agentNodeById.get(id) : undefined;
-    if (!agentNode) return n;
-
-    const canonicalPublic = getRecordValue(canonical?.public);
-    const canonicalSrc = toNonEmptyString(getRecordValue(canonicalPublic?.media)?.src);
-    if (canonicalSrc) return n; // canonical already has media — preserve it
-
-    const agentMedia = getRecordValue(getRecordValue(agentNode.public)?.media);
-    const agentSrc = toNonEmptyString(agentMedia?.src);
-    if (!agentSrc) return n;
-
-    // Also carry the agent's rendering hints when filling missing media so that
-    // articleBodyToMarkdown actually renders the media (it only emits inline media
-    // when rendering.placement === 'inline'). Only fill missing hints — if canonical
-    // already has rendering with a placement, leave it intact.
-    const canonicalRendering = getRecordValue(canonical?.rendering);
-    const agentRendering = getRecordValue(agentNode.rendering);
-    const mergedRendering =
-      agentRendering && (!canonicalRendering || (!canonicalRendering.placement && agentRendering.placement))
-        ? canonicalRendering
-          ? { ...canonicalRendering, placement: agentRendering.placement }
-          : agentRendering
-        : undefined;
-
-    return {
-      ...canonical,
-      public: { ...canonicalPublic, media: agentMedia },
-      ...(mergedRendering ? { rendering: mergedRendering } : {}),
-    };
-  });
-
-  return { ...canonicalBody, nodes: mergedNodes };
-};
-
-const extractAgentFinalArticleBody = (record: Record<string, unknown> | undefined) => {
-  const output = getRecordValue(getRecordValue(getRecordValue(record?.agent_outputs)?.final_article)?.output);
-  if (!output) return undefined;
-
-  const directBody = getRecordValue(output.article_body);
-  if (directBody?.schema_version === 'article_body.v1' && Array.isArray(directBody.nodes)) return directBody;
-
-  const contentBody = getRecordValue(getRecordValue(output.content)?.article_body);
-  if (contentBody?.schema_version === 'article_body.v1' && Array.isArray(contentBody.nodes)) return contentBody;
-
-  return undefined;
-};
-
-const promoteAgentArticleBodyIfRicher = (
-  record: Record<string, unknown> | undefined,
-  recordInput: Record<string, unknown> | undefined
-) => {
-  const agentBody = extractAgentFinalArticleBody(record);
-  if (!agentBody) return { effectiveRecordInput: recordInput, promotedArticleBody: undefined };
-
-  const inputContent = getRecordValue(recordInput?.content);
-  const inputArticleBody = getRecordValue(inputContent?.article_body);
-
-  const agentNodeCount = countPublicArticleBodyNodes(agentBody);
-  const inputNodeCount = countPublicArticleBodyNodes(inputArticleBody);
-
-  if (agentNodeCount < inputNodeCount) {
-    return { effectiveRecordInput: recordInput, promotedArticleBody: undefined };
-  }
-
-  // Equal node count: only promote when the agent adds media to canonical nodes that have none.
-  // Do NOT promote when the agent merely holds a different src on an already-populated node —
-  // the canonical may have been repaired to a different artifact after the agent ran, and
-  // overwriting it would revert that repair.
-  if (agentNodeCount === inputNodeCount) {
-    const canonicalNodesById = new Map<string, Record<string, unknown>>();
-    if (Array.isArray(inputArticleBody?.nodes)) {
-      for (const n of inputArticleBody.nodes as unknown[]) {
-        const node = getRecordValue(n);
-        const id = toNonEmptyString(node?.id);
-        if (id && node) canonicalNodesById.set(id, node);
-      }
-    }
-
-    const agentFillsMissingMedia =
-      Array.isArray(agentBody?.nodes) &&
-      (agentBody.nodes as unknown[]).some((n) => {
-        if (!hasReaderVisibleArticleBodyNode(n)) return false;
-        const agentNode = getRecordValue(n);
-        const agentSrc = toNonEmptyString(getRecordValue(getRecordValue(agentNode?.public)?.media)?.src);
-        if (!agentSrc) return false;
-        const id = toNonEmptyString(agentNode?.id);
-        const canonical = id ? canonicalNodesById.get(id) : undefined;
-        return !toNonEmptyString(getRecordValue(getRecordValue(canonical?.public)?.media)?.src);
-      });
-
-    if (!agentFillsMissingMedia) {
-      return { effectiveRecordInput: recordInput, promotedArticleBody: undefined };
-    }
-
-    // Merge agent media only into canonical nodes that currently have no media.
-    // Canonical title, body, items, and existing media are preserved.
-    const mergedBody = inputArticleBody ? mergeAgentMediaIntoCanonicalBody(inputArticleBody, agentBody) : agentBody;
-    return {
-      effectiveRecordInput: { ...recordInput, content: { ...inputContent, article_body: mergedBody } },
-      promotedArticleBody: mergedBody,
-    };
-  }
-
-  return {
-    effectiveRecordInput: { ...recordInput, content: { ...inputContent, article_body: agentBody } },
-    promotedArticleBody: agentBody,
-  };
-};
-
-const validateCanonicalArticleBody = (recordInput: Record<string, unknown> | undefined) => {
-  const content = getRecordValue(recordInput?.content);
-  const articleBody = getRecordValue(content?.article_body);
-
-  if (articleBody?.schema_version !== 'article_body.v1') {
-    return {
-      ok: false as const,
-      error: 'Publishing requires input.content.article_body.schema_version === "article_body.v1".',
-      error_code: 'invalid_article_body_schema',
-    };
-  }
-
-  if (!Array.isArray(articleBody.nodes) || !articleBody.nodes.some(hasReaderVisibleArticleBodyNode)) {
-    return {
-      ok: false as const,
-      error: 'Publishing requires input.content.article_body.nodes with at least one reader-visible public node.',
-      error_code: 'article_body_missing_public_node',
-    };
-  }
-
-  // article_body.v1 is the ONLY canonical content path. A legacy prose blob
-  // (content.blocks / content.structure.sections) carried ALONGSIDE it is a
-  // competing, non-canonical body — reject it here rather than let an ambiguous
-  // record publish. Markdown exists only as an export/render adapter
-  // (src/lib/article-content/to-markdown.ts), never as canonical input.
-  const legacyBlocks = Array.isArray(content?.blocks) ? content.blocks : [];
-  const legacyStructure = getRecordValue(content?.structure);
-  const legacySections = Array.isArray(legacyStructure?.sections) ? legacyStructure.sections : [];
-  if (legacyBlocks.length > 0 || legacySections.length > 0) {
-    return {
-      ok: false as const,
-      error:
-        'article_body.v1 is the only canonical content path; a competing content.blocks / content.structure prose body must not accompany it at publish. Remove the legacy prose — Markdown and block/structure prose are export-only, never canonical input.',
-      error_code: 'competing_non_canonical_body',
-    };
-  }
-
-  return { ok: true as const, articleBody, content };
-};
-
-const slugifyPublishTitle = (value: string) =>
-  value
-    .trim()
-    .toLowerCase()
-    .normalize('NFKD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '') || 'article';
-
-const parseArtifactPointer = (value: string): { requestId: string; sha256: string; ext: string } | undefined => {
-  const match = value.match(/^(?:image|pdf)\/([^/]+)\/([a-fA-F0-9]{64})\.([a-z0-9]+)$/);
-  if (!match) return undefined;
-  return { requestId: match[1], sha256: match[2].toLowerCase(), ext: match[3] };
-};
-
-const buildCanonicalPublishPayload = async (
-  requestId: string,
-  lockToken: string,
-  record: WorkflowRecord,
-  articleBody: Record<string, unknown>,
-  publishedTime: string,
-  artifactReferences: ArtifactReference[],
-  event: LambdaEvent
-) => {
-  const recordInput = getRecordValue(record.input) || {};
-  const content = getRecordValue(recordInput.content);
-  const taxonomy = getRecordValue(recordInput.taxonomy);
-  const seo = getRecordValue(recordInput.seo);
-  const media = getRecordValue(recordInput.media);
-  const title = toNonEmptyString(content?.title);
-
-  if (!title) {
-    return { ok: false as const, error: 'Publishing requires input.content.title.', error_code: 'missing_title' };
-  }
-
-  type ImageCandidate = { path: string; priority: number };
-  const candidates: ImageCandidate[] = [];
-
-  const isHeroAsset = (asset: Record<string, unknown> | undefined) => {
-    if (!asset) return false;
-    const metadata = getRecordValue(asset.metadata);
-    const purpose = toNonEmptyString(asset.purpose) || toNonEmptyString(metadata?.purpose);
-    const status = toNonEmptyString(asset.status) || toNonEmptyString(metadata?.status);
-    const isPrimary =
-      asset.primary === true ||
-      asset.primary === 'true' ||
-      metadata?.primary === true ||
-      metadata?.primary === 'true' ||
-      metadata?.hero === true ||
-      metadata?.hero === 'true';
-
-    return (
-      purpose?.toLowerCase() === 'hero' ||
-      purpose?.toLowerCase() === 'article' ||
-      status?.toLowerCase() === 'primary' ||
-      isPrimary
-    );
-  };
-
-  // Only a request-scoped artifact pointer (a Major Key blobKey like
-  // image/<req>/<sha>.<ext>) is a trusted featured-image source. Remote URLs,
-  // data URIs, and repo/asset paths carried on the register are NOT accepted:
-  // the single artifact transfer protocol is a pdf-tool storage-grant write that
-  // lands in the artifact index as a blobKey. parseArtifactPointer(path) is the
-  // gate — anything that is not such a pointer contributes no candidate, so a
-  // remote URL can never be promoted to the committed frontmatter image.
-  const imageAssets = Array.isArray(media?.image_asset_register) ? media.image_asset_register : [];
-  for (const asset of imageAssets) {
-    const assetRecord = getRecordValue(asset);
-    const path = toNonEmptyString(assetRecord?.repoPath) || toNonEmptyString(assetRecord?.url);
-    if (path && parseArtifactPointer(path)) {
-      candidates.push({ path, priority: isHeroAsset(assetRecord) ? 10 : 5 });
-    }
-  }
-
-  const imageSets = Array.isArray(media?.image_sets) ? media.image_sets : [];
-  for (const set of imageSets) {
-    const setRecord = getRecordValue(set);
-    const assetIds = Array.isArray(setRecord?.asset_ids) ? setRecord.asset_ids : [];
-    const isHeroSet = isHeroAsset(setRecord);
-    for (const assetId of assetIds) {
-      const asset = imageAssets.find((a: unknown) => getRecordValue(a)?.asset_id === assetId);
-      const assetRecord = getRecordValue(asset);
-      const path = toNonEmptyString(assetRecord?.repoPath) || toNonEmptyString(assetRecord?.url);
-      if (path && parseArtifactPointer(path)) {
-        candidates.push({ path, priority: isHeroSet ? 12 : 6 });
-      }
-    }
-  }
-
-  const nodes = Array.isArray(articleBody.nodes) ? articleBody.nodes : [];
-  for (const node of nodes) {
-    const nodeRecord = getRecordValue(node);
-    const nodePublic = getRecordValue(nodeRecord?.public);
-    const nodeMedia = getRecordValue(nodePublic?.media);
-    // Same trust gate for node media: only a request-scoped artifact pointer is a
-    // featured-image (or cross-request document) source; a node whose src is a
-    // remote URL / data URI / repo path contributes no candidate.
-    const path = toNonEmptyString(nodeMedia?.src);
-    if (path && parseArtifactPointer(path) && nodeMedia?.type === 'image') {
-      const rendering = getRecordValue(nodeRecord?.rendering);
-      const isHeroNode = rendering?.presentation === 'hero' || nodeRecord?.id === 'n_hero';
-      candidates.push({ path, priority: isHeroNode ? 10 : 3 });
-    } else if (path && parseArtifactPointer(path) && nodeMedia?.type === 'document') {
-      // Include document (PDF) pointers for cross-request resolution.
-      // Priority 0 ensures PDFs never influence featured-image selection.
-      candidates.push({ path, priority: 0 });
-    }
-  }
-
-  const allRefs = [...artifactReferences];
-  const finalArticleOutput = getRecordValue(record.agent_outputs?.final_article?.output);
-  const finalRefs = Array.isArray(finalArticleOutput?.artifactReferences) ? finalArticleOutput.artifactReferences : [];
-  for (const ref of finalRefs) {
-    const refRecord = getRecordValue(ref);
-    if (refRecord && !allRefs.find((r) => r.sha256 === refRecord.sha256)) {
-      if (isArtifactReference(refRecord)) {
-        allRefs.push(refRecord);
-      }
-    }
-  }
-
-  // Resolve cross-request artifact pointers: candidates may reference artifacts stored under a
-  // different request ID (Major Key image refs from earlier workflow steps). Fetch and include
-  // any that aren't already present in allRefs.
-  const store = (await _mcpInternal.getArtifactIndexBlobStore(event)) as unknown as ArtifactIndexStore;
-  const knownSha256s = new Set(allRefs.map((r) => r.sha256));
-  for (const { path } of candidates) {
-    const parsed = parseArtifactPointer(path);
-    if (!parsed || knownSha256s.has(parsed.sha256)) continue;
-    const crossRef = await readArtifactReference(store, parsed.requestId, parsed.sha256);
-    if (crossRef && !isDeletedArtifactReference(crossRef)) {
-      allRefs.push(crossRef);
-      knownSha256s.add(parsed.sha256);
-    } else if (!crossRef) {
-      event.log?.({
-        event: 'cross_request_artifact_not_found',
-        requestId: parsed.requestId,
-        sha256: parsed.sha256,
-        candidatePath: path,
-      });
-    }
-  }
-
-  // Dedupe allRefs by sha256 (guards against duplicates from any source)
-  const dedupedRefs: ArtifactReference[] = [];
-  const dedupSeen = new Set<string>();
-  for (const ref of allRefs) {
-    if (!dedupSeen.has(ref.sha256)) {
-      dedupSeen.add(ref.sha256);
-      dedupedRefs.push(ref);
-    }
-  }
-
-  for (const ref of dedupedRefs) {
-    if (ref.contentType.startsWith('image/')) {
-      const isHeroArtifact = isHeroAsset(ref as unknown as Record<string, unknown>);
-      candidates.push({ path: ref.blobKey, priority: isHeroArtifact ? 10 : 2 });
-    }
-  }
-
-  candidates.sort((a, b) => b.priority - a.priority);
-  // Document (PDF) pointers enter the candidate list at priority 0 solely so their
-  // cross-request references resolve; they must never be SELECTED as the featured image.
-  // Every genuine image candidate has priority >= 2, so filtering on > 0 excludes exactly
-  // the document pointers — without it, an article whose only media is a document node
-  // would commit a PDF path into the frontmatter image: field.
-  const featuredImage = candidates.find((candidate) => candidate.priority > 0)?.path;
-
-  return {
-    ok: true as const,
-    payload: {
-      requestId,
-      request_id: requestId,
-      lock_token: lockToken,
-      article_body: articleBody,
-      title,
-      slug: slugifyPublishTitle(title),
-      publishDate: publishedTime,
-      published_time: publishedTime,
-      description: toNonEmptyString(content?.description) ?? toNonEmptyString(content?.deck),
-      excerpt: toNonEmptyString(content?.deck),
-      seoDescription: toNonEmptyString(seo?.meta_description),
-      tags: Array.isArray(taxonomy?.tags) ? taxonomy.tags : undefined,
-      featuredImage,
-      artifactReferences: dedupedRefs,
-      overwrite: true,
-    },
-  };
-};
-
-const callPublishByTime = async (event: LambdaEvent, input: Record<string, unknown>) => {
-  const requestId = toNonEmptyString(input.request_id);
-  const lockToken = toNonEmptyString(input.lock_token);
-  if (!requestId || !lockToken) return toolError('request_id and lock_token are required.');
-
-  const now = new Date();
-  const rawPublishedTime = input.published_time;
-  const publishedTime =
-    rawPublishedTime === undefined
-      ? now.toISOString()
-      : rawPublishedTime === null
-        ? null
-        : toNonEmptyString(rawPublishedTime);
-
-  const publishedMs = publishedTime ? Date.parse(publishedTime) : Number.NaN;
-  if (publishedTime !== null && (!publishedTime || Number.isNaN(publishedMs))) {
-    return toolError('published_time must be omitted, null, or a valid ISO timestamp.', {
-      error_code: 'invalid_published_time',
-      published_time: rawPublishedTime,
-    });
-  }
-
-  const getResult = await invokeSaveJsonBlob(event, { action: 'get_request', request_id: requestId });
-  if ('isError' in getResult) return getResult;
-
-  const record = getRecordValue(getResult.record);
-  const recordInput = getRecordValue(record?.input);
-  if (recordInput?.record_type !== 'content_source' || recordInput?.schema_version !== 'content_source.v1') {
-    return toolError('Publishing requires a content_source.v1 workflow record.', {
-      error_code: 'invalid_workflow_record_type',
-      record_type: recordInput?.record_type,
-      schema_version: recordInput?.schema_version,
-    });
-  }
-
-  const { effectiveRecordInput, promotedArticleBody } = promoteAgentArticleBodyIfRicher(record, recordInput);
-  const bodyValidation = validateCanonicalArticleBody(effectiveRecordInput);
-  if (!bodyValidation.ok) return toolError(bodyValidation.error, bodyValidation);
-
-  const artifactReferences = await getArtifactReferencesForRequest(event, requestId);
-
-  if (publishedTime === null) {
-    const payloadResult = await buildCanonicalPublishPayload(
-      requestId,
-      lockToken,
-      record as unknown as WorkflowRecord,
-      bodyValidation.articleBody,
-      now.toISOString(),
-      artifactReferences,
-      event
-    );
-    if (!payloadResult.ok) return toolError(payloadResult.error, payloadResult);
-
-    const unpublishResult = await callPublishArticle(event, { ...payloadResult.payload, published_time: null });
-    if (!unpublishResult.ok) {
-      return toolError('Article was not unpublished; published_time was not changed.', {
-        error_code: 'unpublish_failed',
-        publish_status: unpublishResult.statusCode,
-        publish_result: unpublishResult.body,
-      });
-    }
-
-    const receipt = {
-      commit: unpublishResult.body.commit,
-      commit_sha: unpublishResult.body.commit,
-      article_path: unpublishResult.body.articlePath ?? unpublishResult.body.path,
-      articlePath: unpublishResult.body.articlePath ?? unpublishResult.body.path,
-      deployStatus: unpublishResult.body.deployStatus,
-      message: unpublishResult.body.message,
-      published_time: null,
-      unpublished: true,
-      media: unpublishResult.body.media,
-    };
-
-    const clearResult = await invokeSaveJsonBlob(event, {
-      action: 'set_published_time',
-      request_id: requestId,
-      lock_token: lockToken,
-      published_time: null,
-      publish_receipt: receipt,
-      ...(promotedArticleBody ? { article_body: promotedArticleBody } : {}),
-    });
-    if ('isError' in clearResult) return clearResult;
-    return toolResult({
-      status: 'unpublished',
-      published_time: null,
-      article_path: receipt.article_path,
-      commit_sha: receipt.commit_sha,
-      record: clearResult.record,
-      publish_result: unpublishResult.body,
-      media: unpublishResult.body.media,
-    });
-  }
-
-  const isFuturePublish = publishedMs > now.getTime();
-
-  const payloadResult = await buildCanonicalPublishPayload(
-    requestId,
-    lockToken,
-    record as unknown as WorkflowRecord,
-    bodyValidation.articleBody,
-    publishedTime,
-    artifactReferences,
-    event
-  );
-  if (!payloadResult.ok) return toolError(payloadResult.error, payloadResult);
-
-  const publishResult = await callPublishArticle(event, payloadResult.payload);
-  if (!publishResult.ok) {
-    return toolError('Article file was not written; published_time was not changed.', {
-      error_code: 'publish_by_time_failed',
-      publish_status: publishResult.statusCode,
-      publish_result: publishResult.body,
-    });
-  }
-
-  const receipt = {
-    commit: publishResult.body.commit,
-    commit_sha: publishResult.body.commit,
-    article_path: publishResult.body.articlePath ?? publishResult.body.path,
-    articlePath: publishResult.body.articlePath ?? publishResult.body.path,
-    deployStatus: publishResult.body.deployStatus,
-    message: publishResult.body.message,
-    published_time: publishedTime,
-    media: publishResult.body.media,
-  };
-
-  const saveResult = await invokeSaveJsonBlob(event, {
-    action: 'set_published_time',
-    request_id: requestId,
-    lock_token: lockToken,
-    published_time: publishedTime,
-    publish_receipt: receipt,
-    ...(promotedArticleBody ? { article_body: promotedArticleBody } : {}),
-  });
-  if ('isError' in saveResult) return saveResult;
-
-  return toolResult({
-    status: isFuturePublish ? 'time_set' : 'published',
-    published_time: publishedTime,
-    article_path: receipt.article_path,
-    commit_sha: receipt.commit_sha,
-    record: saveResult.record,
-    publish_result: publishResult.body,
-    media: receipt.media,
-  });
-};
-
 const normalizeArtifactUploadIntentInput = (input: Record<string, unknown>) => {
   const requestId = toNonEmptyString(input.requestId);
   if (!requestId) return { ok: false as const, error: 'requestId is required.' };
@@ -3110,18 +1741,9 @@ const callArtifactUpload = async (event: LambdaEvent, payload: Record<string, un
   return toolResult(result);
 };
 
-const callAction = async (event: LambdaEvent, payload: Record<string, unknown>, resultKey: string) => {
-  const result = await invokeSaveJsonBlob(event, payload);
-
-  if ('isError' in result) return result;
-
-  return toolResult({ [resultKey]: result[resultKey] });
-};
-
-// ── Object-verb proxy (T0.9): mirror of invokeSaveJsonBlob/callAction for the
-//    generic object store. Injects the publish key server-side and forwards to
-//    netlify/functions/object-store.ts, exactly the A§1.8 proxy pattern. The
-//    article proxy above is untouched. ──
+// ── Object-verb proxy (T0.9) for the generic object store. Injects the
+//    publish key server-side and forwards to object-store.ts, exactly the
+//    A§1.8 proxy pattern. ──
 const createObjectStoreHeaders = (event: LambdaEvent, publishSecret: string) => ({
   ...(event.headers ?? {}),
   ...(getHeader(event.headers, 'x-nf-site-id') ? { 'x-nf-site-id': getHeader(event.headers, 'x-nf-site-id') } : {}),
@@ -3223,53 +1845,6 @@ const callObjectPublish = async (event: LambdaEvent, payload: Record<string, unk
         : {}),
     },
   });
-};
-
-const callNormalizedAction = async (
-  event: LambdaEvent,
-  createPayload: () => Record<string, unknown>,
-  resultKey: string
-) => {
-  try {
-    return await callAction(event, createPayload(), resultKey);
-  } catch (error) {
-    return toolError(error instanceof Error ? error.message : String(error));
-  }
-};
-
-const defaultFinalArticleCompletionFields = (input: Record<string, unknown>) => {
-  if (Object.hasOwn(input, 'current_stage')) return {};
-
-  return { current_stage: null };
-};
-
-const createMarkAgentCompletePayload = (input: Record<string, unknown>, agentName: string) => {
-  const finalArticleDefaults =
-    agentName === 'final_article'
-      ? {
-          ...defaultFinalArticleCompletionFields(input),
-          ...(Object.hasOwn(input, 'next_agent') ? {} : { next_agent: null }),
-          ...(Object.hasOwn(input, 'workflow_status') ? {} : { workflow_status: 'completed' }),
-          ...(Object.hasOwn(input, 'needs_review') ? {} : { needs_review: false }),
-          ...(Object.hasOwn(input, 'last_error') ? {} : { last_error: null }),
-        }
-      : {};
-  const payload = {
-    action: 'mark_agent_complete',
-    ...finalArticleDefaults,
-    ...input,
-    agent_name: agentName,
-  };
-
-  return {
-    ...payload,
-    current_stage: normalizeOptionalAgentName(payload.current_stage, 'current_stage'),
-    next_agent: normalizeOptionalAgentName(payload.next_agent, 'next_agent'),
-  };
-};
-
-const callMarkAgentComplete = (event: LambdaEvent, input: Record<string, unknown>, agentName: string) => {
-  return callNormalizedAction(event, () => createMarkAgentCompletePayload(input, agentName), 'record');
 };
 
 type ArtifactBlobStore = Awaited<ReturnType<typeof getArtifactBlobStore>>;
@@ -4068,11 +2643,6 @@ const reconcileArtifactIndexes = async (event: LambdaEvent, input: Record<string
 // W11 T11.10: tool names whose `agent_name` argument is the free-form CMS
 // object-store attribution string (creation-policy allowlists, object
 // history) — the ONLY place a verified per-agent token should override it.
-// Deliberately EXCLUDES save_json_blob_mark_agent_complete/
-// patch_agent_output: their `agent_name` is a DIFFERENT axis entirely (the
-// workflow-pipeline STAGE identity, validated against `allowedAgentNames`'
-// fixed enum by `normalizeAgentName`) — overriding it with an arbitrary
-// verified CMS agent name would break those calls, not secure them.
 const CMS_AGENT_NAME_ATTRIBUTION_TOOLS = new Set([
   'object_create',
   'object_create_variant',
@@ -4102,97 +2672,6 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
         instance_age_ms: Date.now() - INSTANCE_BOOTED_AT_MS,
         instance_invocations: instanceInvocationCount,
       });
-    case 'save_json_blob_create_request':
-      if (toNonEmptyString(input.request_id) === undefined) return missingRequestIdError();
-      return callAction(
-        event,
-        {
-          action: 'create_request',
-          input: input.input,
-          request_id: input.request_id,
-          current_agent: input.current_agent,
-          next_agent: input.next_agent,
-          validation_mode: input.validation_mode ?? 'admin_publish_draft',
-        },
-        'record'
-      );
-
-    case 'save_json_blob_create_article_draft':
-      if (toNonEmptyString(input.request_id) === undefined) return missingRequestIdError();
-      return callAction(
-        event,
-        {
-          action: 'create_request',
-          input: input.input,
-          request_id: input.request_id,
-          current_agent: input.current_agent,
-          next_agent: input.next_agent,
-          validation_mode: 'admin_publish_draft',
-        },
-        'record'
-      );
-    case 'save_json_blob_get_request':
-      return callAction(event, { action: 'get_request', request_id: input.request_id }, 'record');
-    case 'save_json_blob_list_pending_requests':
-      return callNormalizedAction(
-        event,
-        () => ({
-          action: 'list_pending_requests',
-          stage: normalizeOptionalAgentName(input.stage, 'stage'),
-          status: input.status,
-          limit: input.limit,
-        }),
-        'records'
-      );
-    case 'save_json_blob_checkout_request':
-      return callAction(
-        event,
-        {
-          action: 'checkout_request',
-          request_id: input.request_id,
-          owner_id: input.owner_id,
-          owner_label: input.owner_label,
-          lease_seconds: input.lease_seconds,
-        },
-        'record'
-      );
-    case 'save_json_blob_refresh_lock':
-      return callAction(
-        event,
-        {
-          action: 'refresh_lock',
-          request_id: input.request_id,
-          lock_token: input.lock_token,
-          lease_seconds: input.lease_seconds,
-        },
-        'record'
-      );
-    case 'save_json_blob_checkin_request':
-      return callAction(
-        event,
-        { action: 'checkin_request', request_id: input.request_id, lock_token: input.lock_token },
-        'record'
-      );
-    case 'save_json_blob_publish_by_time':
-      return callPublishByTime(event, input);
-    case 'save_json_blob_patch_canonical_input':
-      return callAction(
-        event,
-        {
-          action: 'patch_canonical_input',
-          request_id: input.request_id,
-          lock_token: input.lock_token,
-          expected_record_version: input.expected_record_version,
-          node_patches: input.node_patches,
-          replace_image_asset_register: input.replace_image_asset_register,
-          promote_publish_payload: input.promote_publish_payload,
-          repair_workflow_status: input.repair_workflow_status,
-          clear_last_error: input.clear_last_error,
-          clear_failed_agents: input.clear_failed_agents,
-          reset_needs_review: input.reset_needs_review,
-        },
-        'record'
-      );
     case 'deploy_status':
       return callDeployStatus(event, input);
     case 'verify_article_images':
@@ -4314,21 +2793,6 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
       return wipeBlobStores(event, input);
     case 'reconcile_artifact_indexes':
       return reconcileArtifactIndexes(event, input);
-    case 'save_json_blob_patch_agent_output':
-      return callNormalizedAction(
-        event,
-        () => ({
-          action: 'patch_agent_output',
-          request_id: input.request_id,
-          agent_name: normalizeAgentName(input.agent_name, 'agent_name'),
-          expected_agent_version: input.expected_agent_version,
-          lock_token: input.lock_token,
-          output: input.output,
-        }),
-        'record'
-      );
-    case 'save_json_blob_mark_agent_complete':
-      return callMarkAgentComplete(event, input, normalizeAgentName(input.agent_name, 'agent_name') as string);
 
     // ── Object verbs (T0.9) → object-store.ts (publish key injected). ──
     case 'object_get':
@@ -4590,29 +3054,6 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
       break;
   }
 
-  if (typeof name === 'string') {
-    const updateAgent = ALLOWED_AGENTS.find((agentName) => name === `${agentName}_update_output`);
-    if (updateAgent) {
-      return callAction(
-        event,
-        {
-          action: 'patch_agent_output',
-          request_id: input.request_id,
-          agent_name: updateAgent,
-          expected_agent_version: input.expected_agent_version ?? 0,
-          lock_token: input.lock_token,
-          output: input.output,
-        },
-        'record'
-      );
-    }
-
-    const completeAgent = ALLOWED_AGENTS.find((agentName) => name === `${agentName}_mark_complete`);
-    if (completeAgent) {
-      return callMarkAgentComplete(event, input, completeAgent);
-    }
-  }
-
   return toolError(`Unknown tool: ${String(name)}`);
 };
 
@@ -4661,15 +3102,15 @@ const handleRpcRequest = async (event: LambdaEvent, request: JsonRpcRequest): Pr
 
 /**
  * The tool surface THIS site exposes. Identical to TOOL_DEFINITIONS for a site
- * with the legacy article path; on every other site the legacy tools are
- * omitted entirely.
+ * that injects every optional handler; a site missing one omits the tools that
+ * depend on it entirely.
  */
 export const visibleToolDefinitions = (): ToolDefinition[] =>
-  hasLegacyArticlePath() ? TOOL_DEFINITIONS : TOOL_DEFINITIONS.filter((tool) => !LEGACY_ARTICLE_TOOLS.has(tool.name));
+  hasVerifyArticleImages()
+    ? TOOL_DEFINITIONS
+    : TOOL_DEFINITIONS.filter((tool) => !OPTIONAL_HANDLER_TOOLS.has(tool.name));
 
 export const _mcpInternal = {
-  saveJsonBlobHandler,
-  publishArticleHandler,
   getArtifactIndexBlobStore,
   objectStoreHandler,
   resolveReleaseWaitBudgetSeconds,

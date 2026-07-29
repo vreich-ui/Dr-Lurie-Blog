@@ -7,6 +7,77 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-29 (the legacy `save_json_blob` article pipeline is RETIRED and DELETED)
+
+OQ-W11-6 said retire-with-the-legacy-pipeline, importer-check first. Its last
+consumer moved to the object dialect, so this session executed the retirement.
+
+**Precondition, verified before touching code.** CMS-Agent's `dr-lurie` project
+allowlists **zero** `save_json_blob_*` tools: every one of them, plus all ten
+per-stage helpers (`reader_insight_*`/`research_*`/`angle_*`/`draft_*`/
+`final_article_*`), is explicitly `blocked` in its `toolPolicies`, and the
+controlled-tool registry carries no entry for any of them. `verify_article_images`
+stays `allowed` — it serves the object path.
+
+**What was deleted.**
+
+- The **11 `save_json_blob_*` MCP tools** and the **10 per-stage workflow
+  tools**, with their dispatch cases, the `ALLOWED_AGENTS` stage vocabulary,
+  `STAGE_TRANSITIONS`, and the whole `content_source.v1` JSON-schema tree that
+  existed only to describe their inputs. `packages/core/server/functions/mcp.ts`
+  went 4,796 → ~3,400 lines.
+- `mcp/save-json-blob-mcp/` (the whole module), `netlify/functions/save-json-blob.ts`,
+  `publish-article.ts`, `admin-workflow-lock.ts`, and
+  `packages/core/lib/publishArticleFromPayload.ts` + its `Window` declaration.
+- `scripts/agent-builder-publish-dry-run.mjs` and the `agent:publish*` npm
+  scripts — a client of the deleted endpoint.
+- The eight `netlify/lib/*` re-export shims and the five `src/schema/`+`src/lib/`
+  FROZEN-PATH stubs that existed **only** to keep the deleted functions'
+  imports resolving. (Those stub headers said, verbatim, "Delete when the legacy
+  article path retires.") `src/schema/` and `src/lib/` are gone entirely.
+- ~20 legacy test files. Net: **46 files deleted, ~16.5k lines removed.**
+
+**Importer check — two live couplings surfaced, neither silently broken.**
+`LockManager`'s default config pointed at `admin-workflow-lock`; its only live
+caller (`EditSession`) always passed an explicit object-endpoint config, so the
+default was removed and `config` became required. `publishArticleFromPayload`
+had no runtime caller at all — only a leftover `Window` type from the T9.24
+vanilla-JS admin — so it went with the endpoint it called.
+
+**What was PRESERVED, deliberately.** This retired the WRITE pipeline, not
+published content: the committed posts under `src/data/post/` and their
+rendering are untouched (build verified: 74 pages, the committed post still
+renders); the `content_item` slug-uniqueness check still runs against committed
+legacy posts; and `verify_article_images` keeps its legacy committed-asset
+`filename-stem` matching branch, because published pages still serve
+`/_astro/`-hashed committed assets.
+
+`verify_article_images` also keeps the per-site INJECTION seam it shared with
+the legacy trio — it is a per-site function and serves the object path
+(post-release image verification), so `configureMcp` now takes one optional
+handler instead of three. Sites that do not inject it still advertise zero of
+its tools rather than a tool that cannot run.
+
+**Guardrail.** `tests/netlify/mcp-legacy-tool-surface.test.ts` was inverted from
+"hidden on sites without the legacy path" to "gone everywhere": no site
+advertises a retired tool, and the retired names must not reappear as quoted
+strings in `mcp.ts` at all.
+
+**Docs.** `docs/agents/publishing-instructions.md`, `mcp-article-body-v1.md`,
+and `docs/mcp-final-agent-sequence.md` carry HISTORICAL banners pointing at
+`docs/agents/publishing-policy.md` (the object-path runbook).
+
+**Still open — the blob wipe is NOT part of this change.** Wiping the legacy
+workflow records with `wipe_blob_stores` is a separate, human-approved
+operation to run after this PR deploys; `wipe_blob_stores` stays admin-gated.
+The cross-reference it requires (no published `content_item` media path
+resolving into a wiped prefix) must be done against the live store first,
+because the artifact stores are SHARED with the object path — only legacy
+workflow records may go.
+
+Full check: `npm test` 1,606 + 89 pass / 0 fail, `eslint .` clean, `prettier
+--check` clean, `astro build` clean.
+
 ## Session 2026-07-27 (F10 — every site is now its own OAuth 2.1 authorization server)
 
 Wolf's call on the F9 options: **build OAuth** (option 2), and keep the URL key

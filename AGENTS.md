@@ -141,11 +141,12 @@ files in full before writing any code, in this order:
 
 ## CMS hard constraints — every task, no exceptions
 
-- `admin-workflow-lock.ts`, `publish-article.ts`, and existing article MCP
-  tools are **off-limits**. Do not modify, import from, or refactor them.
-  (Bounded exceptions only: T5.6, T5.7, and the W3 taxonomy-enforcement hook —
-  Wolf-sanctioned + shipped 2026-07-11; additive, registry-gated, zero behavior
-  change to existing tests.)
+- ~~`admin-workflow-lock.ts`, `publish-article.ts`, and existing article MCP
+  tools are **off-limits**.~~ **VOID since 2026-07-29** — those files and the
+  `save_json_blob_*` / per-stage tools were DELETED when the legacy article
+  pipeline was retired (ruling OQ-W11-6). There is nothing left to protect and
+  no successor alias; a doc or comment still naming them describes history.
+  Articles are `content_item` objects on the governed object verbs.
 - Every new file is additive. The public site must remain fully functional
   after every commit.
 - One task, one commit. Do not bundle cleanup or unrelated fixes.
@@ -173,7 +174,7 @@ M-8 (grid manual+fallback) is deliberately NOT in T0.2 — it lands in T3.3.
 ## Remote MCP / ChatGPT connector notes
 
 - Production ChatGPT/Atlas connects to `https://drluriescience.netlify.app/mcp` and should see the connector name `Dr_Lurie_MCP_Server`.
-- Keep `/mcp` routed through Netlify (`netlify.toml`) to the site function in `netlify/functions/mcp.ts`. The package under `mcp/save-json-blob-mcp/` is still useful for local stdio/standalone HTTP tests, but it is not the production Netlify entry point by itself.
+- Keep `/mcp` routed through Netlify (`netlify.toml`) to the site function in `netlify/functions/mcp.ts` — the per-site shim over the core server in `packages/core/server/functions/mcp.ts`. (The `mcp/save-json-blob-mcp/` package that used to serve local stdio/standalone HTTP tests was deleted with the legacy pipeline on 2026-07-29.)
 - If ChatGPT reports `No tool was defined under the given paths`, verify the deployed `/mcp` route first with `initialize` and `tools/list` JSON-RPC requests before changing tool names or schemas.
 - Do not expose `NETLIFY_PUBLISH_SECRET` or `PUBLISH_SECRET` to browser code, tool schemas, prompts, or checked-in client configuration. MCP tool calls must use server-side environment variables only.
 

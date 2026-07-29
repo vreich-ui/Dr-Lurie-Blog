@@ -1,5 +1,11 @@
 # MCP final agent sequence
 
+> **HISTORICAL (2026-07-29).** Every tool in this sequence — the `final_article`
+> stage helpers and `save_json_blob_publish_by_time` — was deleted with the
+> legacy article pipeline (ruling OQ-W11-6). The live equivalent is
+> `object_checkout` → `object_patch` → `object_publish` →
+> `release_to_production`; see [`agents/publishing-policy.md`](agents/publishing-policy.md).
+
 The final article agent prepares a reviewed `content.article_body` and keeps the workflow lock active through publication.
 
 1. Re-fetch the workflow/request state.

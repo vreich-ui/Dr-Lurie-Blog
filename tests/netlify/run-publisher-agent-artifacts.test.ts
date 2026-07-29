@@ -9,7 +9,6 @@ test('run-publisher-agent fails fast when inline image media cannot be uploaded 
   process.env.PUBLISH_SECRET = publishSecret;
   process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
   process.env.OPENAI_API_KEY = 'test-openai-key';
-  process.env.NETLIFY_PUBLISH_ENDPOINT = 'https://example.com/.netlify/functions/publish-article';
 
   const response = await handler({
     httpMethod: 'POST',
@@ -32,7 +31,6 @@ test('run-publisher-agent rejects malformed artifactReferences before publishing
   process.env.PUBLISH_SECRET = publishSecret;
   process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
   process.env.OPENAI_API_KEY = 'test-openai-key';
-  process.env.NETLIFY_PUBLISH_ENDPOINT = 'https://example.com/.netlify/functions/publish-article';
 
   const response = await handler({
     httpMethod: 'POST',

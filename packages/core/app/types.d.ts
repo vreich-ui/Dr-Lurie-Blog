@@ -298,9 +298,6 @@ export {};
 
 declare global {
   interface Window {
-    publishArticleFromPayload?: (
-      payload: import('./lib/publishArticleFromPayload').PublishArticlePayload
-    ) => Promise<import('./lib/publishArticleFromPayload').PublishArticleResult>;
     __cmsLoginModal?: {
       open: () => void;
       close: () => void;

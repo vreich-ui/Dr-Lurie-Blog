@@ -161,24 +161,8 @@ test('a verified token overrides a forged agent_name on a CMS attribution tool (
   assert.equal(actorName, 'verified-drafter', 'the VERIFIED identity must win, not the forged self-declared one');
 });
 
-test('a verified token does NOT override agent_name on a workflow-stage tool (save_json_blob_mark_agent_complete stays enum-validated)', async () => {
-  delete process.env.MCP_HTTP_AUTH_TOKEN;
-  const { token } = await seedAgentKey('verified-drafter', 'site_drlurie');
-
-  // 'verified-drafter' is not a member of the workflow-stage agent_name enum
-  // (allowedAgentNames) — if the override wrongly applied here, this call
-  // would 400 on an invalid agent_name instead of on its actually-missing
-  // required fields, proving the carve-out held.
-  const { response, body } = await mcpRequest(
-    'tools/call',
-    { authorization: `Bearer ${token}` },
-    { name: 'save_json_blob_mark_agent_complete', arguments: { agent_name: 'research' } }
-  );
-  assert.equal(response.statusCode, 200);
-  const result = body.result as { isError?: boolean; content?: { text?: string }[] };
-  // Whatever this call's outcome (it will fail for lack of a real request_id
-  // — unrelated to this test), the failure must NOT be an invalid-agent_name
-  // rejection of 'research' (the legitimate self-declared stage name).
-  const text = result.content?.[0]?.text ?? '';
-  assert.doesNotMatch(text, /invalid.*agent_name|agent_name.*invalid/i);
-});
+// The final case here proved the CMS-attribution override did NOT apply to a
+// workflow-STAGE tool (`save_json_blob_mark_agent_complete`), whose agent_name
+// was a different axis entirely — the fixed `allowedAgentNames` enum. The whole
+// stage-tool surface was retired on 2026-07-29 (ruling OQ-W11-6), so there is
+// no second axis left to carve out and no tool to assert it against.

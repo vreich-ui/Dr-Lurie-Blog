@@ -2,19 +2,19 @@
  * Site shim for Dr-Lurie's MCP endpoint (W14 T14.3).
  *
  * The server itself is fleet law in packages/core/server/functions/mcp.ts.
- * This file is the per-site wire, and it carries the one thing that is
- * genuinely this client's: the LEGACY ARTICLE PATH.
+ * This file is the per-site wire: it registers this site's policy bindings and
+ * builds the core handlers with THIS site's SiteBinding — the same pattern as
+ * the other 32 shims.
  *
- * `save-json-blob.ts`, `publish-article.ts`, and `verify-article-images.ts`
- * stay at the repo root, frozen and untouched, because they are Dr-Lurie's
- * pre-object-substrate article pipeline. Injecting them here is what keeps
- * them out of core: a client born after the object substrate omits them, and
- * the tools that need them are simply absent from that site's tool list
- * (Wolf's 2026-07-13 ruling — reverse support is not required, and the legacy
- * dialect must not propagate across the fleet).
+ * The legacy `save_json_blob` / `publish-article` pipeline this shim used to
+ * inject was RETIRED on 2026-07-29 (ruling OQ-W11-6), together with its
+ * `save_json_blob_*` and per-stage workflow tools. Dr-Lurie's articles are
+ * `content_item` objects like every other site's; the committed legacy posts
+ * under `src/data/post/` still render, because only the WRITE path was retired.
  *
- * The three governed handlers come from the core factories, built with THIS
- * site's SiteBinding — the same pattern as the other 32 shims.
+ * `verify-article-images` stays at the repo root and is still INJECTED rather
+ * than imported by core: it is a per-site function, and it serves the object
+ * path (post-release image verification), not just the retired legacy one.
  */
 import '../../sites/drlurie/config/policy-bindings.js';
 
@@ -24,16 +24,12 @@ import { createHandler as createObjectStoreHandler } from '../../packages/core/s
 import { createHandler as createDeployStatusHandler } from '../../packages/core/server/functions/deploy-status.js';
 import { drlurieSiteBinding } from '../../sites/drlurie/config/site-binding.js';
 
-import { handler as saveJsonBlobHandler } from './save-json-blob.js';
-import { handler as publishArticleHandler } from './publish-article.js';
 import { handler as verifyArticleImagesHandler } from './verify-article-images.js';
 
 configureMcp({
   saveArtifactHandler: createSaveArtifactHandler(drlurieSiteBinding),
   objectStoreHandler: createObjectStoreHandler(drlurieSiteBinding),
   deployStatusHandler: createDeployStatusHandler(drlurieSiteBinding),
-  saveJsonBlobHandler,
-  publishArticleHandler,
   verifyArticleImagesHandler,
 });
 

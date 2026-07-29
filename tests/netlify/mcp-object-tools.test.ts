@@ -98,9 +98,14 @@ test('tools/list includes every object verb tool and registry_get', async () => 
   for (const name of [...OBJECT_TOOLS, 'registry_get']) getTool(tools, name);
 });
 
-test('tools/list still includes the existing article tools (nothing removed)', async () => {
+// T0.9 added the object verbs ADDITIVELY, so this pinned that the legacy
+// article tools were still listed alongside them. Those tools were retired on
+// 2026-07-29 (ruling OQ-W11-6) — their absence is pinned in
+// mcp-legacy-tool-surface.test.ts. What this still usefully guards is that the
+// object verbs did not displace the rest of the surface.
+test('tools/list carries the object verbs alongside the other governed tools', async () => {
   const tools = await listTools();
-  for (const name of ['save_json_blob_create_request', 'save_json_blob_publish_by_time', 'ping']) getTool(tools, name);
+  for (const name of ['object_get', 'object_publish', 'save_artifact', 'deploy_status', 'ping']) getTool(tools, name);
 });
 
 test('object tool input schemas declare the right required fields', async () => {
