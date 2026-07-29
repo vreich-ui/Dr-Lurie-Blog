@@ -1,14 +1,15 @@
 /**
- * Client-side lock lifecycle manager.
- * Wraps /.netlify/functions/admin-workflow-lock with checkout/checkin/refresh
- * and an auto-refresh timer that keeps the lease alive while the editor is open.
+ * Client-side lock lifecycle manager: checkout/checkin/refresh plus an
+ * auto-refresh timer that keeps the lease alive while the editor is open.
  *
- * T1.5: the endpoint and wire request shape are pluggable via an optional
- * 3rd constructor argument, so the SAME lifecycle/timer logic also drives
- * the generic object lock (`admin-object.ts`'s checkout/refresh_lock/checkin
- * actions) for the objects review surface. Omitting the argument reproduces
- * today's exact behavior byte-for-byte — the article editor's call site is
- * unchanged and untouched.
+ * T1.5 made the endpoint and wire request shape pluggable (the `config`
+ * argument) so the same lifecycle/timer logic could drive both the article
+ * editor's lock and the generic object lock. The legacy article editor and its
+ * `/.netlify/functions/admin-workflow-lock` endpoint were retired on
+ * 2026-07-29 with the rest of the legacy pipeline, so there is no default
+ * config any more — every caller passes the endpoint it locks against, and
+ * today the only one is `EditSession` (`admin-object.ts`'s
+ * checkout/refresh_lock/checkin actions).
  */
 
 export type LockState =
@@ -38,21 +39,9 @@ export type LockManagerConfig = {
   buildRequestBody: LockRequestBuilder;
 };
 
-const LOCK_ENDPOINT = '/.netlify/functions/admin-workflow-lock';
 // Refresh when 20 % of lease time remains (lease = 900 s → refresh at ~720 s elapsed)
 const REFRESH_AT_REMAINING_FRACTION = 0.2;
 const DEFAULT_LEASE_SECONDS = 900;
-
-/** Today's article-editor wire shape, extracted verbatim — the default config, unchanged. */
-const ARTICLE_LOCK_CONFIG: LockManagerConfig = {
-  endpoint: LOCK_ENDPOINT,
-  buildRequestBody: (action, requestId, fields) => ({
-    action,
-    requestId,
-    ...(fields.lockToken !== undefined ? { lockToken: fields.lockToken } : {}),
-    ...(fields.leaseSeconds !== undefined ? { leaseSeconds: fields.leaseSeconds } : {}),
-  }),
-};
 
 export class LockManager {
   private requestId: string;
@@ -62,7 +51,7 @@ export class LockManager {
   private refreshTimer: ReturnType<typeof setTimeout> | null = null;
   private onStateChange: ((state: LockState) => void) | null = null;
 
-  constructor(requestId: string, getToken: () => Promise<string>, config: LockManagerConfig = ARTICLE_LOCK_CONFIG) {
+  constructor(requestId: string, getToken: () => Promise<string>, config: LockManagerConfig) {
     this.requestId = requestId;
     this.getToken = getToken;
     this.config = config;

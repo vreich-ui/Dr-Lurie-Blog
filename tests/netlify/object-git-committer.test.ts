@@ -312,26 +312,20 @@ const importSpecifiers = (source: string): string[] => [
   ...[...source.matchAll(/\bimport\(\s*['"]([^'"]+)['"]\s*\)/g)].map((match) => match[1]),
 ];
 
-test('object committer and article publisher share zero import edges (OQ-12)', () => {
+// OQ-12 originally pinned zero import edges BETWEEN this committer and the
+// legacy `publish-article.ts`. That file was deleted on 2026-07-29 with the
+// rest of the legacy pipeline, so half the assertion has no subject any more.
+// The half that still earns its keep is the committer's own isolation: it is
+// core library code and must never reach into a site's function directory.
+test('object committer imports nothing from netlify/functions (OQ-12)', () => {
   const root = findRepoRoot();
   const committerSource = readFileSync(path.join(root, 'packages/core/server/lib/object-git-committer.ts'), 'utf-8');
-  const articleSource = readFileSync(path.join(root, 'netlify/functions/publish-article.ts'), 'utf-8');
 
   const committerImports = importSpecifiers(committerSource);
-  assert.equal(
-    committerImports.some((specifier) => /publish-article/.test(specifier)),
-    false,
-    'object-git-committer.ts must not import from publish-article.ts'
-  );
   assert.equal(
     committerImports.some((specifier) => /\/functions\//.test(specifier)),
     false,
     'object-git-committer.ts must not import from netlify/functions at all'
-  );
-  assert.equal(
-    importSpecifiers(articleSource).some((specifier) => /object-git-committer/.test(specifier)),
-    false,
-    'publish-article.ts must not import the object committer'
   );
 });
 

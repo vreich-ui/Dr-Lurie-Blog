@@ -1,12 +1,19 @@
 /**
- * W14 T14.4 — the legacy article surface must not appear on a site that has no
- * legacy article path.
+ * The legacy article surface is RETIRED (2026-07-29, ruling OQ-W11-6) and must
+ * not come back on any site.
  *
- * The T14.3 decoupling injected the legacy HANDLERS per site but left the tool
- * DECLARATIONS static, so `sites/platform` advertised all twelve legacy tools
- * and would have thrown on any of them. The live round-trip caught it. This
- * pins both halves: the list shrinks when the path is absent, and the named set
- * stays in lockstep with the tools that actually route to a legacy handler.
+ * This file began as W14 T14.4's guard, when the legacy tools still existed and
+ * only had to be hidden from sites that lacked the legacy handlers: the T14.3
+ * decoupling injected the handlers per site but left the tool DECLARATIONS
+ * static, so `sites/platform` advertised all twelve and would have thrown on
+ * any of them. The retirement deleted the tools outright, so the guard is now
+ * absolute — no site advertises them, and the names must not reappear in the
+ * server source at all.
+ *
+ * What DID survive the retirement is the injection SEAM, because
+ * `verify_article_images` still uses it: it is a per-site function serving the
+ * OBJECT path (post-release image verification). So the shrink-when-absent
+ * behavior is still pinned below, just with the one tool that still needs it.
  */
 import '../../sites/drlurie/config/policy-bindings.js'; // registers providers — the core import chain resolves site identity at module load
 
@@ -39,45 +46,48 @@ const governedOnly = {
   deployStatusHandler: noop,
 };
 
-const withLegacy = {
+const withVerifyArticleImages = {
   ...governedOnly,
-  saveJsonBlobHandler: noop,
-  publishArticleHandler: noop,
   verifyArticleImagesHandler: noop,
 };
 
-test('a site with no legacy article path advertises no legacy tools', () => {
+/** The retired write pipeline: 11 save_json_blob_* tools + the 10 per-stage helpers. */
+const RETIRED_TOOL_PATTERN =
+  /^(save_json_blob_|(reader_insight|research|angle|draft|final_article)_(update_output|mark_complete)$)/;
+
+test('no site advertises a retired legacy article tool', () => {
+  for (const handlers of [governedOnly, withVerifyArticleImages]) {
+    configureMcp(handlers);
+    const names = visibleToolDefinitions().map((tool) => tool.name);
+    const leaked = names.filter((name) => RETIRED_TOOL_PATTERN.test(name));
+    assert.deepEqual(leaked, [], `retired legacy tools advertised: ${leaked.join(', ')}`);
+    assert.ok(names.length > 30, 'the governed surface is still there');
+  }
+});
+
+test('the retired tool names are gone from the server source entirely', () => {
+  const source = readFileSync(SOURCE, 'utf8');
+  // A prose mention in the retirement note is fine; a quoted tool name — the
+  // shape a declaration or dispatch case takes — is not.
+  const quotedNames = [...source.matchAll(/'([a-z0-9_]+)'/g)].map((match) => match[1]);
+  const revived = [...new Set(quotedNames.filter((name) => RETIRED_TOOL_PATTERN.test(name)))].sort();
+  assert.deepEqual(revived, [], `retired legacy tool names reappeared in mcp.ts: ${revived.join(', ')}`);
+});
+
+test('verify_article_images is omitted on a site that does not inject its handler', () => {
+  configureMcp(withVerifyArticleImages);
+  assert.ok(visibleToolDefinitions().some((tool) => tool.name === 'verify_article_images'));
+
   configureMcp(governedOnly);
-  const names = visibleToolDefinitions().map((tool) => tool.name);
-  const leaked = names.filter((name) => /^save_json_blob_|^verify_article_images$/.test(name));
-  assert.deepEqual(leaked, [], `legacy tools advertised on a site without the legacy path: ${leaked.join(', ')}`);
-  assert.ok(names.length > 30, 'the governed surface is still there');
+  assert.ok(!visibleToolDefinitions().some((tool) => tool.name === 'verify_article_images'));
 });
 
-test('a site WITH the legacy article path still advertises them (Dr-Lurie is unchanged)', () => {
-  configureMcp(withLegacy);
-  const names = visibleToolDefinitions().map((tool) => tool.name);
-  assert.ok(names.includes('save_json_blob_create_request'));
-  assert.ok(names.includes('verify_article_images'));
-});
-
-test('the omitted set equals the tools that actually route to a legacy handler', () => {
-  configureMcp(withLegacy);
+test('omitting the optional handler hides only the tools that need it', () => {
+  configureMcp(withVerifyArticleImages);
   const withNames = new Set(visibleToolDefinitions().map((tool) => tool.name));
   configureMcp(governedOnly);
   const withoutNames = new Set(visibleToolDefinitions().map((tool) => tool.name));
   const omitted = [...withNames].filter((name) => !withoutNames.has(name)).sort();
 
-  // Every omitted tool must be one whose implementation reaches a legacy
-  // handler — otherwise the set has drifted and a governed tool is being hidden.
-  const source = readFileSync(SOURCE, 'utf8');
-  for (const name of omitted) {
-    const declared = source.includes(`'${name}'`);
-    assert.ok(declared, `${name} is omitted but not declared in the source`);
-  }
-  assert.ok(omitted.length >= 12, `expected the legacy surface, got ${omitted.length}`);
-  assert.ok(
-    omitted.every((name) => name.startsWith('save_json_blob_') || name === 'verify_article_images'),
-    `omitted set contains a non-legacy tool: ${omitted.join(', ')}`
-  );
+  assert.deepEqual(omitted, ['verify_article_images']);
 });

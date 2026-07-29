@@ -1,10 +1,35 @@
 # Agent publishing instructions — articles with images and PDFs
 
-The contract agents must follow to publish an article through the Dr. Lurie MCP server so
-that every image and PDF actually renders on the live page. This document reflects the
-pipeline as of the image-pipeline audit (PRs #326–#332 plus the audit fix series); tool
-descriptions in `netlify/functions/mcp.ts` are the machine-readable version of the same
-contract — if they ever disagree, one of them is a bug.
+> **HISTORICAL — DO NOT FOLLOW THE SEQUENCES BELOW (2026-07-29).**
+>
+> Every `save_json_blob_*` and per-stage workflow tool named in this document
+> was **deleted** when the legacy article pipeline was retired (ruling
+> OQ-W11-6). They are gone from the MCP server, not merely frozen: calling one
+> now returns `Unknown tool`. The functions behind them
+> (`save-json-blob.ts`, `publish-article.ts`, `admin-workflow-lock.ts`) and the
+> `save-json-blob-mcp` module were deleted in the same change.
+>
+> **The live contract is [`docs/agents/publishing-policy.md`](publishing-policy.md)**
+> — the object-path runbook. Articles are `content_item` OBJECTS published with
+> `object_create`/`object_patch` → `object_publish` → `release_to_production`.
+> See also [`cms-agent-contract-alignment.md`](cms-agent-contract-alignment.md)
+> §1–§3 for the cross-server contract and
+> [`cms-agent-enablement-runbook.md`](cms-agent-enablement-runbook.md) for the
+> switch-flip checklist.
+>
+> This file is kept only for the parts that outlived the pipeline and are still
+> accurate on the object path: the **artifact-safety semantics** (§2 accepted
+> formats, per-request trust, soft delete), the **node media rules** (§3), and
+> the **failure taxonomy**. Read those as background; take every tool name and
+> call sequence as history.
+>
+> Retiring the WRITE pipeline changed nothing about published content — the
+> committed posts under `src/data/post/` and their rendering are untouched, and
+> `verify_article_images` still matches their committed-asset paths.
+
+The contract agents followed to publish an article through the Dr. Lurie MCP server so
+that every image and PDF actually renders on the live page. This document reflected the
+pipeline as of the image-pipeline audit (PRs #326–#332 plus the audit fix series).
 
 Companion references: `docs/agents/artifact-upload-paths.md` (upload transport),
 `docs/agents/naming-convention.md` (ids, slugs, filenames),
