@@ -401,6 +401,17 @@ const netlifyTomlTemplate = (ids) => `# Per-site Netlify config. The redirects h
   directory = "netlify/functions"
   node_bundler = "esbuild"
 
+# Every site DEPLOYS \`mcp-keepalive\`, but a scheduled function only ever runs
+# if its schedule is DECLARED here. Shipping the function without this block is
+# what leaves a site's /mcp cold: after ~5-15 idle minutes the instance is
+# reclaimed and the next agent pays a cold start (bundle load + native sharp
+# binding) slow enough to blow an MCP client's initialize timeout — the
+# "cannot connect" symptom the function exists to prevent. Scheduled functions
+# run only on the published production deploy; MCP_KEEPALIVE_DISABLED=true
+# turns probing off without a code change.
+[functions."mcp-keepalive"]
+  schedule = "*/5 * * * *"
+
 [[redirects]]
   from = "/pdf/*"
   to = "/.netlify/functions/get-public-pdf?blobKey=pdf/:splat"
