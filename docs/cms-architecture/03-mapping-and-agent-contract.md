@@ -167,6 +167,9 @@ Mapping verdict: every editorial surface the audit found lands on an existing co
 object_get            { object_type, object_id }                          → record (draft state)
 object_list           { object_type, filters? }                           → summaries
 object_validate       { object_type, object_id, candidate_patch? }        → readiness report (dry-run)
+                      | { object_type, body, requested_id? }               → same report, for a body with NO
+                                                                              object_id yet (pre-create dry-run,
+                                                                              W-object-validate-dry-run)
 object_create         { object_type, site, body, requested_id? }          → record
 object_checkout       { object_type, object_id, lease_seconds? }          → lock_token   | 423 + holder
 object_refresh_lock   / object_checkin                                    (as today, A§1.2)

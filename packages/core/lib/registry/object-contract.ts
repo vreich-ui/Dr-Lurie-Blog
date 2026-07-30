@@ -850,6 +850,7 @@ const workflow = (objectType: ObjectType, policy: ApprovalPolicy) => ({
         ]
       : []),
     'object_contract (this call) → read the schema, ops, constraints',
+    `object_validate (object_type: "${objectType}" + body, NO object_id) — dry-run the candidate body BEFORE creating it: the identical checks object_create runs (id pattern/availability, singleton conflict where applicable, body schema, id discipline, reference integrity, PageType/route/slug/taxonomy law where applicable), read-only, zero writes.`,
     'object_create (omit requested_id to mint one) — for a new object',
     ...(objectType === 'content_item'
       ? [

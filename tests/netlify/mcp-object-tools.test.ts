@@ -119,6 +119,10 @@ test('object tool input schemas declare the right required fields', async () => 
     'expected_record_version',
     'ops',
   ]);
+  // object_validate: only object_type is required — object_id is now optional
+  // (mode 1: validate an existing object) so body [+ requested_id] can stand
+  // in for it (mode 2: dry-run a candidate that has no object yet).
+  assert.deepEqual(getTool(tools, 'object_validate').inputSchema.required, ['object_type']);
   // object_type is a closed enum of the seven object types.
   const enumValues = (getTool(tools, 'object_get').inputSchema.properties?.object_type as { enum?: string[] }).enum;
   assert.ok(enumValues?.includes('page') && enumValues?.includes('taxonomy'));
@@ -203,6 +207,43 @@ test('object_create then object_get round-trips through the proxy to object-stor
   const got = await callTool('object_get', { object_type: 'page', object_id: 'page_home' });
   assert.ok(!got.isError);
   assert.equal((got.structuredContent?.record as { object_id: string }).object_id, 'page_home');
+});
+
+test('object_validate with body and no object_id dry-runs the create-path checks through the real MCP proxy', async () => {
+  await reset();
+  // A valid candidate: mints an id, reports it available, and comes back ready.
+  const valid = await callTool('object_validate', { object_type: 'page', body: validPageBody() });
+  assert.ok(!valid.isError, JSON.stringify(valid.structuredContent));
+  assert.equal(valid.structuredContent?.dry_run, true);
+  assert.equal(valid.structuredContent?.id_available, true);
+  assert.ok(typeof valid.structuredContent?.object_id === 'string');
+  assert.equal((valid.structuredContent?.summary as { eligible: boolean }).eligible, true);
+
+  // An invalid candidate: still 200 (read-only preview, never a write), but
+  // eligible: false with the schema blocker — the same shape a real
+  // object_create's 422 would carry, learned WITHOUT ever creating anything.
+  const invalid = await callTool('object_validate', { object_type: 'page', body: { route: '/', title: 'x' } });
+  assert.ok(!invalid.isError, JSON.stringify(invalid.structuredContent));
+  const summary = invalid.structuredContent?.summary as { eligible: boolean; blockers: { id: string }[] };
+  assert.equal(summary.eligible, false);
+  assert.ok(summary.blockers.some((b) => b.id === 'schema_zod'));
+
+  // Once an object with that requested_id is actually created, dry-running
+  // the same requested_id again reports it taken — never a false "ready".
+  const created = await callTool('object_create', {
+    object_type: 'page',
+    site: 'site_drlurie',
+    body: validPageBody(),
+    requested_id: 'page_home',
+  });
+  assert.ok(!created.isError, JSON.stringify(created.structuredContent));
+  const takenCheck = await callTool('object_validate', {
+    object_type: 'page',
+    body: validPageBody(),
+    requested_id: 'page_home',
+  });
+  assert.ok(!takenCheck.isError, JSON.stringify(takenCheck.structuredContent));
+  assert.equal(takenCheck.structuredContent?.id_available, false);
 });
 
 test('object_inventory proxies both the sweep and the single-object detail view', async () => {
