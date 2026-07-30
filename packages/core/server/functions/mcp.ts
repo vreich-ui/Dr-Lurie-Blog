@@ -33,7 +33,6 @@
  */
 import { randomUUID, timingSafeEqual } from 'node:crypto';
 
-
 /**
  * A Netlify function handler, as invoked in-process by the tool bodies.
  * `LambdaEvent`/`LambdaContext` are declared further down this module.
@@ -947,14 +946,31 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: 'object_validate',
     description:
-      'Dry-run validation of an object, or of a candidate_patch applied to it. Read-only: no lock, no write.',
+      'Dry-run validation. Read-only: no lock, no write, no record created. Two mutually exclusive modes: ' +
+      '(1) object_id [+ candidate_patch] — validate an EXISTING object, optionally dry-running proposed patch ops ' +
+      'through the real engine before applying them (candidate_patch requires object_id). ' +
+      '(2) object_type + body [+ requested_id], with NO object_id — validate a CANDIDATE body that has no object ' +
+      'yet, running the IDENTICAL checks object_create would run (id pattern/availability, singleton conflict for ' +
+      'singleton types, body schema, id discipline, reference integrity, PageType law and route/slug/taxonomy ' +
+      'uniqueness where applicable) without persisting anything. This is how you learn whether a body is valid ' +
+      'BEFORE creating it — the previous alternative was attempting a real object_create just to learn a body was ' +
+      'invalid. Returns the built object_id (minted or your requested_id), id_available, and the same validation/' +
+      'summary shape as mode (1). Call this before object_create (see object_contract workflow.sequence).',
     inputSchema: objectSchema(
       {
         object_type: objectTypeEnumSchema(),
-        object_id: stringSchema(),
-        candidate_patch: patchOpsSchema('Optional ops to dry-run through the engine before validating the result.'),
+        object_id: stringSchema('The object id, for mode (1): validate an existing object. Omit for mode (2).'),
+        candidate_patch: patchOpsSchema(
+          'Mode (1) only: optional ops to dry-run through the engine before validating the result. Requires object_id.'
+        ),
+        body: anyObjectSchema(
+          'Mode (2) only: the candidate object body to validate as if it were about to be created. Omit object_id and candidate_patch when using this.'
+        ),
+        requested_id: stringSchema(
+          'Mode (2) only: optional explicit id for the candidate; a valid id is minted from the body when omitted (same minting object_create uses).'
+        ),
       },
-      ['object_type', 'object_id']
+      ['object_type']
     ),
   },
 
@@ -2485,7 +2501,15 @@ const wipeBlobStores = async (event: LambdaEvent, input: Record<string, unknown>
     return toolError(
       'prefixes is required and must be a non-empty array — there is no default-to-everything mode. ' +
         'Pass exactly the prefixes you have verified are safe to wipe (dry run included).',
-      { error_code: 'missing_prefixes', dryRun, deleted: 0, scanned: 0, skipped: 0, prefixes: [], sampleDeletedKeys: [] }
+      {
+        error_code: 'missing_prefixes',
+        dryRun,
+        deleted: 0,
+        scanned: 0,
+        skipped: 0,
+        prefixes: [],
+        sampleDeletedKeys: [],
+      }
     );
   }
 
@@ -2916,6 +2940,8 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
         object_type: input.object_type,
         object_id: input.object_id,
         candidate_patch: input.candidate_patch,
+        body: input.body,
+        requested_id: input.requested_id,
       });
     case 'object_inventory':
       return callObjectAction(event, {

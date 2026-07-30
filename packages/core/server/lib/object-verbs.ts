@@ -235,8 +235,19 @@ export const objectVerbRequestSchema = z.discriminatedUnion('action', [
   z.object({
     action: z.literal('validate'),
     object_type: objectTypeSchema,
-    object_id: objectId,
+    // Two mutually exclusive modes (the handler enforces the pairing — same
+    // reason the zod union can't express it as the 'inventory' action above):
+    // (1) object_id [+ candidate_patch] — dry-run an existing record, optionally
+    //     with a proposed patch (unchanged since T0.8/T-2).
+    // (2) body [+ requested_id], no object_id — dry-run a CANDIDATE that has no
+    //     record yet, running the identical create-path checks object_create
+    //     would run (id pattern/availability, schema, references, structural
+    //     invariants) without persisting anything. Mirrors the object_instantiate_*
+    //     dry_run affordance so "validate before it exists" needs no draft write.
+    object_id: objectId.optional(),
     candidate_patch: opsField.optional(),
+    body: z.unknown().optional(),
+    requested_id: z.string().min(1).optional(),
   }),
   // ─── T1.4 review-state wiring ───────────────────────────────────────────
   z.object({
@@ -460,6 +471,21 @@ const seedForCreate = (objectType: ObjectType, body: unknown): string => {
   return stableStringify(body);
 };
 
+// W13 (12-plan §3): tracking_config is a per-site SINGLETON (the
+// site/taxonomy convention, but engine-enforced): creating a second active
+// registry is refused regardless of its id — edit the existing one via
+// set_tracking_config_fields instead.
+// D1 (2026-07-28): editorial_voice is the same shape of singleton — one
+// declared voice per site, edited via set_voice_fields. A second voice would
+// make "the site's voice" ambiguous at exactly the moment an agent needs an
+// unambiguous answer.
+// Module-scoped (not local to `create`) so the object_validate candidate-body
+// dry-run can report the same conflict a real object_create would hit.
+const SINGLETON_TYPES: Partial<Record<ObjectType, { label: string; editOp: string; noun: string }>> = {
+  tracking_config: { label: 'tracking_config', editOp: 'set_tracking_config_fields', noun: 'tracker registry' },
+  editorial_voice: { label: 'editorial_voice', editOp: 'set_voice_fields', noun: 'declared editorial voice' },
+};
+
 /**
  * The W8.3b creation gate. Humans always create; agents resolve through the
  * committed creation policy (src/config/creation-policy.ts — default open).
@@ -629,22 +655,6 @@ export const handleObjectVerb = async (
       const key = objectRecordKey(objectType, objectIdValue);
       if (await store.get(key)) return err(409, { error: 'Object already exists', object_id: objectIdValue });
 
-      // W13 (12-plan §3): tracking_config is a per-site SINGLETON (the
-      // site/taxonomy convention, but engine-enforced): creating a second
-      // active registry is refused regardless of its id — edit the existing
-      // one via set_tracking_config_fields instead.
-      // D1 (2026-07-28): editorial_voice is the same shape of singleton — one
-      // declared voice per site, edited via set_voice_fields. A second voice
-      // would make "the site's voice" ambiguous at exactly the moment an agent
-      // needs an unambiguous answer.
-      const SINGLETON_TYPES: Partial<Record<typeof objectType, { label: string; editOp: string; noun: string }>> = {
-        tracking_config: {
-          label: 'tracking_config',
-          editOp: 'set_tracking_config_fields',
-          noun: 'tracker registry',
-        },
-        editorial_voice: { label: 'editorial_voice', editOp: 'set_voice_fields', noun: 'declared editorial voice' },
-      };
       const singleton = SINGLETON_TYPES[objectType];
       if (singleton) {
         const existing = await collectBlobListItems(
@@ -1332,6 +1342,92 @@ export const handleObjectVerb = async (
     }
 
     case 'validate': {
+      // Mode (2): no object_id yet — dry-run a CANDIDATE body through the
+      // identical checks object_create would run (id pattern/availability,
+      // singleton conflict, schema, references, structural invariants),
+      // without persisting anything. This is the ONLY way to learn whether a
+      // body is valid before an object_id exists to validate against — the
+      // gap that previously forced an agent to attempt a real object_create
+      // just to learn its body was invalid (400 object_id required / 404 not
+      // found on a pre-create validate attempt).
+      if (request.object_id === undefined) {
+        if (request.body === undefined) {
+          return err(400, {
+            error:
+              'validate requires either object_id (validate an existing object, optionally with candidate_patch) ' +
+              'or body (dry-run a candidate object that has no object_id yet).',
+          });
+        }
+        if (request.candidate_patch && request.candidate_patch.length > 0) {
+          return err(400, {
+            error:
+              'candidate_patch applies ops to an EXISTING record and requires object_id. To validate a brand-new ' +
+              'body, pass body with no object_id and no candidate_patch.',
+          });
+        }
+
+        const objectType = request.object_type;
+        let objectIdValue: string;
+        if (request.requested_id) {
+          const check = validateObjectIdForType(objectType, request.requested_id);
+          if (!check.ok) return err(400, { error: 'Invalid requested_id', detail: check.error });
+          objectIdValue = request.requested_id;
+        } else {
+          try {
+            objectIdValue =
+              objectType === 'content_item'
+                ? mintId(
+                    { kind: 'content_item', yyyymmdd: timestamp.slice(0, 10).replaceAll('-', '') },
+                    seedForCreate(objectType, request.body)
+                  )
+                : mintId({ kind: 'object', objectType }, seedForCreate(objectType, request.body));
+          } catch (error) {
+            if (error instanceof MintIdError)
+              return err(400, { error: 'Could not mint an object id', detail: error.message });
+            throw error;
+          }
+        }
+
+        const idTaken = Boolean(await store.get(objectRecordKey(objectType, objectIdValue)));
+
+        const singleton = SINGLETON_TYPES[objectType];
+        let singletonConflict: { object_id: string | undefined; label: string; editOp: string } | undefined;
+        if (singleton) {
+          const existing = await collectBlobListItems(
+            await store.list({ prefix: objectStatusIndexPrefix(objectType, 'active') })
+          );
+          if (existing.length > 0) {
+            singletonConflict = {
+              object_id: existing[0]!.key.split('/').at(-1),
+              label: singleton.label,
+              editOp: singleton.editOp,
+            };
+          }
+        }
+
+        const groups = validateObject({ objectType, objectId: objectIdValue, body: request.body }, context);
+        const summary = summarizeValidation(groups);
+        return ok({
+          dry_run: true,
+          object_type: objectType,
+          object_id: objectIdValue,
+          id_available: !idTaken,
+          ...(singletonConflict
+            ? {
+                singleton_conflict: {
+                  ...singletonConflict,
+                  note: `A ${singletonConflict.label} singleton already exists (${singletonConflict.object_id}) — a real object_create would be refused (409); edit the existing one via ${singletonConflict.editOp} instead.`,
+                },
+              }
+            : {}),
+          body: request.body,
+          validation: groups,
+          summary,
+        });
+      }
+
+      // Mode (1): object_id present — validate (or dry-run a candidate_patch
+      // against) an EXISTING record, unchanged since T0.8/T-2.
       const key = objectRecordKey(request.object_type, request.object_id);
       const record = await loadRecord(store, key);
       if (!record) return err(404, { error: 'Object record not found', not_found: true });

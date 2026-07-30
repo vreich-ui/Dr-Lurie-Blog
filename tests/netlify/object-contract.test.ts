@@ -40,6 +40,19 @@ test('every object type produces a well-formed contract without throwing', () =>
   }
 });
 
+test('workflow.sequence names the object_validate candidate-body dry-run BEFORE object_create, for every type', () => {
+  for (const type of OBJECT_CONTRACT_TYPES) {
+    const sequence = buildObjectContract(type).workflow.sequence;
+    const validateIndex = sequence.findIndex((step) => step.startsWith('object_validate ('));
+    const createIndex = sequence.findIndex((step) => step.startsWith('object_create ('));
+    assert.ok(validateIndex >= 0, `${type} workflow must name the candidate-body object_validate step`);
+    assert.ok(createIndex >= 0, `${type} workflow must name object_create`);
+    assert.ok(validateIndex < createIndex, `${type} workflow must discover object_validate before object_create`);
+    assert.match(sequence[validateIndex]!, new RegExp(`object_type: "${type}"`));
+    assert.match(sequence[validateIndex]!, /NO object_id/);
+  }
+});
+
 test('every governed type — content_item included since W7.3 — carries a non-empty body JSON-schema', () => {
   for (const type of [...GOVERNED, 'content_item' as ObjectType]) {
     const body = buildObjectContract(type).body_schema as Record<string, unknown>;

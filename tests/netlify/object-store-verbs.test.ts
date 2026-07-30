@@ -2,9 +2,14 @@ import '../../sites/drlurie/config/policy-bindings.js'; // W11: register site pr
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { handleObjectVerb, type ObjectVerbRequest, type ObjectVerbStore } from '../../packages/core/server/lib/object-verbs.js';
+import {
+  handleObjectVerb,
+  type ObjectVerbRequest,
+  type ObjectVerbStore,
+} from '../../packages/core/server/lib/object-verbs.js';
 import { objectRecordKey } from '../../packages/core/server/lib/object-store-keys.js';
 import { validateObjectIdForType } from '../../packages/core/lib/object-ids.js';
+import { trackingConfigBodySchema } from '../../packages/core/schema/bodies/tracking-config-v1.js';
 import type { ObjectRecord, Principal } from '../../packages/core/schema/object-record-v1.js';
 
 // Integration suite for the shared object-verb core (T0.8) against an in-memory
@@ -335,6 +340,109 @@ test('validate returns the report; validate with a candidate_patch dry-runs thro
   });
   assert.equal(bad.body.eligible, false);
   assert.equal((bad.body.apply_error as { code: string }).code, 'invalid_op');
+});
+
+// ═══ validate: candidate body, no object_id yet (dry-run before create) ═══════
+
+test('validate with body and no object_id dry-runs the create-path checks: valid body mints an id and reports ready', async () => {
+  const store = createMemoryStore();
+  const res = await call(store, { action: 'validate', object_type: 'page', body: validPageBody() });
+  assert.equal(res.status, 200, JSON.stringify(res.body));
+  assert.equal(res.body.dry_run, true);
+  assert.ok(typeof res.body.object_id === 'string' && res.body.object_id.length > 0);
+  assert.ok(validateObjectIdForType('page', res.body.object_id as string).ok, 'minted id passes the T0.3 validator');
+  assert.equal(res.body.id_available, true);
+  assert.equal((res.body.summary as { eligible: boolean }).eligible, true);
+  assert.ok(Array.isArray(res.body.validation));
+  // Nothing persisted.
+  assert.equal(store.blobs.size, 0);
+});
+
+test('validate with body and no object_id surfaces the same schema failure object_create would 422 on', async () => {
+  const store = createMemoryStore();
+  const res = await call(store, { action: 'validate', object_type: 'page', body: { route: '/', title: 'x' } });
+  assert.equal(res.status, 200, JSON.stringify(res.body));
+  const summary = res.body.summary as { eligible: boolean; blockers: { id: string }[] };
+  assert.equal(summary.eligible, false);
+  assert.ok(summary.blockers.some((b) => b.id === 'schema_zod'));
+  assert.equal(store.blobs.size, 0);
+});
+
+test('validate with body honors requested_id: invalid pattern 400s, taken id reports id_available:false', async () => {
+  const store = createMemoryStore();
+  const badId = await call(store, {
+    action: 'validate',
+    object_type: 'page',
+    body: validPageBody(),
+    requested_id: 'not-a-valid-page-id',
+  });
+  assert.equal(badId.status, 400);
+  assert.match(String(badId.body.error), /Invalid requested_id/);
+
+  const { objectId } = await seedPage(store);
+  const taken = await call(store, {
+    action: 'validate',
+    object_type: 'page',
+    body: validPageBody(),
+    requested_id: objectId,
+  });
+  assert.equal(taken.status, 200, JSON.stringify(taken.body));
+  assert.equal(taken.body.object_id, objectId);
+  assert.equal(taken.body.id_available, false);
+});
+
+test('validate rejects body+candidate_patch together and rejects neither object_id nor body', async () => {
+  const store = createMemoryStore();
+  const both = await call(store, {
+    action: 'validate',
+    object_type: 'page',
+    body: validPageBody(),
+    candidate_patch: [{ op: 'update_section_data', section_id: 's_hero', fields: { heading: 'x' } }],
+  });
+  assert.equal(both.status, 400);
+  assert.match(String(both.body.error), /candidate_patch/);
+
+  const neither = await call(store, { action: 'validate', object_type: 'page' });
+  assert.equal(neither.status, 400);
+  assert.match(String(neither.body.error), /object_id|body/);
+});
+
+test('validate with body reports a singleton_conflict for a would-be second tracking_config (agents can still dry-run it)', async () => {
+  const store = createMemoryStore();
+  const singletonBody = trackingConfigBodySchema.parse({
+    providers: {},
+    consent: { posture: 'us-first', restricted_regions: [], honor_gpc: true },
+    defaults: {
+      page: [],
+      section: [],
+      content_item: [],
+      product: [],
+      navigation: [],
+      taxonomy: [],
+      outbound_links: false,
+      utm_capture: false,
+    },
+  });
+  const created = await call(
+    store,
+    {
+      action: 'create',
+      object_type: 'tracking_config',
+      site: 'site_drlurie',
+      body: singletonBody,
+      requested_id: 'trk_drlurie',
+    },
+    HUMAN
+  );
+  assert.equal(created.status, 200, JSON.stringify(created.body));
+
+  // An agent may not CREATE a second tracking_config, but validate is a
+  // read-only preview and still reports the conflict it would hit.
+  const res = await call(store, { action: 'validate', object_type: 'tracking_config', body: singletonBody }, AGENT);
+  assert.equal(res.status, 200, JSON.stringify(res.body));
+  const conflict = res.body.singleton_conflict as { object_id: string } | undefined;
+  assert.ok(conflict, 'expected a singleton_conflict to be reported');
+  assert.equal(conflict?.object_id, 'trk_drlurie');
 });
 
 // ═══ ID minting: {slug,label} → add_term with a minted term_id ════════════════
