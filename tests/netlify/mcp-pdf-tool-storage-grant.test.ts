@@ -193,7 +193,7 @@ test('get_pdf_tool_storage_grant sits behind the MCP endpoint auth gate', async 
   }
 });
 
-test('tool description teaches the storage argument, re-fetch-on-expiry, and never-persist rules', async () => {
+test('tools/list keeps the internal pdf-tool storage grant out of agent discovery', async () => {
   const response = await handler({
     httpMethod: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -204,10 +204,5 @@ test('tool description teaches the storage argument, re-fetch-on-expiry, and nev
   };
   const tool = body.result.tools.find((candidate) => candidate.name === 'get_pdf_tool_storage_grant');
 
-  assert.ok(tool, 'expected tools/list to include get_pdf_tool_storage_grant');
-  assert.match(tool!.description, /"storage" argument/);
-  assert.match(tool!.description, /rejects expired grants/i);
-  assert.match(tool!.description, /retry once/i);
-  assert.match(tool!.description, /NEVER write the grant or its token/i);
-  assert.deepEqual(tool!.inputSchema.required ?? [], [], 'the grant tool must not require any input');
+  assert.equal(tool, undefined);
 });

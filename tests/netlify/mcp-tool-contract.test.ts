@@ -39,12 +39,27 @@ const getTool = (tools: ToolDefinition[], name: string) => {
   return tool;
 };
 
-test('artifact upload tool descriptions state the accepted image formats', async () => {
+test('agent discovery omits artifact upload, deletion, and maintenance actions', async () => {
   const tools = await listTools();
+  const names = new Set(tools.map((tool) => tool.name));
 
-  for (const name of ['create_artifact_upload_intent', 'create_artifact_from_url', 'save_artifact']) {
-    const tool = getTool(tools, name);
-    assert.match(tool.description, /JPEG, PNG, WebP/i, `${name} must document the accepted image formats`);
+  for (const name of [
+    'trigger_netlify_build',
+    'get_pdf_tool_storage_grant',
+    'create_artifact_upload_intent',
+    'create_artifact_from_url',
+    'save_artifact',
+    'soft_delete_artifact',
+    'restore_artifact',
+    'migrate_artifact_indexes',
+    'wipe_blob_stores',
+    'reconcile_artifact_indexes',
+  ]) {
+    assert.equal(names.has(name), false, `${name} must stay out of agent discovery`);
+  }
+
+  for (const name of ['list_artifacts_for_request', 'get_artifact_metadata', 'object_get', 'object_patch']) {
+    assert.equal(names.has(name), true, `${name} information exchange must remain visible`);
   }
 });
 

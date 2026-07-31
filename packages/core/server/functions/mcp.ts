@@ -78,6 +78,25 @@ const requireSiblings = (): McpSiblingHandlers => {
  */
 const OPTIONAL_HANDLER_TOOLS = new Set(['verify_article_images']);
 
+/**
+ * Operational tools that remain callable for backwards-compatible admin and
+ * test workflows, but are intentionally absent from agent discovery. They are
+ * not part of normal information exchange or governed object editing, and a
+ * large destructive/upload surface makes agent planning needlessly noisy.
+ */
+const INTERNAL_ONLY_TOOLS = new Set([
+  'trigger_netlify_build',
+  'get_pdf_tool_storage_grant',
+  'create_artifact_upload_intent',
+  'create_artifact_from_url',
+  'save_artifact',
+  'soft_delete_artifact',
+  'restore_artifact',
+  'migrate_artifact_indexes',
+  'wipe_blob_stores',
+  'reconcile_artifact_indexes',
+]);
+
 /** True when this site supplied the article-image verification handler. */
 const hasVerifyArticleImages = (): boolean => Boolean(requireSiblings().verifyArticleImagesHandler);
 
@@ -3162,9 +3181,10 @@ const handleRpcRequest = async (event: LambdaEvent, request: JsonRpcRequest): Pr
  * depend on it entirely.
  */
 export const visibleToolDefinitions = (): ToolDefinition[] =>
-  hasVerifyArticleImages()
-    ? TOOL_DEFINITIONS
-    : TOOL_DEFINITIONS.filter((tool) => !OPTIONAL_HANDLER_TOOLS.has(tool.name));
+  TOOL_DEFINITIONS.filter(
+    (tool) =>
+      !INTERNAL_ONLY_TOOLS.has(tool.name) && (hasVerifyArticleImages() || !OPTIONAL_HANDLER_TOOLS.has(tool.name))
+  );
 
 export const _mcpInternal = {
   getArtifactIndexBlobStore,

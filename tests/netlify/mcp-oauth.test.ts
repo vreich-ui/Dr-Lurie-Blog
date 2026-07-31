@@ -88,7 +88,7 @@ const registerClient = async (redirectUris: string[] = [REDIRECT_URI]) => {
 };
 
 /** Registration → authorize → approve → code. The happy path, reused by most tests. */
-const approvedCode = async (options: { resource?: string } = {}) => {
+const approvedCode = async (options: { resource?: string; scope?: string } = {}) => {
   const client = await registerClient();
   const { verifier, challenge } = pkce();
 
@@ -102,6 +102,7 @@ const approvedCode = async (options: { resource?: string } = {}) => {
       code_challenge: challenge,
       code_challenge_method: 'S256',
       state: 'state-123',
+      ...(options.scope ? { scope: options.scope } : {}),
       ...(options.resource ? { resource: options.resource } : {}),
     },
   });
@@ -150,6 +151,14 @@ test('authorization-server metadata advertises S256 PKCE and no weaker challenge
   assert.equal(body.registration_endpoint, `${ORIGIN}/oauth/register`);
   assert.deepEqual(body.code_challenge_methods_supported, ['S256']);
   assert.deepEqual(body.grant_types_supported, ['authorization_code', 'refresh_token']);
+  assert.deepEqual(body.scopes_supported, ['mcp', 'offline_access']);
+});
+
+test('protected-resource metadata advertises offline access for ChatGPT reconnects', async () => {
+  const response = await call({ httpMethod: 'GET', path: '/.well-known/oauth-protected-resource/mcp' });
+  const body = JSON.parse(response.body) as Record<string, string[]>;
+
+  assert.deepEqual(body.scopes_supported, ['mcp', 'offline_access']);
 });
 
 // ─── dynamic client registration ─────────────────────────────────────────────
@@ -160,6 +169,7 @@ test('dynamic registration issues a public client with no secret by default', as
   assert.ok(client.client_id);
   assert.equal(client.client_secret, undefined, 'a public client must not be handed a secret it cannot protect');
   assert.equal(client.token_endpoint_auth_method, 'none');
+  assert.equal(client.scope, 'mcp offline_access');
 });
 
 test('registration refuses a redirect URI that is not https or loopback', async () => {
@@ -351,7 +361,24 @@ test('a valid exchange returns a bearer access token and a refresh token', async
   assert.equal(body.token_type, 'Bearer');
   assert.ok(body.access_token);
   assert.ok(body.refresh_token);
+  assert.equal(body.scope, 'mcp offline_access');
   assert.equal(response.headers?.['Cache-Control'], 'no-store');
+});
+
+test('an explicit mcp-only request is not widened to offline access', async () => {
+  const { client, code, verifier } = await approvedCode({ scope: 'mcp' });
+  const response = await call(
+    postForm('/oauth/token', {
+      grant_type: 'authorization_code',
+      code,
+      redirect_uri: REDIRECT_URI,
+      client_id: client.client_id,
+      code_verifier: verifier,
+    })
+  );
+
+  assert.equal(response.statusCode, 200, response.body);
+  assert.equal(jsonBody(response).scope, 'mcp');
 });
 
 test('an authorization code cannot be redeemed twice', async () => {

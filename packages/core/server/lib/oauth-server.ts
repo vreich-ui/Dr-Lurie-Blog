@@ -27,6 +27,8 @@
 import {
   ACCESS_TOKEN_TTL_MS,
   AUTHORIZATION_CODE_TTL_MS,
+  MCP_OAUTH_SCOPE,
+  MCP_OAUTH_SCOPES,
   MCP_SCOPE,
   PENDING_AUTHORIZATION_TTL_MS,
   REFRESH_TOKEN_TTL_MS,
@@ -120,7 +122,7 @@ export const resolveRequestOrigin = (input: {
 export const buildProtectedResourceMetadata = (input: { origin: string; resourceName: string }) => ({
   resource: `${input.origin}/mcp`,
   authorization_servers: [input.origin],
-  scopes_supported: [MCP_SCOPE],
+  scopes_supported: [...MCP_OAUTH_SCOPES],
   bearer_methods_supported: ['header'],
   resource_name: input.resourceName,
 });
@@ -132,7 +134,7 @@ export const buildAuthorizationServerMetadata = (input: { origin: string }) => (
   token_endpoint: `${input.origin}/oauth/token`,
   registration_endpoint: `${input.origin}/oauth/register`,
   revocation_endpoint: `${input.origin}/oauth/revoke`,
-  scopes_supported: [MCP_SCOPE],
+  scopes_supported: [...MCP_OAUTH_SCOPES],
   response_types_supported: ['code'],
   response_modes_supported: ['query'],
   grant_types_supported: ['authorization_code', 'refresh_token'],
@@ -218,7 +220,7 @@ export const registerClient = async (store: OAuthBlobStore, input: RegisterClien
     token_endpoint_auth_method: requestedAuthMethod as OAuthClientRecord['token_endpoint_auth_method'],
     grant_types: grantTypes,
     response_types: asStringArray(body.response_types) ?? ['code'],
-    scope: MCP_SCOPE,
+    scope: MCP_OAUTH_SCOPE,
     site: input.site,
     created_at: input.nowIso,
     registration: 'dynamic',
@@ -341,11 +343,15 @@ export const beginAuthorization = async (
     ...(state ? { state } : {}),
     code_challenge: codeChallenge,
     code_challenge_method: 'S256',
-    // One scope exists. A client that asks for something else still gets `mcp`
-    // rather than a hard failure: refusing an unknown scope name is correct by
-    // the letter and breaks connectors that hardcode one, and there is no
-    // narrower grant here to accidentally widen.
-    scope: MCP_SCOPE,
+    // New registrations default to `mcp offline_access`, which is the signal
+    // ChatGPT needs in order to retain and use the rotating refresh token.
+    // Honor an explicit subset without widening it; ignore unknown names for
+    // compatibility with clients that hardcode an extra scope.
+    scope: (() => {
+      const requested = (asString(params.scope) ?? client.scope).split(/\s+/);
+      const granted = MCP_OAUTH_SCOPES.filter((scope) => requested.includes(scope));
+      return granted.includes(MCP_SCOPE) ? granted.join(' ') : MCP_SCOPE;
+    })(),
     ...(resource ? { resource } : {}),
     site: input.site,
     created_at: input.nowIso,

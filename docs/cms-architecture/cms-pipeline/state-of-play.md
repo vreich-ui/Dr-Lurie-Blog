@@ -7,6 +7,35 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-31 (Dr. Lurie ChatGPT connection expiry + agent tool-surface cleanup)
+
+The reported connect-then-drop behavior was reproduced through the live app:
+`ping` waited for credential recovery and returned
+`run_with_credentials_failed_token_refresh_not_supported` /
+`TRIGGER_REAUTHENTICATION`. The live authorization-server metadata advertised
+only `mcp`, while access tokens expire after one hour. ChatGPT's documented MCP
+OAuth behavior requires `offline_access` (or the provider equivalent) to be
+advertised/requested so it will retain and use a refresh token. The server was
+already issuing rotating refresh tokens, but its discovery contract did not
+tell ChatGPT that offline access was available.
+
+**Fix.** Both OAuth discovery documents now advertise `mcp` and
+`offline_access`; new dynamic registrations default to `mcp offline_access`;
+the authorization path carries the requested supported subset without widening
+an explicit `mcp`-only request. The existing one-hour access-token and rotating
+30-day refresh-token security posture is unchanged. Existing ChatGPT app
+registrations must be recreated once after deployment so ChatGPT rescans the
+updated metadata and stores a refresh-capable grant.
+
+**Agent action surface.** `tools/list` no longer advertises the operational
+artifact/upload/deletion/maintenance actions (`create_artifact_*`,
+`save_artifact`, `soft_delete_artifact`, `restore_artifact`, artifact index
+migration/reconciliation, blob wipe, pdf-tool storage grant, or the redundant
+manual build trigger). Their guarded implementations remain available to
+explicit internal/admin callers. Read-only artifact metadata, deploy status,
+the governed object verbs, registry/commerce tools, release, verification, and
+diagnostic actions remain visible; normal information exchange is unchanged.
+
 ## Session 2026-07-29 (the legacy `save_json_blob` article pipeline is RETIRED and DELETED)
 
 OQ-W11-6 said retire-with-the-legacy-pipeline, importer-check first. Its last

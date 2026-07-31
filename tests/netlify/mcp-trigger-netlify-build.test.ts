@@ -108,7 +108,7 @@ test('trigger_netlify_build reports the HTTP status on a non-2xx response withou
   });
 });
 
-test('trigger_netlify_build tool description documents async queueing, deploy_status polling, and batching guidance', async () => {
+test('trigger_netlify_build remains internal and is not advertised to agents', async () => {
   const response = await handler({
     httpMethod: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -119,10 +119,7 @@ test('trigger_netlify_build tool description documents async queueing, deploy_st
   };
   const tool = body.result.tools.find((candidate) => candidate.name === 'trigger_netlify_build');
 
-  assert.ok(tool, 'expected tools/list to include trigger_netlify_build');
-  assert.match(tool!.description, /deploy_status/);
-  assert.match(tool!.description, /batch/i);
-  assert.match(tool!.description, /build minutes/i);
+  assert.equal(tool, undefined);
 });
 
 const callReleaseToProduction = async (args: Record<string, unknown> = {}): Promise<ToolCallResult> => {

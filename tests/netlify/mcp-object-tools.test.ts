@@ -105,7 +105,7 @@ test('tools/list includes every object verb tool and registry_get', async () => 
 // object verbs did not displace the rest of the surface.
 test('tools/list carries the object verbs alongside the other governed tools', async () => {
   const tools = await listTools();
-  for (const name of ['object_get', 'object_publish', 'save_artifact', 'deploy_status', 'ping']) getTool(tools, name);
+  for (const name of ['object_get', 'object_publish', 'deploy_status', 'ping']) getTool(tools, name);
 });
 
 test('object tool input schemas declare the right required fields', async () => {

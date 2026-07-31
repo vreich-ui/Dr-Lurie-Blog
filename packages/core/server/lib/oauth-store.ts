@@ -46,8 +46,17 @@ export const AUTHORIZATION_CODE_TTL_MS = 60_000;
 export const ACCESS_TOKEN_TTL_MS = 60 * 60_000;
 export const REFRESH_TOKEN_TTL_MS = 30 * 24 * 60 * 60_000;
 
-/** The single scope V1 issues: full access to this site's MCP surface. */
+/** Full access to this site's MCP surface. */
 export const MCP_SCOPE = 'mcp';
+/**
+ * ChatGPT requires an advertised offline-access scope before it will retain
+ * and use the rotating refresh token returned by this authorization server.
+ * Without it, the one-hour access token expires and the app falls back to a
+ * full reauthentication prompt even though `/oauth/token` supports refresh.
+ */
+export const OFFLINE_ACCESS_SCOPE = 'offline_access';
+export const MCP_OAUTH_SCOPES = [MCP_SCOPE, OFFLINE_ACCESS_SCOPE] as const;
+export const MCP_OAUTH_SCOPE = MCP_OAUTH_SCOPES.join(' ');
 
 export const oauthClientRecordSchema = z.object({
   schema_version: z.literal('oauth-client.v1'),

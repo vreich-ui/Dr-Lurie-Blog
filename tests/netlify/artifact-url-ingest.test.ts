@@ -490,7 +490,7 @@ test('saveArtifactFromUrl rejects invalid image bytes', async (t) => {
   });
 });
 
-test('MCP tools/list includes create_artifact_from_url', async () => {
+test('MCP tools/list hides create_artifact_from_url from agents', async () => {
   const previousSecret = process.env.NETLIFY_PUBLISH_SECRET;
   process.env.NETLIFY_PUBLISH_SECRET = 'mcp-secret';
   try {
@@ -508,7 +508,7 @@ test('MCP tools/list includes create_artifact_from_url', async () => {
     const body = JSON.parse(response.body);
     const tools = body.result.tools;
     const hasTool = tools.some((t: { name: string }) => t.name === 'create_artifact_from_url');
-    assert.equal(hasTool, true);
+    assert.equal(hasTool, false);
   } finally {
     if (previousSecret) process.env.NETLIFY_PUBLISH_SECRET = previousSecret;
     else delete process.env.NETLIFY_PUBLISH_SECRET;
