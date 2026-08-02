@@ -1,0 +1,89 @@
+{
+  "__generated": {
+    "at": "2026-08-02T18:39:30.128Z",
+    "from": "objects/content_item/by-id/req_agent_multisite_without_forks_20260802_01.json",
+    "record_version": 2
+  },
+  "author": "Platform Documentation",
+  "deck": "How the platform shares one engine while each tenant keeps its own data, authority, policies, and deployment.",
+  "description": "A practical explanation of tenant generation, isolation boundaries, fleet propagation, and dependency-safe seeding.",
+  "nodes": [
+    {
+      "id": "n_multisiteintro",
+      "kind": "content",
+      "private": {
+        "intent": "educate",
+        "strategy": "hook"
+      },
+      "public": {
+        "body": "The platform’s multisite model begins with a simple rule: reuse software, isolate authority. A tenant imports the shared renderer and publishing engine, but it does not share object records, credentials, policies, or production deployment with another site."
+      }
+    },
+    {
+      "id": "n_multisitescaffold",
+      "kind": "content",
+      "private": {
+        "intent": "educate",
+        "strategy": "step"
+      },
+      "public": {
+        "body": "The create-site command writes a dedicated site directory with identity and binding configuration, an empty committed-export tree, and baseline seed data. A dry run makes the intended files and account steps reviewable before anything is written.",
+        "title": "Scaffold the tenant boundary"
+      }
+    },
+    {
+      "id": "n_multisiteprovision",
+      "kind": "content",
+      "private": {
+        "intent": "educate",
+        "strategy": "step"
+      },
+      "public": {
+        "body": "The production half creates or resolves the tenant’s Netlify project, probes its stores, installs generated secrets, connects shared services, and leaves account-level choices such as GitHub binding, human roles, payment credentials, and DNS to explicit operators.",
+        "title": "Provision authority separately"
+      }
+    },
+    {
+      "id": "n_multisiteseed",
+      "kind": "content",
+      "private": {
+        "intent": "educate",
+        "strategy": "explanation"
+      },
+      "public": {
+        "body": "Navigation must exist before the site singleton can name it. Taxonomy, themes, recipes, shared sections, and content targets must exist before dependent pages or menus publish. The seed drive uses the tenant’s MCP so the first records prove the same lifecycle later agents will use.",
+        "title": "Seed in dependency order"
+      }
+    },
+    {
+      "id": "n_multisiteproof",
+      "kind": "content",
+      "private": {
+        "intent": "educate",
+        "strategy": "resolution"
+      },
+      "public": {
+        "body": "A complete acceptance run creates and publishes an object on the new site, confirms the new inventory contains it, confirms another tenant did not change, and then shows that a core change fans out through fleet CI. That combination proves both halves of the promise: isolated data and shared maintenance.",
+        "title": "Prove isolation and propagation"
+      }
+    }
+  ],
+  "publication_context": {
+    "domain": "kugel-platform.netlify.app",
+    "publication_name": "Platform",
+    "topic_scope": "CMS architecture and operations"
+  },
+  "seo": {
+    "meta_description": "How the CMS generates isolated tenants on one shared core without duplicating application code.",
+    "meta_title": "Multisite Without Content Forks"
+  },
+  "slug": "multisite-without-content-forks",
+  "taxonomy": {
+    "category": "guide",
+    "tags": [
+      "multisite",
+      "architecture"
+    ]
+  },
+  "title": "Multisite Without Content Forks"
+}
