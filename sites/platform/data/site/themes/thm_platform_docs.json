@@ -1,0 +1,43 @@
+{
+  "__generated": {
+    "at": "2026-08-02T18:20:04.352Z",
+    "from": "objects/theme/by-id/thm_platform_docs.json",
+    "record_version": 2
+  },
+  "description": "The neutral documentation theme used to verify theme creation and atomic application without changing the established brand palette.",
+  "name": "Platform documentation",
+  "scope": "evergreen",
+  "tokens": {
+    "colors": {
+      "accent": "rgb(0 150 136)",
+      "bg-page": "rgb(255 255 255)",
+      "bg-page-dark": "rgb(10 12 20)",
+      "bg-surface": "rgb(245 246 248)",
+      "gold": "rgb(191 155 48)",
+      "primary": "rgb(51 102 204)",
+      "secondary": "rgb(38 77 153)",
+      "text-default": "rgb(38 43 48)",
+      "text-heading": "rgb(20 24 28)",
+      "text-muted": "rgb(60 67 75 / 76%)"
+    },
+    "fonts": {
+      "heading": "Georgia, serif",
+      "sans": "system-ui, sans-serif",
+      "serif": "Georgia, serif"
+    },
+    "layout": {
+      "containerWidth": "wide",
+      "sectionRhythm": "default"
+    },
+    "shape": {
+      "buttonShape": "soft",
+      "radius": "soft",
+      "shadow": "soft"
+    },
+    "type": {
+      "headingWeight": "medium",
+      "scale": "default"
+    }
+  },
+  "whenToUse": "Use for the Platform manual and for returning documentation pages to the verified layout, shape, and typography axes."
+}
