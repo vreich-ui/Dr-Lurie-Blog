@@ -1,0 +1,47 @@
+{
+  "__generated": {
+    "at": "2026-08-02T11:31:35.688Z",
+    "from": "objects/page/by-id/page_library.json",
+    "record_version": 2
+  },
+  "pageType": "listing",
+  "route": "/library",
+  "sections": [
+    {
+      "data": {
+        "actions": [],
+        "body": "<p>Browse practical articles published on the platform.</p>",
+        "heading": "Articles and resources",
+        "kicker": "Library"
+      },
+      "id": "s_libraryintro",
+      "type": "lede"
+    },
+    {
+      "data": {
+        "columns": 3,
+        "heading": "Latest articles",
+        "limit": 12,
+        "source": {
+          "fallback": {
+            "kind": "query",
+            "query": {
+              "sort": "published_time_desc"
+            }
+          },
+          "items": [
+            "req_agent_simple_skincare_routine_id_choose_20260802_01"
+          ],
+          "kind": "manual"
+        }
+      },
+      "id": "s_librarygrid",
+      "type": "content_grid"
+    }
+  ],
+  "seo": {
+    "description": "Browse published articles and practical resources.",
+    "title": "Library"
+  },
+  "title": "Library"
+}
