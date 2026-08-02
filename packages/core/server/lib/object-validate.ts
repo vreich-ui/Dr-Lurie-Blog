@@ -672,7 +672,7 @@ const validateAssetRef = (
       kind: 'existence',
       message:
         `${path} "${value}" is not in the artifact index (never uploaded, or the key is mistyped). ` +
-        `Generate it through pdf-tool under the site's storage grant (get_pdf_tool_storage_grant) and use the ` +
+        `Generate it through the site's Platform artifact bridge (create_agent_artifact_job) and use the ` +
         `exact returned ArtifactReference blobKey — list_artifacts_for_request shows what exists.`,
     };
   }

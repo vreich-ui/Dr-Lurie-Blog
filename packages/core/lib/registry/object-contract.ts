@@ -814,7 +814,7 @@ const mediaPolicyContract = (policy: MediaPolicy): MediaPolicyContract => ({
   preferred_image_format: policy.preferredImageFormat,
   over_budget: policy.overBudget,
   note:
-    'Per-site image budget (src/config/media-policy.ts), also carried on the pdf-tool storage grant as `limits`. ' +
+    'Per-site image budget (src/config/media-policy.ts), enforced by the server-side pdf-tool artifact bridge. ' +
     'Encode images to preferred_image_format and keep each within max_image_bytes. over_budget=warn stores an ' +
     'over-limit image but flags it (abide unless a human/admin explicitly asks for a larger one); block rejects it. ' +
     'To fix an already-stored oversize image, ask pdf-tool to shrink it under the budget.',
@@ -936,12 +936,12 @@ const auxiliaryInputs = (objectType: ObjectType): AuxiliaryInput[] => {
       {
         input: 'image artifacts',
         when: 'node public.media {type:"image"}, public.images[], hero body.image',
-        how: "Generate through pdf-tool under the site's storage grant (get_pdf_tool_storage_grant), then set src to the PUBLIC path of the returned blobKey: image/{id}/{sha256}.{ext} → /img/{id}/{sha256}.{ext}. Raw blobKeys, data URIs, and src/assets paths are rejected; remote https URLs warn (ungoverned). The hero must be an IMAGE — a PDF there fails the whole build.",
+        how: "Call this Platform connector's create_agent_artifact_job with site_id + this content_item's request_id (never guess projectId and never fetch/pass a grant), poll get_agent_artifact_job_status, then use its verified public_path: /img/{id}/{sha256}.{ext}. Raw blobKeys, data URIs, and src/assets paths are rejected; remote https URLs warn (ungoverned). The hero must be an IMAGE — a PDF there fails the whole build.",
       },
       {
         input: 'PDF artifacts',
         when: 'node public.media {type:"document"} or a /pdf/ ctaLink',
-        how: 'Generate the PDF through pdf-tool under a storage grant, then use its public path /pdf/{id}/{sha256}.pdf as the document media src (renders as a download link) or the action-node ctaLink. Missing/deleted artifacts block publish.',
+        how: "Use this Platform connector's create_agent_artifact_job + get_agent_artifact_job_status bridge; Platform resolves the project and grant server-side. Use the verified /pdf/{id}/{sha256}.pdf public_path as the document media src or action-node ctaLink. Missing/deleted artifacts block publish.",
       }
     );
   }
@@ -950,7 +950,7 @@ const auxiliaryInputs = (objectType: ObjectType): AuxiliaryInput[] => {
     inputs.push({
       input: 'artifact ref',
       when: 'any *AssetRef field',
-      how: "Generate/store the asset through pdf-tool under the site's storage grant (get_pdf_tool_storage_grant — the sanctioned artifact transfer path), then use the returned Major-Key ref (image|pdf/{id}/{sha256}.{ext}). URLs/data:/src/assets are rejected; refs are checked against the artifact index at publish.",
+      how: "Generate/store through this Platform connector's create_agent_artifact_job bridge (site_id + request_id; project and grant are injected server-side), then use the verified Major-Key ref (image|pdf/{id}/{sha256}.{ext}). URLs/data:/src/assets are rejected; refs are checked against the artifact index at publish.",
     });
   }
   if (objectType === 'page' || objectType === 'navigation' || objectType === 'site') {
@@ -965,7 +965,7 @@ const auxiliaryInputs = (objectType: ObjectType): AuxiliaryInput[] => {
       {
         input: 'fulfillment artifact ref',
         when: 'fulfillment.kind "download"',
-        how: "Produce the deliverable through pdf-tool under the site's storage grant (get_pdf_tool_storage_grant) so it lands in the artifacts store, then use the returned Major-Key ref. It is delivered only through token-gated purchase links, never a public URL.",
+        how: "Produce the deliverable through this Platform connector's create_agent_artifact_job bridge so the canonical project and grant stay server-side, then use the verified Major-Key ref. It is delivered only through token-gated purchase links, never a public URL.",
       },
       {
         input: 'long-form page',

@@ -1,15 +1,17 @@
 # pdf-tool storage grants — Dr-Lurie as the grant provider
 
-pdf-tool is stateless: it holds **no blob credentials of its own**. Agents
-fetch a short-lived storage grant from Dr-Lurie's `get_pdf_tool_storage_grant`
-MCP tool and forward it with each pdf-tool MCP call; pdf-tool uses the grant
+pdf-tool is stateless: it holds **no blob credentials of its own**. Platform
+mints a short-lived storage grant and forwards it server-side with each bridged
+pdf-tool call; pdf-tool uses the grant
 to write artifacts, templates, image-search state, and its job records
 directly into Dr-Lurie's Netlify Blob stores. Dr-Lurie therefore owns the
 storage, the credential, and the full artifact-job audit trail.
 
-Code: `netlify/lib/pdf-tool-storage-grant.ts` (grant builder, canonical store
-list) and the `get_pdf_tool_storage_grant` tool in
-`netlify/functions/mcp.ts`. Provisioning probe:
+Code: `packages/core/server/lib/pdf-tool-storage-grant.ts` (grant builder,
+canonical store list), `packages/core/server/lib/pdf-tool-client.ts` (secret-
+preserving bridge), and the artifact tools in `packages/core/server/functions/mcp.ts`.
+The grant builder is server-internal and no raw grant operation is exposed over
+MCP. Provisioning probe:
 `scripts/provision-pdf-tool-stores.mjs`.
 
 ## The grant contract (pdf-tool accepts exactly this shape)
@@ -88,39 +90,37 @@ ever printing the credentials.
      CI). **Never** expose either in client-side code, logs, or workflow JSON;
      do not prefix with `PUBLIC_`.
 4. Run the provisioning probe (step above) once after setting the vars.
-5. Verify the tool end-to-end: call `get_pdf_tool_storage_grant` over the
-   authenticated MCP endpoint and confirm the grant shape; then make one
-   pdf-tool call passing the grant as its `storage` argument.
+5. Set `PDF_TOOL_BASE_URL` and `PDF_TOOL_AGENT_RUN_TOKEN` on the site, then
+   verify the visible Platform bridge end-to-end: create one job, poll it, and
+   retrieve the verified request-scoped artifact. No grant/proof may appear in
+   the MCP response or structured logs.
 
-The `get_pdf_tool_storage_grant` tool fails closed with
-`pdf_tool_storage_grant_not_configured` until step 3 is done. It never logs
-the token and never writes it to any stored record — issuance logs carry
-metadata only (`grantType`, `expiresAt`).
+The Platform bridge fails closed with
+`pdf_tool_storage_grant_not_configured` until step 3 is done. It never returns
+or logs the token and never writes it to any stored record.
 
 ## Agent workflow rules
 
-1. **Before any pdf-tool call that touches storage**, call
-   `get_pdf_tool_storage_grant` and pass the entire result object as that
-   call's `storage` argument.
+1. **Use Platform's visible artifact bridge tools.** Pass `site_id` and the
+   existing content-item `request_id`; Platform injects the canonical project
+   and grant server-side.
 2. Store returned **ArtifactReferences** in workflow JSON as usual. **NEVER**
    write the grant or its token into workflow JSON, drafts, article content,
    artifact metadata, or any persisted blob.
-3. If pdf-tool returns **"grant expired"** or a storage auth error, fetch a
-   fresh grant and **retry once** before surfacing the failure.
-4. Don't cache grants across working sessions — `expiresAt` is about an hour
-   out and pdf-tool enforces it.
+3. Poll the returned job id rather than creating another job.
+4. Grants are minted per bridge call and never cached or exposed to agents.
 
 ## Rotation and revocation
 
 - **Rotate `PDF_TOOL_STORAGE_TOKEN` monthly**, and immediately on any
   suspected exposure: generate a new PAT from the machine account, update the
-  env var, then revoke the old PAT. The grant tool always serves the current
+  env var, then revoke the old PAT. The bridge always uses the current
   value, so rotation requires **no pdf-tool change** — in-flight grants
   carrying the revoked PAT simply start failing storage auth, and agents
   recover via the fetch-fresh-and-retry-once rule.
 - **Revocation** (kill switch): revoke the PAT in the machine account (or
   delete the machine account's site access). Every outstanding grant dies
-  with it. Clearing the env var additionally makes the tool fail closed.
+  with it. Clearing the env var additionally makes the bridge fail closed.
 
 ## Future (designed for, not built): `grantType: "exchange"`
 

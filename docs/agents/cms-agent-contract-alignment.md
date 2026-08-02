@@ -46,16 +46,13 @@ object write.
 
 ## 3. Artifact production + verification loop (the triangle)
 
-1. **Grant**: call Dr-Lurie `get_pdf_tool_storage_grant` per working session;
-   pass the ENTIRE grant as every pdf-tool call's `storage` argument. The grant
-   carries `limits` (`maxImageBytes` 153,600 / `preferredImageFormat` webp /
-   `overBudget` warn — `src/config/media-policy.ts`). SECRET RULES: never
-   persist the grant or its token into workflow JSON, drafts, article content,
-   or artifact metadata; on "grant expired"/storage-auth errors fetch a fresh
-   grant and retry ONCE before surfacing. Rotation + kill switch:
-   `pdf-tool-storage-grant.md`.
-2. **Generate**: pdf-tool `create_agent_artifact_job` (poll
-   `get_agent_artifact_job_status`; bytes never transit MCP). RECOMMENDATION
+1. **Bridge**: call Dr-Lurie's Platform `create_agent_artifact_job` with
+   `site_id` and the existing content-item `request_id`. Platform resolves the
+   canonical pdf-tool project and injects a fresh grant server-side. The raw
+   grant RPC has been removed; grants and tokens never enter agent context.
+   Rotation + kill switch: `pdf-tool-storage-grant.md`.
+2. **Generate**: poll Platform `get_agent_artifact_job_status`; bytes never
+   transit MCP. RECOMMENDATION
    (pdf-tool): when a job carries no explicit `requirements`, default image
    generation to the grant `limits` (encode `preferredImageFormat`, stay under
    `maxImageBytes`). Until then, agents MUST pass
@@ -63,9 +60,10 @@ object write.
    under the budget — Dr-Lurie now surfaces over-budget images at validation
    (`media_budget`) and blocks them at publish if the committed policy flips to
    `block`.
-3. **Verify**: prove materialization with pdf-tool `verify_agent_artifact`
-   (rejects hand-authored keys, copied refs, remote URLs, data URIs) and/or
-   Dr-Lurie `list_artifacts_for_request`. RECOMMENDATION (CMS-Agent):
+3. **Verify**: Platform proves materialization server-side before returning a
+   completed artifact (rejecting hand-authored keys, copied refs, remote URLs,
+   and data URIs); cross-check Dr-Lurie `list_artifacts_for_request` when
+   needed. RECOMMENDATION (CMS-Agent):
    `workflow_publish_readiness.verifiedMediaRefs` should be fed the UNION of
    those two sources; derive blobKeys from Blob-shaped srcs via the documented
    inverse `/img/{id}/{sha}.{ext}` ⇄ `image/{id}/{sha}.{ext}` (and `/pdf/` ⇄

@@ -127,7 +127,17 @@ export const ENV_CHECKLIST = [
       {
         name: 'PDF_TOOL_PROJECT_ID',
         cls: 'per-site',
-        note: 'Defaults to the site slug if unset — override only if it must differ.',
+        note: 'Escape hatch for the canonical project id committed in sites/<client>/config/site-identity.ts.',
+      },
+      {
+        name: 'PDF_TOOL_BASE_URL',
+        cls: 'fleet-shared',
+        note: 'Base URL of the shared pdf-tool service used by the server-side artifact bridge.',
+      },
+      {
+        name: 'PDF_TOOL_AGENT_RUN_TOKEN',
+        cls: 'fleet-shared',
+        note: 'Server-to-server bearer for the shared pdf-tool artifact bridge.',
       },
       {
         name: 'PDF_TOOL_STORAGE_SITE_ID',
@@ -287,6 +297,7 @@ export const siteIdentityConfig = {
   // Placeholder — point at this client's real asset CDN before going live.
   assetHost: 'https://example-assets.netlify.app',
   assetFolder: '${ids.clientSlug}',
+  pdfToolProjectId: '${ids.clientSlug}',
 } satisfies SiteIdentityConfig;
 `;
 

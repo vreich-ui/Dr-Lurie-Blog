@@ -163,6 +163,8 @@ test('the env checklist covers every per-site row from the T11.7 brief (not an i
     'ADMIN_EMAILS',
     'ARTIFACT_UPLOAD_TOKEN_SECRET',
     'PDF_TOOL_PROJECT_ID',
+    'PDF_TOOL_BASE_URL',
+    'PDF_TOOL_AGENT_RUN_TOKEN',
     'PDF_TOOL_STORAGE_SITE_ID',
     'TRACKING_SALT',
     'ANTHROPIC_API_KEY',

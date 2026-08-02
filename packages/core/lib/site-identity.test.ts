@@ -23,6 +23,7 @@ import test from 'node:test';
 // therefore registers the real site bindings (tests are exempt from the
 // zero-drlurie core lint per the ratified carve-out, 2026-07-22).
 import '../../../sites/drlurie/config/policy-bindings.js';
+import { siteIdentityConfig } from '../../../sites/drlurie/config/site-identity.js';
 import { getSiteIdentity, resolveSiteIdentity } from './site-identity.js';
 
 // The compiled test runs from a temp dir; ascend to the repo root to read the
@@ -69,11 +70,27 @@ test('the config stays in lockstep with the committed site export (drift guard)'
 });
 
 test('a second tenant gets the id conventions from its siteId and slug', () => {
-  const identity = resolveSiteIdentity({ SITE_OBJECT_ID: 'site_acme', SITE_SLUG: 'acme-skin' });
+  const identity = resolveSiteIdentity(
+    { SITE_OBJECT_ID: 'site_acme', SITE_SLUG: 'acme-skin' },
+    { ...siteIdentityConfig, pdfToolProjectId: undefined }
+  );
   assert.equal(identity.siteShortId, 'acme');
   assert.equal(identity.taxonomyId, 'tax_acme');
   assert.equal(identity.trackingProjectId, 'trk_acme');
   assert.equal(identity.pdfToolProjectId, 'acme-skin');
+});
+
+test('the committed site-to-artifact-project mapping wins over slug inference', () => {
+  const identity = resolveSiteIdentity(
+    {},
+    {
+      ...siteIdentityConfig,
+      siteId: 'site_acme',
+      siteSlug: 'acme-site',
+      pdfToolProjectId: 'acme-artifacts',
+    }
+  );
+  assert.equal(identity.pdfToolProjectId, 'acme-artifacts');
 });
 
 test('every env override wins over the committed config', () => {

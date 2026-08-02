@@ -16,7 +16,8 @@ next.
 2. ★ **Verify pdf-tool storage credentials**: `PDF_TOOL_STORAGE_TOKEN`
    (machine-account PAT per `pdf-tool-storage-grant.md`) +
    `PDF_TOOL_STORAGE_SITE_ID`; run `node scripts/provision-pdf-tool-stores.mjs`.
-   Check: `get_pdf_tool_storage_grant` returns a grant with `limits`.
+   Check: the provisioning probe passes all six stores; the raw grant stays
+   server-internal.
 3. ★ **Provision PDF templates** (failure-class-4 closure): preflight
    `list_pdf_templates` under a fresh grant; if empty, `create_pdf_template` →
    `publish_pdf_template` for each needed template. Check: a dry-run
@@ -55,9 +56,9 @@ next.
 
 ## Operating discipline (agents, once enabled)
 
-8. **Produce + verify media first** (contract-alignment doc §3): grant →
-   pdf-tool jobs (webp, ≤153,600 bytes) → `verify_agent_artifact` /
-   `list_artifacts_for_request` → public paths into the content_item body →
+8. **Produce + verify media first** (contract-alignment doc §3): Platform
+   bridge jobs (webp, ≤153,600 bytes) → server-side verification → public paths
+   into the content_item body →
    `object_validate` (existence, media paths, budget, hero rules all report
    here). A media failure means publish is NOT attempted — never work around
    it with an unverified ref.

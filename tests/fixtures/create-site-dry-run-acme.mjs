@@ -126,7 +126,11 @@ Env checklist:
       Allowed hosts for URL-based artifact ingest — human-owned policy choice.
   pdf-tool + tracking tenancy axes:
     PDF_TOOL_PROJECT_ID              [per-site]  ☐ human-supplied — see the provisioning runbook
-      Defaults to the site slug if unset — override only if it must differ.
+      Escape hatch for the canonical project id committed in sites/<client>/config/site-identity.ts.
+    PDF_TOOL_BASE_URL                [fleet-shared]  reuse the fleet value — do not create a new one
+      Base URL of the shared pdf-tool service used by the server-side artifact bridge.
+    PDF_TOOL_AGENT_RUN_TOKEN         [fleet-shared]  reuse the fleet value — do not create a new one
+      Server-to-server bearer for the shared pdf-tool artifact bridge.
     PDF_TOOL_STORAGE_SITE_ID         [fleet-shared]  reuse the fleet value — do not create a new one
       Points at the ONE shared pdf-tool storage service — reuse the fleet value, do not create a new one.
     PDF_TOOL_STORAGE_TOKEN           [fleet-shared]  reuse the fleet value — do not create a new one

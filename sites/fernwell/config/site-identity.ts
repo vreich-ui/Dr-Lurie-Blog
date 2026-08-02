@@ -20,4 +20,5 @@ export const siteIdentityConfig = {
   // Placeholder — point at this client's real asset CDN before going live.
   assetHost: 'https://example-assets.netlify.app',
   assetFolder: 'fernwell',
+  pdfToolProjectId: 'fernwell',
 } satisfies SiteIdentityConfig;
