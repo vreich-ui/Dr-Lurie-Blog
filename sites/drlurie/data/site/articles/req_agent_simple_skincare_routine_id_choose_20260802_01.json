@@ -1,8 +1,8 @@
 {
   "__generated": {
-    "at": "2026-08-02T11:14:58.386Z",
+    "at": "2026-08-02T16:47:59.006Z",
     "from": "objects/content_item/by-id/req_agent_simple_skincare_routine_id_choose_20260802_01.json",
-    "record_version": 2
+    "record_version": 6
   },
   "author": "Dr. Lurie Skincare",
   "deck": "A practical morning-and-evening routine built around consistency, comfort, and sun protection.",
@@ -13,6 +13,18 @@
       "kind": "content",
       "public": {
         "body": "If I were building a skincare routine for myself, I would make it deliberately boring. Skin usually does not need a crowded shelf or a new experiment every week. I would choose a few comfortable products, use them consistently, and change only one thing at a time.",
+        "images": [
+          {
+            "alt": "A simple morning skincare routine with cleanser, moisturizer, and sunscreen",
+            "src": "/img/req_agent_simple_skincare_routine_id_choose_20260802_01/aa5af8044647af6c30e0f7d0e2e79ccb371a8245754108b7a2aeb55e21387b63.webp",
+            "type": "image"
+          },
+          {
+            "alt": "A calm evening skincare routine with cleanser and moisturizer",
+            "src": "/img/req_agent_simple_skincare_routine_id_choose_20260802_01/6b94abefdba2eb4847cc1b22949928193ee66e31806faca1d178427386c1421b.webp",
+            "type": "image"
+          }
+        ],
         "title": "Simple on purpose"
       },
       "rendering": {
