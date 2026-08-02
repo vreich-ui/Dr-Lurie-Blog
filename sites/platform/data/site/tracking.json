@@ -1,0 +1,48 @@
+{
+  "__generated": {
+    "at": "2026-08-02T18:20:17.278Z",
+    "from": "objects/tracking_config/by-id/trk_platform.json",
+    "record_version": 2
+  },
+  "consent": {
+    "banner": {
+      "accept_label": "Allow",
+      "body": "Platform documentation does not enable third-party analytics by default. If measurement is enabled later, choose whether non-essential tracking may run.",
+      "headline": "Your privacy choices",
+      "manage_label": "Manage",
+      "reject_label": "Decline"
+    },
+    "honor_gpc": true,
+    "posture": "consent-first",
+    "restricted_regions": []
+  },
+  "defaults": {
+    "content_item": [
+      "pageview",
+      "read_progress",
+      "completion"
+    ],
+    "navigation": [
+      "nav_click"
+    ],
+    "outbound_links": true,
+    "page": [
+      "pageview",
+      "scroll_depth",
+      "completion"
+    ],
+    "product": [
+      "pageview",
+      "buy_click"
+    ],
+    "section": [
+      "section_impression"
+    ],
+    "taxonomy": [
+      "term_view",
+      "tag_click"
+    ],
+    "utm_capture": false
+  },
+  "providers": {}
+}
