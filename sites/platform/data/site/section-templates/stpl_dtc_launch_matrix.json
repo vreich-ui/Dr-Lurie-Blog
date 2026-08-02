@@ -1,0 +1,64 @@
+{
+  "__generated": {
+    "at": "2026-08-02T18:19:51.475Z",
+    "from": "objects/section_template/by-id/stpl_dtc_launch_matrix.json",
+    "record_version": 2
+  },
+  "blueprint": {
+    "data": {
+      "columns": [
+        {
+          "label": "Surface"
+        },
+        {
+          "label": "Object"
+        },
+        {
+          "label": "Gate"
+        }
+      ],
+      "heading": "Map each surface to its governing object",
+      "kicker": "DTC architecture",
+      "rows": [
+        {
+          "cells": [
+            "Customer route",
+            "page",
+            "Structure + references"
+          ],
+          "label": "Landing page"
+        },
+        {
+          "cells": [
+            "Commercial promise",
+            "product",
+            "Approval + payment"
+          ],
+          "label": "Offer"
+        },
+        {
+          "cells": [
+            "Education",
+            "content_item",
+            "Taxonomy + safety"
+          ],
+          "label": "Story"
+        },
+        {
+          "cells": [
+            "Consent-aware events",
+            "tracking_config",
+            "Provider readiness"
+          ],
+          "label": "Measurement"
+        }
+      ]
+    },
+    "id": "s_dtcmatrix",
+    "type": "comparison_table"
+  },
+  "description": "A reusable comparison table that maps customer-facing DTC surfaces to their governed object and release gate.",
+  "name": "DTC launch matrix",
+  "scope": "evergreen",
+  "whenToUse": "Use in architecture, launch planning, and commerce documentation where a cross-object dependency view is more useful than prose."
+}
