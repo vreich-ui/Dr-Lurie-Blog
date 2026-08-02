@@ -19,6 +19,7 @@ import test from 'node:test';
 import {
   checkDeploySafety,
   checkRenderability,
+  checkRenderTargetSupport,
   protectedEnvValues,
   summarizeValidation,
   validateObject,
@@ -142,4 +143,72 @@ test('the full pipeline blocks the real trap-14 shape at validate/patch/create/p
     summary.blockers.some((blocker) => blocker.id === 'deploy_safety'),
     JSON.stringify(summary.blockers.map((blocker) => blocker.id))
   );
+});
+
+test('render target support: unresolved taxonomy targets are write-time blockers', () => {
+  const body = {
+    role: 'header',
+    groups: [
+      {
+        id: 'g_primary',
+        items: [
+          {
+            id: 'i_topic',
+            label: 'Topic',
+            target: { kind: 'taxonomy', termKind: 'category', term_id: 'cat_skin' },
+          },
+        ],
+      },
+    ],
+  };
+  const [criterion] = checkRenderTargetSupport('navigation', body);
+  assert.equal(criterion.status, 'missing');
+  assert.match(criterion.message, /category\/cat_skin/);
+
+  const summary = summarizeValidation(validateObject({ objectType: 'navigation', objectId: 'nav_header', body }));
+  assert.equal(summary.eligible, false);
+  assert.ok(summary.blockers.some((blocker) => blocker.id === 'render_nav_targets'));
+});
+
+test('render target support: page targets are supported by the committed Page route resolver', () => {
+  const body = {
+    role: 'header',
+    groups: [
+      {
+        id: 'g_primary',
+        items: [{ id: 'i_library', label: 'Library', target: { kind: 'page', page: 'page_library' } }],
+      },
+    ],
+  };
+  const criteria = checkRenderTargetSupport(
+    'navigation',
+    body,
+    { resolveObject: () => ({ exists: true, published: true }) },
+    true
+  );
+  assert.equal(criteria.find((criterion) => criterion.id === 'render_nav_targets')?.status, 'complete');
+  assert.equal(criteria.find((criterion) => criterion.id === 'render_page_targets_published')?.status, 'complete');
+});
+
+test('render target support: actions cannot publish before their target Page export exists', () => {
+  const body = {
+    section: {
+      id: 's_cta',
+      type: 'cta_banner',
+      data: {
+        heading: 'Read next',
+        actions: [{ label: 'Draft page', target: { kind: 'page', page: 'page_draft' } }],
+      },
+    },
+  };
+  const context = { resolveObject: () => ({ exists: true, published: false }) };
+  const draft = checkRenderTargetSupport('section', body, context, false);
+  const publish = checkRenderTargetSupport('section', body, context, true);
+  assert.equal(draft.find((criterion) => criterion.id === 'render_page_targets_published')?.status, 'warning');
+  assert.equal(publish.find((criterion) => criterion.id === 'render_page_targets_published')?.status, 'missing');
+
+  const summary = summarizeValidation(
+    validateObject({ objectType: 'section', objectId: 'sec_cta', body }, { ...context, publishIntent: true })
+  );
+  assert.ok(summary.blockers.some((blocker) => blocker.id === 'render_page_targets_published'));
 });

@@ -3,13 +3,8 @@ import Layout from '~/layouts/Layout.astro';
 import Header from '~/components/widgets/Header.astro';
 import Footer from '~/components/widgets/Footer.astro';
 import { getEntry } from 'astro:content';
-import {
-  createNavTargetResolver,
-  navigationToFooterProps,
-  navigationToHeaderProps,
-  parseNavigationExport,
-} from '~/utils/navigation-data';
-import { getBlogPermalink } from '~/utils/permalinks';
+import { navigationToFooterProps, navigationToHeaderProps, parseNavigationExport } from '~/utils/navigation-data';
+import { buildSiteNavTargetResolver } from '~/utils/site-nav-targets';
 import { getSiteObject } from '~/utils/site-object';
 
 import type { MetaData } from '~/types';
@@ -46,7 +41,7 @@ if (!headerEntry || !footerEntry) {
       'new site, or docs/cms-architecture/cms-pipeline/phase-2-runbook.md §4 for the original cutover.'
   );
 }
-const resolveNavTarget = createNavTargetResolver({ blogPermalink: getBlogPermalink() });
+const resolveNavTarget = await buildSiteNavTargetResolver();
 const headerData = navigationToHeaderProps(parseNavigationExport(headerEntry.data), resolveNavTarget);
 const footerData = navigationToFooterProps(parseNavigationExport(footerEntry.data), resolveNavTarget);
 ---
