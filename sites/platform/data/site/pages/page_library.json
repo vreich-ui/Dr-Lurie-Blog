@@ -1,18 +1,27 @@
 {
   "__generated": {
-    "at": "2026-08-02T11:31:35.688Z",
+    "at": "2026-08-02T18:31:55.726Z",
     "from": "objects/page/by-id/page_library.json",
-    "record_version": 2
+    "record_version": 7
   },
   "pageType": "listing",
   "route": "/library",
   "sections": [
     {
       "data": {
-        "actions": [],
-        "body": "<p>Browse practical articles published on the platform.</p>",
-        "heading": "Articles and resources",
-        "kicker": "Library"
+        "actions": [
+          {
+            "label": "Read the object model article",
+            "style": "primary",
+            "target": {
+              "href": "/everything-is-an-object",
+              "kind": "route"
+            }
+          }
+        ],
+        "body": "<p>Long-form explanations complement the object reference. Each article is a governed <strong>content_item</strong> with reader-visible nodes and private editorial annotations.</p>",
+        "heading": "Concepts and operational guides",
+        "kicker": "Platform library"
       },
       "id": "s_libraryintro",
       "type": "lede"
@@ -20,7 +29,7 @@
     {
       "data": {
         "columns": 3,
-        "heading": "Latest articles",
+        "heading": "Published Platform articles",
         "limit": 12,
         "source": {
           "fallback": {
