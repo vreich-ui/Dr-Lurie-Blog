@@ -1,21 +1,65 @@
 {
   "__generated": {
-    "at": "2026-08-02T11:24:48.496Z",
+    "at": "2026-08-02T18:15:57.463Z",
     "from": "objects/taxonomy/by-id/tax_platform.json",
-    "record_version": 5
+    "record_version": 15
   },
   "kinds": {
     "category": {
-      "terms": []
+      "terms": [
+        {
+          "description": "Task-focused explanations for operating the CMS",
+          "label": "Guide",
+          "slug": "guide",
+          "status": "active",
+          "term_id": "t_guide"
+        },
+        {
+          "description": "Object schemas, contracts, and technical reference",
+          "label": "Reference",
+          "slug": "reference",
+          "status": "active",
+          "term_id": "t_reference"
+        }
+      ]
     },
     "tag": {
       "terms": [
         {
           "description": "Skincare routines, ingredients, and practical skin-health guidance",
           "label": "Skincare",
+          "merged_into": "t_architecture",
           "slug": "skincare",
-          "status": "active",
+          "status": "deprecated",
           "term_id": "t_skincare"
+        },
+        {
+          "description": "Core object model and rendering architecture",
+          "label": "Architecture",
+          "slug": "architecture",
+          "status": "active",
+          "term_id": "t_architecture"
+        },
+        {
+          "description": "Validation, review, publication, and release workflow",
+          "label": "Publishing",
+          "slug": "publishing",
+          "status": "active",
+          "term_id": "t_publishing"
+        },
+        {
+          "description": "Tenant generation, isolation, and fleet propagation",
+          "label": "Multisite",
+          "slug": "multisite",
+          "status": "active",
+          "term_id": "t_multisite"
+        },
+        {
+          "description": "Round-trip, build, authorization, and visual verification",
+          "label": "Testing",
+          "slug": "testing",
+          "status": "active",
+          "term_id": "t_testing"
         }
       ]
     }
