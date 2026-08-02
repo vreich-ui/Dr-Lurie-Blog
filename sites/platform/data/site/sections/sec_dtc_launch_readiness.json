@@ -1,0 +1,69 @@
+{
+  "__generated": {
+    "at": "2026-08-02T18:19:25.156Z",
+    "from": "objects/section/by-id/sec_dtc_launch_readiness.json",
+    "record_version": 2
+  },
+  "section": {
+    "data": {
+      "anchor": "dtc-launch-readiness",
+      "columns": [
+        {
+          "label": "Customer surface"
+        },
+        {
+          "label": "Primary object"
+        },
+        {
+          "label": "Release gate"
+        }
+      ],
+      "heading": "A DTC launch is a graph of governed objects",
+      "kicker": "DTC example",
+      "rows": [
+        {
+          "cells": [
+            "Page",
+            "page + sections",
+            "Route, structure, references"
+          ],
+          "label": "Campaign landing page"
+        },
+        {
+          "cells": [
+            "Section",
+            "shared section",
+            "Component schema, reader safety"
+          ],
+          "label": "Reusable trust block"
+        },
+        {
+          "cells": [
+            "Product",
+            "product",
+            "Human approval, payment linkage"
+          ],
+          "label": "Offer and price"
+        },
+        {
+          "cells": [
+            "Article",
+            "content_item",
+            "Taxonomy, visible nodes, media trust"
+          ],
+          "label": "Educational story"
+        },
+        {
+          "cells": [
+            "Tracking",
+            "tracking_config",
+            "Consent posture, typed provider IDs"
+          ],
+          "label": "Acquisition measurement"
+        }
+      ]
+    },
+    "id": "s_dtcreadiness",
+    "type": "comparison_table"
+  }
+}
