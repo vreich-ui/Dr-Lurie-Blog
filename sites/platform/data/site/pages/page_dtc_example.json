@@ -1,8 +1,8 @@
 {
   "__generated": {
-    "at": "2026-08-02T18:28:00.909Z",
+    "at": "2026-08-02T18:38:38.633Z",
     "from": "objects/page/by-id/page_dtc_example.json",
-    "record_version": 2
+    "record_version": 6
   },
   "pageType": "standard",
   "route": "/manual/examples/dtc-launch",
@@ -32,6 +32,59 @@
       },
       "id": "s_dtcshared",
       "type": "shared_ref"
+    },
+    {
+      "data": {
+        "columns": [
+          {
+            "label": "Surface"
+          },
+          {
+            "label": "Object"
+          },
+          {
+            "label": "Gate"
+          }
+        ],
+        "heading": "Map each surface to its governing object",
+        "kicker": "DTC architecture",
+        "rows": [
+          {
+            "cells": [
+              "Customer route",
+              "page",
+              "Structure + references"
+            ],
+            "label": "Landing page"
+          },
+          {
+            "cells": [
+              "Commercial promise",
+              "product",
+              "Approval + payment"
+            ],
+            "label": "Offer"
+          },
+          {
+            "cells": [
+              "Education",
+              "content_item",
+              "Taxonomy + safety"
+            ],
+            "label": "Story"
+          },
+          {
+            "cells": [
+              "Consent-aware events",
+              "tracking_config",
+              "Provider readiness"
+            ],
+            "label": "Measurement"
+          }
+        ]
+      },
+      "id": "s_69f5a1185c63",
+      "type": "comparison_table"
     },
     {
       "data": {
