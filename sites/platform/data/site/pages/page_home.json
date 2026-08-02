@@ -1,8 +1,8 @@
 {
   "__generated": {
-    "at": "2026-07-26T18:04:31.108Z",
+    "at": "2026-08-02T18:31:15.135Z",
     "from": "objects/page/by-id/page_home.json",
-    "record_version": 12
+    "record_version": 19
   },
   "navigationOverrides": {
     "footer": "nav_footer"
@@ -12,10 +12,116 @@
   "sections": [
     {
       "data": {
-        "body": "<h2>Platform is live.</h2><p>Created through the front door — this store record replaces the bootstrap stub on the next publish.</p>"
+        "actions": [
+          {
+            "label": "Start here",
+            "style": "primary",
+            "target": {
+              "kind": "page",
+              "page": "page_start"
+            }
+          },
+          {
+            "label": "Read the manual",
+            "style": "secondary",
+            "target": {
+              "kind": "page",
+              "page": "page_manual"
+            }
+          }
+        ],
+        "body": "<p>The Platform tenant is executable documentation: its pages, menus, taxonomy, recipes, theme, article, tracking posture, product example, and editorial voice all use the same contracts it explains.</p>",
+        "heading": "Build, publish, and operate every surface as an object",
+        "kicker": "Governed CMS reference",
+        "variant": "split"
       },
       "id": "s_welcome",
+      "type": "hero"
+    },
+    {
+      "data": {
+        "body": "<h2>One governed front door</h2><p>Each object type has a strict body schema, a small set of typed patch operations, reference rules, creation policy, and publication policy. Agents read the live contract, validate candidates, edit under a lease, publish dark exports, and release a verified batch.</p><h2>Software is shared; tenants are isolated</h2><p>Core packages own rendering and publishing behavior. Each site owns its content, policies, credentials, stores, exports, and deployment. A core fix propagates through fleet CI without mixing tenant data.</p>"
+      },
+      "id": "s_how",
       "type": "prose"
+    },
+    {
+      "data": {
+        "heading": "Choose a path",
+        "links": [
+          {
+            "label": "Getting started",
+            "target": {
+              "kind": "page",
+              "page": "page_start"
+            }
+          },
+          {
+            "label": "Architecture",
+            "target": {
+              "kind": "page",
+              "page": "page_architecture"
+            }
+          },
+          {
+            "label": "V1 publishing schema",
+            "target": {
+              "kind": "page",
+              "page": "page_publishing_v1"
+            }
+          },
+          {
+            "label": "Multisite generation",
+            "target": {
+              "kind": "page",
+              "page": "page_multisite"
+            }
+          },
+          {
+            "label": "Testing evidence",
+            "target": {
+              "kind": "page",
+              "page": "page_testing"
+            }
+          },
+          {
+            "label": "DTC worked example",
+            "target": {
+              "kind": "page",
+              "page": "page_dtc_example"
+            }
+          }
+        ]
+      },
+      "id": "s_paths",
+      "type": "link_list"
+    },
+    {
+      "data": {
+        "actions": [
+          {
+            "label": "View findings",
+            "style": "primary",
+            "target": {
+              "kind": "page",
+              "page": "page_known_gaps"
+            }
+          },
+          {
+            "label": "Browse object types",
+            "style": "secondary",
+            "target": {
+              "kind": "page",
+              "page": "page_manual"
+            }
+          }
+        ],
+        "body": "<p>Every example on this site is backed by a real governed record. Current limitations and failed validations are recorded alongside the workflow.</p>",
+        "compact": false,
+        "heading": "Documentation that can fail honestly"
+      },
+      "id": "s_status",
+      "type": "cta_banner"
     }
   ],
   "seo": {
