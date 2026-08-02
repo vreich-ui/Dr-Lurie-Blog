@@ -1,8 +1,8 @@
 {
   "__generated": {
-    "at": "2026-07-26T17:52:22.446Z",
+    "at": "2026-08-02T18:32:25.267Z",
     "from": "objects/page/by-id/page_manual_page.json",
-    "record_version": 2
+    "record_version": 5
   },
   "pageType": "system",
   "route": "/manual/types/page",
@@ -16,7 +16,7 @@
     },
     {
       "data": {
-        "body": "<h2>Body fields</h2><ul><li><strong>tracking</strong></li><li><strong>route</strong> <em>(required)</em></li><li><strong>pageType</strong> <em>(required)</em></li><li><strong>title</strong> <em>(required)</em></li><li><strong>seo</strong> <em>(required)</em></li><li><strong>template</strong></li><li><strong>sections</strong> <em>(required)</em></li><li><strong>navigationOverrides</strong></li></ul><h2>Patch operations</h2><ul><li><strong>set_page_meta</strong> — Merge page meta fields (title/route/seo/…); sections are edited only via section ops.</li><li><strong>upsert_section</strong></li><li><strong>update_section_data</strong></li><li><strong>move_section</strong></li><li><strong>set_section_visibility</strong></li><li><strong>remove_section</strong></li><li><strong>set_tracking</strong></li></ul><p><em>This reference is generated from the live <strong>object_contract</strong>. If it disagrees with the contract, the manual is wrong and the drift guard fails the build of it.</em></p>"
+        "body": "<h2>Body fields</h2><ul><li><strong>tracking</strong></li><li><strong>route</strong> <em>(required)</em></li><li><strong>pageType</strong> <em>(required)</em></li><li><strong>title</strong> <em>(required)</em></li><li><strong>seo</strong> <em>(required)</em></li><li><strong>template</strong></li><li><strong>sections</strong> <em>(required)</em></li><li><strong>navigationOverrides</strong></li></ul><h2>Patch operations</h2><ul><li><strong>set_page_meta</strong> — Merge page meta fields (title/route/seo/…); sections are edited only via section ops.</li><li><strong>upsert_section</strong></li><li><strong>update_section_data</strong></li><li><strong>move_section</strong></li><li><strong>set_section_visibility</strong></li><li><strong>remove_section</strong></li><li><strong>set_tracking</strong></li></ul><p><em>This reference is generated from the live <strong>object_contract</strong>. If it disagrees with the contract, the manual is wrong and the drift guard fails the build of it.</em></p><h2>Worked example</h2><p><strong>page_publishing_v1</strong> owns the route <strong>/manual/publishing-schema-v1</strong> and composes lede, steps, comparison table, and prose sections. It was created, validated, published dark, and released with the rest of this manual.</p><h2>Lifecycle note</h2><p>Routes must be unique; page-kind references must resolve; PageType law controls which sections may publish.</p>"
       },
       "id": "s_reference",
       "type": "prose"
