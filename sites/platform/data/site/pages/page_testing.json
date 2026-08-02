@@ -1,0 +1,123 @@
+{
+  "__generated": {
+    "at": "2026-08-02T18:27:46.800Z",
+    "from": "objects/page/by-id/page_testing.json",
+    "record_version": 2
+  },
+  "pageType": "standard",
+  "route": "/manual/testing",
+  "sections": [
+    {
+      "data": {
+        "actions": [
+          {
+            "label": "V1 publishing",
+            "style": "primary",
+            "target": {
+              "href": "/manual/publishing-schema-v1",
+              "kind": "route"
+            }
+          },
+          {
+            "label": "Known findings",
+            "style": "secondary",
+            "target": {
+              "href": "/manual/known-gaps",
+              "kind": "route"
+            }
+          }
+        ],
+        "body": "<p>Platform testing follows the real lifecycle and records where a failure occurred: contract, store, export, build, published deploy, or browser.</p>",
+        "heading": "A green build is only one layer of proof",
+        "kicker": "QA"
+      },
+      "id": "s_testlede",
+      "type": "lede"
+    },
+    {
+      "data": {
+        "heading": "A representative object test",
+        "items": [
+          "Contract and inventory read",
+          "Create or fetch succeeds",
+          "Invalid candidate is rejected without a write",
+          "Valid candidate passes",
+          "Checkout supplies a lease and version",
+          "Typed patch writes expected content",
+          "Publish produces a dark commit",
+          "Checkin releases the lease",
+          "One batch release confirms the production deploy",
+          "Desktop and mobile routes render and link correctly"
+        ],
+        "kicker": "Evidence"
+      },
+      "id": "s_testcheck",
+      "type": "checklist"
+    },
+    {
+      "data": {
+        "columns": [
+          {
+            "label": "Signal"
+          },
+          {
+            "label": "Proves"
+          },
+          {
+            "label": "Does not prove"
+          }
+        ],
+        "heading": "What each signal proves",
+        "kicker": "Failure localization",
+        "rows": [
+          {
+            "cells": [
+              "Schema and governed constraints",
+              "Persistence or rendering"
+            ],
+            "label": "object_validate"
+          },
+          {
+            "cells": [
+              "Export committed and revision stamped",
+              "Production is live"
+            ],
+            "label": "object_publish"
+          },
+          {
+            "cells": [
+              "Target commit is the published deploy",
+              "Every page is visually correct"
+            ],
+            "label": "deploy_status"
+          },
+          {
+            "cells": [
+              "Rendered route and interaction",
+              "Unseen authorization cells"
+            ],
+            "label": "browser verification"
+          }
+        ]
+      },
+      "id": "s_testtable",
+      "type": "comparison_table"
+    },
+    {
+      "data": {
+        "body": "<h2>This site is executable documentation</h2><p>The examples on Platform are real records created through its MCP. The DTC comparison is a shared section; the reference recipe is a template; the documentation palette is a theme; the README article is a content item; analytics defaults live in the tracking singleton; the sample offer and editorial voice exercise approval-gated types.</p>"
+      },
+      "id": "s_testprose",
+      "type": "prose"
+    }
+  ],
+  "seo": {
+    "description": "A practical test matrix for object contracts, round trips, authorization, releases, and visual verification.",
+    "robots": {
+      "follow": false,
+      "index": false
+    },
+    "title": "Testing the platform"
+  },
+  "title": "Testing the platform"
+}
