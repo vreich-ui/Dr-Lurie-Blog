@@ -1,8 +1,8 @@
 {
   "__generated": {
-    "at": "2026-07-26T17:53:19.002Z",
+    "at": "2026-08-02T18:34:18.338Z",
     "from": "objects/page/by-id/page_manual_template.json",
-    "record_version": 2
+    "record_version": 5
   },
   "pageType": "system",
   "route": "/manual/types/template",
@@ -16,7 +16,7 @@
     },
     {
       "data": {
-        "body": "<h2>Body fields</h2><ul><li><strong>tracking</strong></li><li><strong>name</strong> <em>(required)</em></li><li><strong>description</strong></li><li><strong>whenToUse</strong></li><li><strong>scope</strong></li><li><strong>appliesTo</strong> <em>(required)</em></li><li><strong>slots</strong> <em>(required)</em></li></ul><h2>Patch operations</h2><ul><li><strong>set_template_meta</strong></li><li><strong>upsert_slot</strong></li><li><strong>move_slot</strong></li><li><strong>remove_slot</strong></li><li><strong>set_tracking</strong></li></ul><p><em>This reference is generated from the live <strong>object_contract</strong>. If it disagrees with the contract, the manual is wrong and the drift guard fails the build of it.</em></p>"
+        "body": "<h2>Body fields</h2><ul><li><strong>tracking</strong></li><li><strong>name</strong> <em>(required)</em></li><li><strong>description</strong></li><li><strong>whenToUse</strong></li><li><strong>scope</strong></li><li><strong>appliesTo</strong> <em>(required)</em></li><li><strong>slots</strong> <em>(required)</em></li></ul><h2>Patch operations</h2><ul><li><strong>set_template_meta</strong></li><li><strong>upsert_slot</strong></li><li><strong>move_slot</strong></li><li><strong>remove_slot</strong></li><li><strong>set_tracking</strong></li></ul><p><em>This reference is generated from the live <strong>object_contract</strong>. If it disagrees with the contract, the manual is wrong and the drift guard fails the build of it.</em></p><h2>Worked example</h2><p><strong>tpl_object_reference</strong> defines an introduction slot and repeatable detail slot. It stamped the editorial_voice reference page and recorded template provenance without creating a live inheritance link.</p><h2>Lifecycle note</h2><p>Templates are recipes; PageTypes remain structural law. Required slots need usable blueprints before the recipe is publish-ready.</p>"
       },
       "id": "s_reference",
       "type": "prose"
