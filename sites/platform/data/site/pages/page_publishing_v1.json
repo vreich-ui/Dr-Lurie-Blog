@@ -1,0 +1,134 @@
+{
+  "__generated": {
+    "at": "2026-08-02T18:27:17.637Z",
+    "from": "objects/page/by-id/page_publishing_v1.json",
+    "record_version": 2
+  },
+  "pageType": "standard",
+  "route": "/manual/publishing-schema-v1",
+  "sections": [
+    {
+      "data": {
+        "actions": [
+          {
+            "label": "Object lifecycle",
+            "style": "primary",
+            "target": {
+              "href": "/manual/lifecycle",
+              "kind": "route"
+            }
+          },
+          {
+            "label": "Type reference",
+            "style": "secondary",
+            "target": {
+              "href": "/manual",
+              "kind": "route"
+            }
+          }
+        ],
+        "body": "<p>V1 gives every governed object the same concurrency, validation, review, publication, and release semantics.</p>",
+        "heading": "Publishing is a state machine, not a file write",
+        "kicker": "V1 contract"
+      },
+      "id": "s_v1lede",
+      "type": "lede"
+    },
+    {
+      "data": {
+        "columns": 3,
+        "heading": "From intent to production",
+        "items": [
+          {
+            "description": "Read inventory and the live type contract.",
+            "title": "Discover"
+          },
+          {
+            "description": "Build the candidate body or typed patch and dry-run validation.",
+            "title": "Prepare"
+          },
+          {
+            "description": "Checkout returns a lease token and the next expected record version.",
+            "title": "Lock"
+          },
+          {
+            "description": "Patch operations apply atomically and preserve an inverse.",
+            "title": "Write"
+          },
+          {
+            "description": "Validate, materialize an export, commit with skip-build, stamp the revision.",
+            "title": "Publish"
+          },
+          {
+            "description": "Build the accumulated commit once and confirm it is the published deploy.",
+            "title": "Release"
+          }
+        ],
+        "kicker": "Lifecycle"
+      },
+      "id": "s_v1steps",
+      "type": "steps"
+    },
+    {
+      "data": {
+        "columns": [
+          {
+            "label": "Field"
+          },
+          {
+            "label": "Changes when"
+          },
+          {
+            "label": "Purpose"
+          }
+        ],
+        "heading": "Three counters answer three different questions",
+        "kicker": "Concurrency",
+        "rows": [
+          {
+            "cells": [
+              "Record state",
+              "Any record write, including locks/review",
+              "Optimistic concurrency"
+            ],
+            "label": "version"
+          },
+          {
+            "cells": [
+              "Body",
+              "A content operation changes the body",
+              "Approval freshness and audit"
+            ],
+            "label": "content_revision"
+          },
+          {
+            "cells": [
+              "Publication",
+              "A revision is successfully published",
+              "Detect unpublished changes"
+            ],
+            "label": "published_content_revision"
+          }
+        ]
+      },
+      "id": "s_v1counters",
+      "type": "comparison_table"
+    },
+    {
+      "data": {
+        "body": "<h2>Failure is explicit</h2><ul><li><strong>423</strong> means the lease is missing, expired, or held elsewhere.</li><li><strong>409</strong> means the expected version or guarded state is stale.</li><li><strong>422</strong> means the operation or resulting body violates the contract.</li><li><strong>403</strong> means creation, review, or publication policy refused the action.</li></ul><h2>Publish and release are intentionally separate</h2><p>A successful publish is committed but not live. One explicit release deploys all accumulated exports, and success requires confirmation that production is serving the target commit.</p>"
+      },
+      "id": "s_v1prose",
+      "type": "prose"
+    }
+  ],
+  "seo": {
+    "description": "The record envelope, typed patch model, approval gates, dark publish, and explicit release used in V1.",
+    "robots": {
+      "follow": false,
+      "index": false
+    },
+    "title": "V1 publishing schema"
+  },
+  "title": "V1 publishing schema"
+}
