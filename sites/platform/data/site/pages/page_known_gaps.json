@@ -1,0 +1,46 @@
+{
+  "__generated": {
+    "at": "2026-08-02T18:28:15.497Z",
+    "from": "objects/page/by-id/page_known_gaps.json",
+    "record_version": 2
+  },
+  "pageType": "standard",
+  "route": "/manual/known-gaps",
+  "sections": [
+    {
+      "data": {
+        "actions": [
+          {
+            "label": "Testing method",
+            "style": "primary",
+            "target": {
+              "href": "/manual/testing",
+              "kind": "route"
+            }
+          }
+        ],
+        "body": "<p>This page records verified behavior and gaps discovered while building the Platform manual through the Platform itself.</p>",
+        "heading": "Findings belong beside the workflow they affect",
+        "kicker": "Living QA record"
+      },
+      "id": "s_gapslede",
+      "type": "lede"
+    },
+    {
+      "data": {
+        "body": "<h2>Verified in this build</h2><ul><li>Object validation rejected invalid article annotations without persisting.</li><li>Taxonomy, article, section, section template, template, theme, tracking configuration, and site changes completed their governed lifecycle.</li><li>Product and editorial voice creation succeeded, review opened, and publish correctly refused without approval.</li></ul><h2>Open finding</h2><p>A template slot schema accepts <strong>shared_ref</strong>, but live template structural validation currently reports it as an unregistered component. The documentation template was created without that slot while the validator mismatch is tracked for repair.</p>"
+      },
+      "id": "s_gapsprose",
+      "type": "prose"
+    }
+  ],
+  "seo": {
+    "description": "Observed platform behavior, current limitations, and verification status from live README-site QA.",
+    "robots": {
+      "follow": false,
+      "index": false
+    },
+    "title": "Findings and known gaps"
+  },
+  "title": "Findings and known gaps"
+}
