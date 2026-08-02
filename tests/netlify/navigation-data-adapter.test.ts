@@ -201,9 +201,18 @@ test('resolver: route/asset/external pass through; listing → blog permalink', 
   assert.equal(resolve({ kind: 'listing', list: 'content_index' }), '/learn/library');
 });
 
-test('resolver: page/taxonomy targets throw loudly in Phase 2 (no silent dead links)', () => {
-  assert.throws(() => resolve({ kind: 'page', page: 'page_home' }), /materialize time/);
-  assert.throws(() => resolve({ kind: 'taxonomy', termKind: 'category', term_id: 't_abc' }), /taxonomy registry/);
+test('resolver: uninjected page routes and unsupported taxonomy targets throw loudly (no silent dead links)', () => {
+  assert.throws(() => resolve({ kind: 'page', page: 'page_home' }), /published Page export/);
+  assert.throws(() => resolve({ kind: 'taxonomy', termKind: 'category', term_id: 't_abc' }), /taxonomy route/);
+});
+
+test('resolver: page targets resolve from the injected committed Page route map', () => {
+  const withPages = createNavTargetResolver({
+    blogPermalink: '/learn/library',
+    resolvePage: (pageId) => (pageId === 'page_library' ? '/learn/library' : undefined),
+  });
+  assert.equal(withPages({ kind: 'page', page: 'page_library' }), '/learn/library');
+  assert.throws(() => withPages({ kind: 'page', page: 'page_missing' }), /published Page export/);
 });
 
 // ── M-9: adminOnly carry-through (admin menu → main nav, client-gated) ────────

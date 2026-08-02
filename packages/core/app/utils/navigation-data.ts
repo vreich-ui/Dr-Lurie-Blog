@@ -22,12 +22,10 @@
  *  - Header chrome flags (isSticky/showRssFeed/showToggleTheme) are not nav
  *    data — they stay where they are until the Site object lands (P5).
  *
- * Target resolution mirrors what the D§3.8 materializer contract will do for
- * `page`-kind targets at materialize time. In Phase 2 no published nav may
- * carry page/taxonomy targets (Gap Note 2: everything page-like is seeded as
- * `route`), so those two kinds THROW here — a loud build failure instead of a
- * silently dead link; T3.11/T4.5 upgrade targets only after materialize-time
- * resolution exists.
+ * Route-like targets resolve directly. Page targets resolve through a Page-id
+ * → route callback injected by the Astro/content-collection boundary. Taxonomy
+ * targets still THROW rather than becoming silent dead links; the governed
+ * object validator blocks them until that route resolver exists.
  */
 // Relative + extensioned so this module compiles under both Astro/Vite and
 // the NodeNext test compiler (tsconfig.test.json has no `~` alias).
@@ -80,7 +78,14 @@ export type FooterNavProps = {
  * exports. `blogPermalink` is injected (getBlogPermalink() from the Astro
  * side, a literal in tests) so this module stays free of astrowind:config.
  */
-export const createNavTargetResolver = (options: { blogPermalink: string }): NavTargetResolver => {
+export const createNavTargetResolver = (options: {
+  blogPermalink: string;
+  /**
+   * Page-object id → published route. Astro callers inject this from the
+   * committed page-object collection; pure/unit-test callers may omit it.
+   */
+  resolvePage?: (pageId: string) => string | undefined;
+}): NavTargetResolver => {
   return (target: NavTarget): string => {
     switch (target.kind) {
       case 'route':
@@ -89,15 +94,18 @@ export const createNavTargetResolver = (options: { blogPermalink: string }): Nav
         return target.href;
       case 'listing':
         return options.blogPermalink;
-      case 'page':
+      case 'page': {
+        const route = options.resolvePage?.(target.page);
+        if (route) return route;
         throw new Error(
-          `NavTarget page:"${target.page}" cannot be resolved by the P2 adapter — page targets resolve at ` +
-            'materialize time once Page objects exist (T3.11/T4.5); Phase 2 navs must carry route-kind targets.'
+          `NavTarget page:"${target.page}" cannot be resolved — its published Page export is missing or has no route. ` +
+            'Publish the Page first, or use a route-kind target.'
         );
+      }
       case 'taxonomy':
         throw new Error(
-          `NavTarget taxonomy:${target.termKind}/${target.term_id} cannot be resolved by the P2 adapter — ` +
-            'no taxonomy registry export exists until P5; Phase 2 navs must carry route-kind targets.'
+          `NavTarget taxonomy:${target.termKind}/${target.term_id} cannot be resolved by the site adapter — ` +
+            'use a route-kind target until taxonomy route resolution is implemented.'
         );
     }
   };

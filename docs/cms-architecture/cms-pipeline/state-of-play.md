@@ -7,6 +7,41 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-08-02 (platform Netlify build incident — NavTarget renderability closed)
+
+An autonomous publish added `Library` to platform `nav_header` with the
+schema-valid target `{kind:"page", page:"page_library"}`, after publishing the
+referenced Page object. `object_validate` accepted it because the page existed
+and was published. The subsequent `release_to_production` build failed while
+rendering `/404`: the shared navigation adapter still threw on every page-kind
+target. The article published in the same batch was unrelated to the failure.
+
+**Root cause:** the governed write contract and the build renderer disagreed.
+The schema/reference gate advertised published Page targets as legal, but the
+Astro adapter still implemented only the old route-kind bridge. This was a
+system defect, not an agent-content mistake.
+
+**Fix and guardrail:** the site-bound resolver now derives a Page-id → route map
+from the site's committed `pageObject` collection and injects it everywhere a
+NavTarget renders (default header/footer, footer overrides, 404 alternatives,
+and section actions). The published platform target therefore resolves to
+`/library` without editing the generated export or desynchronizing it
+from the object store. Taxonomy targets remain schema-level vocabulary without
+a route resolver; `render_nav_targets` now rejects them through the common
+validation pipeline used by create, candidate validate, patch, and publish.
+They must remain route-kind until resolution exists, so another agent cannot
+turn that known renderer mismatch into a release-time build failure. The same
+renderability gate requires every page-kind target in page, section, and
+template actions to reference an already-published Page before the containing
+object may publish; that guarantees the route export the resolver consumes is
+already committed.
+
+**Verification:** the exact platform Netlify command
+`npx --no-install astro build --config sites/platform/astro.config.ts` is green
+with the incident export unchanged (28 pages); the Dr-Lurie fleet build is
+green (75 pages); `npm test` is green (1621 core/netlify + 89 script tests);
+`astro check` reports 0 errors.
+
 ## Session 2026-07-31 (Dr. Lurie ChatGPT connection expiry + agent tool-surface cleanup)
 
 The reported connect-then-drop behavior was reproduced through the live app:
