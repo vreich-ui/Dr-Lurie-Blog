@@ -1,15 +1,23 @@
 {
   "__generated": {
-    "at": "2026-07-26T16:59:50.213Z",
+    "at": "2026-08-02T11:24:48.496Z",
     "from": "objects/taxonomy/by-id/tax_platform.json",
-    "record_version": 2
+    "record_version": 5
   },
   "kinds": {
     "category": {
       "terms": []
     },
     "tag": {
-      "terms": []
+      "terms": [
+        {
+          "description": "Skincare routines, ingredients, and practical skin-health guidance",
+          "label": "Skincare",
+          "slug": "skincare",
+          "status": "active",
+          "term_id": "t_skincare"
+        }
+      ]
     }
   }
 }
