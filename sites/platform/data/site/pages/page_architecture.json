@@ -1,0 +1,114 @@
+{
+  "__generated": {
+    "at": "2026-08-02T18:27:02.224Z",
+    "from": "objects/page/by-id/page_architecture.json",
+    "record_version": 2
+  },
+  "pageType": "standard",
+  "route": "/architecture",
+  "sections": [
+    {
+      "data": {
+        "actions": [
+          {
+            "label": "Publishing schema",
+            "style": "primary",
+            "target": {
+              "href": "/manual/publishing-schema-v1",
+              "kind": "route"
+            }
+          },
+          {
+            "label": "Multisite",
+            "style": "secondary",
+            "target": {
+              "href": "/manual/multisite",
+              "kind": "route"
+            }
+          }
+        ],
+        "body": "<p>The platform shares software while isolating content and authority. That distinction is the basis of its object system and multisite design.</p>",
+        "heading": "One object model, many independently deployed sites",
+        "kicker": "Concepts"
+      },
+      "id": "s_archlede",
+      "type": "lede"
+    },
+    {
+      "data": {
+        "columns": [
+          {
+            "label": "Layer"
+          },
+          {
+            "label": "Shared across fleet"
+          },
+          {
+            "label": "Per tenant"
+          }
+        ],
+        "heading": "What is shared and what is isolated",
+        "kicker": "Boundaries",
+        "rows": [
+          {
+            "cells": [
+              "Software",
+              "Core components and resolvers",
+              "Site identity and exported objects"
+            ],
+            "label": "Rendering"
+          },
+          {
+            "cells": [
+              "Workflow",
+              "Typed verbs and validators",
+              "Store, policies, credentials, commits"
+            ],
+            "label": "Publishing"
+          },
+          {
+            "cells": [
+              "Standards",
+              "CI matrix and contracts",
+              "Netlify project and release receipt"
+            ],
+            "label": "Operations"
+          },
+          {
+            "cells": [
+              "Schema",
+              "Object type definitions",
+              "Pages, navigation, taxonomy, voice"
+            ],
+            "label": "Content"
+          }
+        ]
+      },
+      "id": "s_archtable",
+      "type": "comparison_table"
+    },
+    {
+      "data": {
+        "section": "sec_dtc_launch_readiness"
+      },
+      "id": "s_archshared",
+      "type": "shared_ref"
+    },
+    {
+      "data": {
+        "body": "<h2>The common envelope</h2><p>Every governed record carries identity, type, site ownership, schema version, body, publication state, review state, lease state, history, a record version, and a content revision. The body differs by type; the lifecycle does not.</p><h2>PageTypes are law; templates are recipes</h2><p>A PageType defines route and section constraints. A template supplies copy-on-create slot blueprints. Editing a template never mutates pages already stamped from it.</p>"
+      },
+      "id": "s_archprose",
+      "type": "prose"
+    }
+  ],
+  "seo": {
+    "description": "How governed objects, shared core packages, and isolated tenants fit together.",
+    "robots": {
+      "follow": false,
+      "index": false
+    },
+    "title": "Architecture"
+  },
+  "title": "Architecture"
+}
