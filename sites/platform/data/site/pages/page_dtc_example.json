@@ -1,0 +1,81 @@
+{
+  "__generated": {
+    "at": "2026-08-02T18:28:00.909Z",
+    "from": "objects/page/by-id/page_dtc_example.json",
+    "record_version": 2
+  },
+  "pageType": "standard",
+  "route": "/manual/examples/dtc-launch",
+  "sections": [
+    {
+      "data": {
+        "actions": [
+          {
+            "label": "Object architecture",
+            "style": "primary",
+            "target": {
+              "href": "/architecture",
+              "kind": "route"
+            }
+          }
+        ],
+        "body": "<p>A DTC campaign is not one giant page document. It is a set of reusable, independently governed records with explicit dependencies.</p>",
+        "heading": "Model the launch as connected objects",
+        "kicker": "Worked example"
+      },
+      "id": "s_dtclede",
+      "type": "lede"
+    },
+    {
+      "data": {
+        "section": "sec_dtc_launch_readiness"
+      },
+      "id": "s_dtcshared",
+      "type": "shared_ref"
+    },
+    {
+      "data": {
+        "columns": 3,
+        "heading": "Create dependencies before dependents",
+        "items": [
+          {
+            "description": "Add taxonomy terms and create the approval-gated product record.",
+            "title": "Vocabulary and offer"
+          },
+          {
+            "description": "Create shared trust, comparison, FAQ, or disclosure sections.",
+            "title": "Reusable evidence"
+          },
+          {
+            "description": "Create the content item and compose the campaign page.",
+            "title": "Story and route"
+          },
+          {
+            "description": "Publish target pages before adding page-kind navigation items.",
+            "title": "Menu and discovery"
+          },
+          {
+            "description": "Bind allowed goals to events declared by the tracking registry.",
+            "title": "Measurement"
+          },
+          {
+            "description": "Publish all objects dark, release once, then verify every route and CTA.",
+            "title": "Release"
+          }
+        ],
+        "kicker": "Build order"
+      },
+      "id": "s_dtcsteps",
+      "type": "steps"
+    }
+  ],
+  "seo": {
+    "description": "A worked example showing how a direct-to-consumer launch is assembled from governed CMS objects.",
+    "robots": {
+      "follow": false,
+      "index": false
+    },
+    "title": "DTC launch object map"
+  },
+  "title": "DTC launch object map"
+}
