@@ -22,6 +22,7 @@ import {
   buildPlan,
   CORE_BLOB_STORES,
   ENV_CHECKLIST,
+  executeNetlifyProvisioning,
   idsFor,
   renderEnvChecklist,
   renderPlan,
@@ -191,7 +192,140 @@ test('the dry-run report never contains a generated secret value — checklist e
 test('renderEnvChecklist(executed=true) reports generated secrets as set, never prints their value', () => {
   const text = renderEnvChecklist(true);
   assert.match(text, /PUBLISH_SECRET.*generated \+ set on the new site \(value not shown\)/s);
+  assert.match(text, /PDF_TOOL_AGENT_RUN_TOKEN.*inherited \+ set on the new site \(value not shown\)/s);
   assert.equal(/\b[0-9a-f]{32,}\b/i.test(text), false);
+});
+
+test('Netlify provisioning inherits the pdf-tool bridge env and stores the bearer as a Functions-only secret', async () => {
+  const inheritedToken = 'sentinel-pdf-tool-token-that-must-never-be-returned';
+  const envPosts: Array<Record<string, unknown>> = [];
+  const envMethods = new Map<string, string>();
+  const fetchImpl = async (input: string | URL | Request, init: RequestInit = {}) => {
+    const url = String(input);
+    const method = init.method || 'GET';
+    if (method === 'GET' && url.endsWith('/sites?name=acme')) {
+      return new Response('[]', { status: 200 });
+    }
+    if (method === 'POST' && url.endsWith('/api/v1/sites')) {
+      return Response.json({ id: 'site-target', account_id: 'account-target', name: 'acme' });
+    }
+    if (method === 'GET' && url.endsWith('/sites?name=pdf-x')) {
+      return Response.json([
+        {
+          id: 'site-pdf-tool',
+          account_id: 'account-pdf-tool',
+          name: 'pdf-x',
+          ssl_url: 'https://pdf-x.netlify.app/',
+        },
+      ]);
+    }
+    if (method === 'GET' && url.includes('/accounts/account-pdf-tool/env?site_id=site-pdf-tool')) {
+      return Response.json([
+        { key: 'AGENT_RUN_TOKEN', values: [{ context: 'all', value: inheritedToken }] },
+      ]);
+    }
+    if (method === 'GET' && url.includes('/accounts/account-target/env/')) {
+      if (url.includes('/PDF_TOOL_BASE_URL?')) {
+        return Response.json({ key: 'PDF_TOOL_BASE_URL', values: [{ context: 'production', value: 'old' }] });
+      }
+      return new Response('', { status: 404 });
+    }
+    if (
+      (method === 'POST' || method === 'PUT') &&
+      url.includes('/accounts/account-target/env') &&
+      url.includes('site_id=site-target')
+    ) {
+      const parsed = JSON.parse(String(init.body)) as Record<string, unknown> | Array<Record<string, unknown>>;
+      const variable = Array.isArray(parsed) ? parsed[0] : parsed;
+      envPosts.push(variable);
+      envMethods.set(String(variable.key), method);
+      return Response.json(variable);
+    }
+    return new Response(`unexpected request: ${method} ${url}`, { status: 500 });
+  };
+  const getStoreImpl = () => {
+    let stored: unknown;
+    return {
+      async setJSON(_key: string, value: unknown) {
+        stored = value;
+      },
+      async get() {
+        return stored;
+      },
+      async delete() {},
+    };
+  };
+
+  const result = await executeNetlifyProvisioning(buildPlan({ name: 'acme' }), {
+    token: 'netlify-test-token',
+    fetchImpl,
+    getStoreImpl,
+    fleetEnv: {},
+  });
+
+  const baseUrl = envPosts.find((entry) => entry.key === 'PDF_TOOL_BASE_URL');
+  assert.deepEqual(baseUrl, {
+    key: 'PDF_TOOL_BASE_URL',
+    scopes: ['functions'],
+    values: [{ value: 'https://pdf-x.netlify.app', context: 'production' }],
+  });
+  assert.equal(envMethods.get('PDF_TOOL_BASE_URL'), 'PUT');
+  const bridgeToken = envPosts.find((entry) => entry.key === 'PDF_TOOL_AGENT_RUN_TOKEN');
+  assert.deepEqual(bridgeToken, {
+    key: 'PDF_TOOL_AGENT_RUN_TOKEN',
+    scopes: ['functions'],
+    values: [{ value: inheritedToken, context: 'production' }],
+    is_secret: true,
+  });
+  assert.equal(envMethods.get('PDF_TOOL_AGENT_RUN_TOKEN'), 'POST');
+  assert.ok(result.secretsSet.includes('PDF_TOOL_BASE_URL'));
+  assert.ok(result.secretsSet.includes('PDF_TOOL_AGENT_RUN_TOKEN'));
+  assert.equal(result.secretsFailed.length, 0);
+  assert.equal(JSON.stringify(result).includes(inheritedToken), false);
+});
+
+test('Netlify provisioning reports both required bridge vars when inheritance is unavailable', async () => {
+  const fetchImpl = async (input: string | URL | Request, init: RequestInit = {}) => {
+    const url = String(input);
+    const method = init.method || 'GET';
+    if (method === 'GET' && url.endsWith('/sites?name=acme')) return Response.json([]);
+    if (method === 'POST' && url.endsWith('/api/v1/sites')) {
+      return Response.json({ id: 'site-target', account_id: 'account-target', name: 'acme' });
+    }
+    if (method === 'GET' && url.endsWith('/sites?name=pdf-x')) return Response.json([]);
+    if (method === 'GET' && url.includes('/accounts/account-target/env/')) {
+      return new Response('', { status: 404 });
+    }
+    if (method === 'POST' && url.includes('/accounts/account-target/env?site_id=site-target')) {
+      return Response.json({});
+    }
+    return new Response(`unexpected request: ${method} ${url}`, { status: 500 });
+  };
+  const getStoreImpl = () => {
+    let stored: unknown;
+    return {
+      async setJSON(_key: string, value: unknown) {
+        stored = value;
+      },
+      async get() {
+        return stored;
+      },
+      async delete() {},
+    };
+  };
+
+  const result = await executeNetlifyProvisioning(buildPlan({ name: 'acme' }), {
+    token: 'netlify-test-token',
+    fetchImpl,
+    getStoreImpl,
+    fleetEnv: {},
+  });
+
+  assert.deepEqual(
+    result.secretsFailed.filter((failure) => failure.name.startsWith('PDF_TOOL_')).map((failure) => failure.name),
+    ['PDF_TOOL_BASE_URL', 'PDF_TOOL_AGENT_RUN_TOKEN']
+  );
+  assert.match(result.secretsFailed.at(-1)?.message || '', /set PDF_TOOL_BASE_URL and PDF_TOOL_AGENT_RUN_TOKEN/);
 });
 
 test('dry-run output matches the committed fixture (tests/fixtures/create-site-dry-run-acme.mjs)', () => {

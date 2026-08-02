@@ -35,9 +35,9 @@ point, not finished content.
 node packages/core/cli/create-site.mjs --name <client> --netlify-token $NETLIFY_API_TOKEN
 ```
 
-(Only runs the Netlify half if `sites/<client>/` doesn't exist yet — delete
-it first, or pass a fresh `--name`, if you need to redo this step.) This
-calls the Netlify API to create the site, probes this site's 8 blob stores
+(If `sites/<client>/` already exists, add `--provision-only`; the command
+reuses the existing Netlify site instead of creating a duplicate.) This calls
+the Netlify API to create or resolve the site, probes this site's 8 blob stores
 (`site-objects`, `workflows`, `artifacts`, `artifact-index`, `commerce`,
 `agent-chats`, `governance`, `users` — a write→read→delete round trip per
 store, the same pattern `scripts/provision-pdf-tool-stores.mjs` uses for the
@@ -46,6 +46,20 @@ that are safe to mint automatically (`PUBLISH_SECRET`,
 `MCP_HTTP_AUTH_TOKEN`, `ARTIFACT_UPLOAD_TOKEN_SECRET`, `TRACKING_SALT`)
 straight to the new site's env store — their values are never printed or
 committed.
+
+The same run also resolves the shared `pdf-x` Netlify service and automatically
+sets `PDF_TOOL_BASE_URL` plus `PDF_TOOL_AGENT_RUN_TOKEN` on the new client.
+Both are scoped to Functions in production; the bearer is stored as a Netlify
+secret and never appears in the scaffold, result object, or terminal output.
+Provisioning fails closed if either required bridge value cannot be installed,
+so a site cannot look successfully provisioned while artifact publishing is
+silently broken.
+
+Normally the command reads `AGENT_RUN_TOKEN` from the `pdf-x` service through
+the Netlify API. If that source value has been marked secret (and is therefore
+not readable), inject `PDF_TOOL_AGENT_RUN_TOKEN` into the provisioning process;
+`PDF_TOOL_BASE_URL` can be supplied the same way to override service discovery.
+These are server-side provisioning inputs, not values to add to generated files.
 
 `NETLIFY_API_TOKEN` needs site-create rights on the Netlify account/team the
 client belongs to. If you don't have one yet: Netlify → User settings →
@@ -70,7 +84,8 @@ For everything NOT auto-generated in step 2:
   pull artifact images from — a policy choice, not a secret.
 - **Tenancy axes** (`PDF_TOOL_PROJECT_ID`, `TRACKING_PROJECT_ID`,
   `TRACKING_SINK_URL`/`_TOKEN`): `PDF_TOOL_PROJECT_ID` defaults to the site
-  slug — only set it if it must differ. `PDF_TOOL_STORAGE_SITE_ID`/`_TOKEN`
+  slug — only set it if it must differ. The bridge URL/token are installed
+  automatically in step 2. `PDF_TOOL_STORAGE_SITE_ID`/`_TOKEN`
   are **fleet-shared** — point at the existing shared pdf-tool storage
   service, do not provision a new one. Tracking sink may be one shared
   owner-DB (partitioned by `TRACKING_PROJECT_ID`) or per-site — your call.
