@@ -35,6 +35,9 @@ export const siteIdentityConfig = {
   mcpDiagnosticName: 'Dr_Lurie_Science_MCP',
   assetHost: 'https://kugelmedia.netlify.app',
   assetFolder: 'drlurieblog',
+  // Canonical adapter id registered in pdf-tool. This is the site → artifact
+  // project mapping; agents never derive it from site_drlurie.
+  pdfToolProjectId: 'dr-lurie',
   // W11 T11.5: pinned so the de-hardcoded core resolves byte-identically.
   adminLabel: 'Dr. Lurié admin',
   committerName: 'Dr. Lurié Publisher',

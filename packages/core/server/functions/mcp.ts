@@ -79,14 +79,13 @@ const requireSiblings = (): McpSiblingHandlers => {
 const OPTIONAL_HANDLER_TOOLS = new Set(['verify_article_images']);
 
 /**
- * Operational tools that remain callable for backwards-compatible admin and
- * test workflows, but are intentionally absent from agent discovery. They are
+ * Operational tools that remain callable for admin and test workflows, but
+ * are intentionally absent from agent discovery. They are
  * not part of normal information exchange or governed object editing, and a
  * large destructive/upload surface makes agent planning needlessly noisy.
  */
 const INTERNAL_ONLY_TOOLS = new Set([
   'trigger_netlify_build',
-  'get_pdf_tool_storage_grant',
   'create_artifact_upload_intent',
   'create_artifact_from_url',
   'save_artifact',
@@ -121,6 +120,14 @@ import {
 } from '../lib/netlify-deploys.js';
 import { releaseToProduction } from '../lib/production-release.js';
 import { buildPdfToolStorageGrant } from '../lib/pdf-tool-storage-grant.js';
+import {
+  canonicalPlatformArtifact,
+  createPlatformArtifactJob,
+  getPlatformArtifactBySlot,
+  getPlatformArtifactJobStatus,
+  verifyPlatformArtifact,
+  type PlatformArtifactJobInput,
+} from '../lib/pdf-tool-client.js';
 import { collectBlobListItems } from '../lib/blob-list.js';
 import {
   getArtifactBlobStore,
@@ -602,10 +609,51 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
     }),
   },
   {
-    name: 'get_pdf_tool_storage_grant',
+    name: 'create_agent_artifact_job',
     description:
-      'Fetch a short-lived storage grant for pdf-tool. pdf-tool is stateless and holds no blob credentials: call this tool before ANY pdf-tool MCP call that touches storage and pass the entire returned grant object as that call\'s "storage" argument — pdf-tool uses it to write artifacts, templates, image-search state, and its job records directly into this site\'s Netlify Blob stores. expiresAt is roughly one hour out and is advisory-but-enforced: pdf-tool rejects expired grants, so fetch a fresh grant per working session instead of caching one long-term. If pdf-tool returns "grant expired" or a storage auth error, fetch a fresh grant and retry once before surfacing the failure. The grant also carries a per-site "limits" policy (maxImageBytes, preferredImageFormat, overBudget): when generating or storing images, encode to the preferred web format and keep each image within maxImageBytes — reject an over-limit image when overBudget is "block", or store-but-flag it when "warn". SECRET HANDLING: the grant contains a live storage token. NEVER write the grant or its token into workflow JSON, drafts, article content, artifact metadata, or any other persisted record — store only the ArtifactReferences pdf-tool returns. Auth-gated like every other tool on this MCP endpoint; no input is required.',
-    inputSchema: objectSchema({}),
+      "Create a pdf-tool artifact job through THIS site's trusted Platform bridge. Pass the owning site_id and content-item request_id; Platform resolves the canonical pdf-tool project, verifies request ownership, mints and forwards a fresh short-lived storage grant server-side, and never returns the grant. Do not call pdf-tool directly or guess projectId. The job is asynchronous: poll get_agent_artifact_job_status with the returned jobId; do not recreate it.",
+    inputSchema: objectSchema(
+      {
+        site_id: stringSchema('Owning site object id, e.g. site_acme. Must match this deployment.'),
+        request_id: stringSchema('Existing content_item object id that will own the artifact.'),
+        artifact_kind: { type: 'string', enum: ['image', 'pdf'], description: 'Artifact kind.' },
+        operation: { type: 'string', enum: ['generate', 'edit'], description: 'Defaults to generate.' },
+        prompt: stringSchema('Generation prompt; required for image generation.'),
+        filename: stringSchema('Output filename including the format-matching extension.'),
+        slot: stringSchema('Stable request-scoped slot such as article_image_1.'),
+        model: stringSchema('Optional explicit model; omit to use the registered project policy.'),
+        requirements: anyObjectSchema(
+          'pdf-tool requirements, e.g. {maxBytes, image:{outputFormat:"webp", size:"1536x1024", usageContext:"article_body"}}.'
+        ),
+      },
+      ['site_id', 'request_id', 'artifact_kind', 'filename']
+    ),
+  },
+  {
+    name: 'get_agent_artifact_job_status',
+    description:
+      'Poll a job created through this Platform bridge. Platform re-validates site/request scope and injects the canonical project and a fresh grant. On completion it verifies materialization server-side and returns the canonical ArtifactReference plus public_path; neither the grant nor materialization proof is exposed. Poll this jobId instead of recreating the job.',
+    inputSchema: objectSchema(
+      {
+        site_id: stringSchema('Owning site object id; must match this deployment.'),
+        request_id: stringSchema('The same content_item request id used to create the job.'),
+        job_id: stringSchema('Job id returned by create_agent_artifact_job.'),
+      },
+      ['site_id', 'request_id', 'job_id']
+    ),
+  },
+  {
+    name: 'get_agent_artifact_by_slot',
+    description:
+      'Retrieve and verify the canonical artifact for a request-scoped slot through the trusted Platform bridge. Site ownership, canonical project, storage grant, and materialization verification are handled server-side. Returns ArtifactReference + public_path with no grant or proof.',
+    inputSchema: objectSchema(
+      {
+        site_id: stringSchema('Owning site object id; must match this deployment.'),
+        request_id: stringSchema('Existing content_item request id.'),
+        slot: stringSchema('The exact slot used when the job was created.'),
+      },
+      ['site_id', 'request_id', 'slot']
+    ),
   },
   {
     name: 'create_artifact_upload_intent',
@@ -1621,26 +1669,6 @@ const callReleaseToProduction = async (event: LambdaEvent, input: Record<string,
   }
 };
 
-const callGetPdfToolStorageGrant = (event: LambdaEvent) => {
-  const built = buildPdfToolStorageGrant();
-
-  if (!built.ok) {
-    event.log?.({ event: 'pdf_tool_storage_grant_not_configured' });
-    return toolError(built.error, { error_code: built.errorCode });
-  }
-
-  // Issuance is logged metadata-only; the token must never appear in any log
-  // or stored record.
-  event.log?.({
-    event: 'pdf_tool_storage_grant_issued',
-    grantVersion: built.grant.grantVersion,
-    grantType: built.grant.grantType,
-    expiresAt: built.grant.expiresAt,
-  });
-
-  return toolResult({ ...built.grant });
-};
-
 const normalizeArtifactUploadIntentInput = (input: Record<string, unknown>) => {
   const requestId = toNonEmptyString(input.requestId);
   if (!requestId) return { ok: false as const, error: 'requestId is required.' };
@@ -1839,6 +1867,247 @@ const invokeObjectStore = async (event: LambdaEvent, payload: Record<string, unk
   }
 
   return stripObjectEnvelope(parsedBody);
+};
+
+type ArtifactBridgeScope = { siteId: string; requestId: string };
+
+const resolveArtifactBridgeScope = async (
+  event: LambdaEvent,
+  input: Record<string, unknown>
+): Promise<{ ok: true; scope: ArtifactBridgeScope } | { ok: false; result: ReturnType<typeof toolError> }> => {
+  const siteId = toNonEmptyString(input.site_id);
+  const requestId = toNonEmptyString(input.request_id);
+  const identity = getSiteIdentity();
+
+  if (!siteId || !requestId) {
+    return {
+      ok: false,
+      result: toolError('site_id and request_id are required.', { error_code: 'artifact_scope_required' }),
+    };
+  }
+  if (siteId !== identity.siteId) {
+    return {
+      ok: false,
+      result: toolError(
+        `Artifact scope mismatch: this deployment owns ${identity.siteId}, not ${siteId}. Use the owning site's Platform connector.`,
+        { error_code: 'artifact_site_mismatch' }
+      ),
+    };
+  }
+
+  const lookup = await invokeObjectStore(event, {
+    action: 'get',
+    object_type: 'content_item',
+    object_id: requestId,
+  });
+  if ('isError' in lookup) {
+    return {
+      ok: false,
+      result: toolError(
+        `Artifact request mapping is absent: content_item ${requestId} does not exist on ${siteId}. Create or select the owning content object before requesting artifacts.`,
+        { error_code: 'artifact_request_not_found' }
+      ),
+    };
+  }
+
+  const record =
+    lookup.record && typeof lookup.record === 'object' && !Array.isArray(lookup.record)
+      ? (lookup.record as Record<string, unknown>)
+      : undefined;
+  if (!record || record.object_id !== requestId || record.site !== siteId) {
+    return {
+      ok: false,
+      result: toolError(`Artifact scope mismatch: ${requestId} is not owned by ${siteId}.`, {
+        error_code: 'artifact_request_scope_mismatch',
+      }),
+    };
+  }
+
+  return { ok: true, scope: { siteId, requestId } };
+};
+
+const buildArtifactBridgeGrant = () => {
+  const built = buildPdfToolStorageGrant();
+  return built.ok
+    ? { ok: true as const, grant: built.grant }
+    : {
+        ok: false as const,
+        result: toolError(built.error, { error_code: built.errorCode, statusCode: 503 }),
+      };
+};
+
+const pdfToolBridgeError = (result: { statusCode: number; error: string; body?: Record<string, unknown> }) =>
+  toolError(result.error, {
+    error_code: 'pdf_tool_bridge_request_failed',
+    statusCode: result.statusCode,
+    ...(result.body ?? {}),
+  });
+
+const platformPolling = (scope: ArtifactBridgeScope, jobId: string) => ({
+  tool: 'get_agent_artifact_job_status',
+  input: { site_id: scope.siteId, request_id: scope.requestId, job_id: jobId },
+  recommended_interval_ms: 2000,
+  terminal_statuses: ['complete', 'failed'],
+});
+
+const callCreateAgentArtifactJob = async (event: LambdaEvent, input: Record<string, unknown>) => {
+  const scoped = await resolveArtifactBridgeScope(event, input);
+  if (!scoped.ok) return scoped.result;
+  const artifactKind = toNonEmptyString(input.artifact_kind);
+  const filename = toNonEmptyString(input.filename);
+  if ((artifactKind !== 'image' && artifactKind !== 'pdf') || !filename) {
+    return toolError('artifact_kind must be image or pdf, and filename is required.');
+  }
+
+  const built = buildArtifactBridgeGrant();
+  if (!built.ok) return built.result;
+  const jobInput: PlatformArtifactJobInput = {
+    requestId: scoped.scope.requestId,
+    artifactKind,
+    filename,
+    ...(toNonEmptyString(input.operation)
+      ? { operation: toNonEmptyString(input.operation) as 'generate' | 'edit' }
+      : {}),
+    ...(toNonEmptyString(input.prompt) ? { prompt: toNonEmptyString(input.prompt) } : {}),
+    ...(toNonEmptyString(input.slot) ? { slot: toNonEmptyString(input.slot) } : {}),
+    ...(toNonEmptyString(input.model) ? { model: toNonEmptyString(input.model) } : {}),
+    ...(input.requirements && typeof input.requirements === 'object' && !Array.isArray(input.requirements)
+      ? { requirements: input.requirements as Record<string, unknown> }
+      : {}),
+  };
+  const created = await createPlatformArtifactJob(built.grant, jobInput);
+  if (!created.ok) return pdfToolBridgeError(created);
+
+  const jobId = toNonEmptyString(created.body.jobId);
+  if (!jobId) return toolError('pdf-tool returned no jobId.', { error_code: 'pdf_tool_invalid_response' });
+  event.log?.({
+    event: 'artifact_bridge_job_created',
+    siteId: scoped.scope.siteId,
+    requestId: scoped.scope.requestId,
+    projectId: built.grant.projectId,
+    jobId,
+  });
+  const { polling: _pdfToolPolling, ...safeBody } = created.body;
+  return toolResult({
+    ...safeBody,
+    siteId: scoped.scope.siteId,
+    projectId: built.grant.projectId,
+    requestId: scoped.scope.requestId,
+    polling: platformPolling(scoped.scope, jobId),
+  });
+};
+
+const verifyBridgeArtifact = async (
+  grant: Extract<ReturnType<typeof buildArtifactBridgeGrant>, { ok: true }>['grant'],
+  requestId: string,
+  artifactReference: Record<string, unknown>,
+  materializationProof: string | undefined
+) => {
+  const verified = await verifyPlatformArtifact(grant, requestId, artifactReference, materializationProof);
+  if (!verified.ok) return { ok: false as const, result: pdfToolBridgeError(verified) };
+  if (verified.body.verified !== true) {
+    return {
+      ok: false as const,
+      result: toolError(
+        typeof verified.body.reason === 'string'
+          ? verified.body.reason
+          : 'pdf-tool could not verify artifact materialization for this request.',
+        { error_code: 'artifact_materialization_unverified' }
+      ),
+    };
+  }
+  const canonical = canonicalPlatformArtifact(verified.body);
+  return canonical
+    ? { ok: true as const, canonical }
+    : {
+        ok: false as const,
+        result: toolError('pdf-tool verification returned no canonical ArtifactReference.', {
+          error_code: 'pdf_tool_invalid_response',
+        }),
+      };
+};
+
+const callGetAgentArtifactJobStatus = async (event: LambdaEvent, input: Record<string, unknown>) => {
+  const scoped = await resolveArtifactBridgeScope(event, input);
+  if (!scoped.ok) return scoped.result;
+  const jobId = toNonEmptyString(input.job_id);
+  if (!jobId) return toolError('job_id is required.');
+  const built = buildArtifactBridgeGrant();
+  if (!built.ok) return built.result;
+
+  const status = await getPlatformArtifactJobStatus(built.grant, jobId);
+  if (!status.ok) return pdfToolBridgeError(status);
+  if (status.body.projectId !== built.grant.projectId || status.body.requestId !== scoped.scope.requestId) {
+    return toolError('pdf-tool job scope does not match the requested site/content object.', {
+      error_code: 'artifact_job_scope_mismatch',
+    });
+  }
+
+  const { polling: _pdfToolPolling, artifact: _duplicateArtifact, artifactReference, ...safeStatus } = status.body;
+  if (status.body.status !== 'complete') {
+    return toolResult({ ...safeStatus, siteId: scoped.scope.siteId, polling: platformPolling(scoped.scope, jobId) });
+  }
+  const claimed =
+    artifactReference && typeof artifactReference === 'object' && !Array.isArray(artifactReference)
+      ? (artifactReference as Record<string, unknown>)
+      : undefined;
+  if (!claimed) return toolError('Completed pdf-tool job returned no ArtifactReference.');
+  const verified = await verifyBridgeArtifact(
+    built.grant,
+    scoped.scope.requestId,
+    claimed,
+    status.internalMaterializationProof
+  );
+  if (!verified.ok) return verified.result;
+
+  event.log?.({
+    event: 'artifact_bridge_job_verified',
+    siteId: scoped.scope.siteId,
+    requestId: scoped.scope.requestId,
+    projectId: built.grant.projectId,
+    jobId,
+    blobKey: verified.canonical.artifactReference.blobKey,
+  });
+  return toolResult({
+    ...safeStatus,
+    siteId: scoped.scope.siteId,
+    projectId: built.grant.projectId,
+    requestId: scoped.scope.requestId,
+    artifactReference: verified.canonical.artifactReference,
+    public_path: verified.canonical.publicPath,
+    verified: true,
+  });
+};
+
+const callGetAgentArtifactBySlot = async (event: LambdaEvent, input: Record<string, unknown>) => {
+  const scoped = await resolveArtifactBridgeScope(event, input);
+  if (!scoped.ok) return scoped.result;
+  const slot = toNonEmptyString(input.slot);
+  if (!slot) return toolError('slot is required.');
+  const built = buildArtifactBridgeGrant();
+  if (!built.ok) return built.result;
+
+  const found = await getPlatformArtifactBySlot(built.grant, scoped.scope.requestId, slot);
+  if (!found.ok) return pdfToolBridgeError(found);
+  const claimed = canonicalPlatformArtifact(found.body)?.artifactReference;
+  if (!claimed) return toolError('pdf-tool slot lookup returned no ArtifactReference.');
+  const verified = await verifyBridgeArtifact(
+    built.grant,
+    scoped.scope.requestId,
+    claimed,
+    found.internalMaterializationProof
+  );
+  if (!verified.ok) return verified.result;
+
+  return toolResult({
+    siteId: scoped.scope.siteId,
+    projectId: built.grant.projectId,
+    requestId: scoped.scope.requestId,
+    slot,
+    artifactReference: verified.canonical.artifactReference,
+    public_path: verified.canonical.publicPath,
+    verified: true,
+  });
 };
 
 const callObjectAction = async (event: LambdaEvent, payload: Record<string, unknown>) => {
@@ -2753,8 +3022,12 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
       return callTriggerNetlifyBuild(event, input);
     case 'release_to_production':
       return callReleaseToProduction(event, input);
-    case 'get_pdf_tool_storage_grant':
-      return callGetPdfToolStorageGrant(event);
+    case 'create_agent_artifact_job':
+      return callCreateAgentArtifactJob(event, input);
+    case 'get_agent_artifact_job_status':
+      return callGetAgentArtifactJobStatus(event, input);
+    case 'get_agent_artifact_by_slot':
+      return callGetAgentArtifactBySlot(event, input);
     case 'create_artifact_upload_intent':
       return callCreateArtifactUploadIntent(event, input);
     case 'create_artifact_from_url': {

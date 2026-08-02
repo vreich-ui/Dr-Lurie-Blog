@@ -132,7 +132,7 @@ export const describeUntrustedArtifactRef = (path: string, value: string, trust:
     return (
       `${path} "${value}" belongs to request '${ownerRequestId}', not '${trust.requestId}'. ` +
       `Cross-request artifact references are not accepted in canonical input. Regenerate the artifact for this ` +
-      `request through pdf-tool using the site's storage grant (get_pdf_tool_storage_grant) so it is written into ` +
+      `request through the site's Platform artifact bridge (create_agent_artifact_job) so it is written into ` +
       `this request's artifact index, then use the returned ArtifactReference blobKey.`
     );
   }
@@ -147,8 +147,8 @@ export const describeUntrustedArtifactRef = (path: string, value: string, trust:
 
   return (
     `${path} "${value}" is not in the artifact index for request '${trust.requestId}' and is not present in ` +
-    `agent_outputs.artifactReferences. Generate the artifact through pdf-tool using the site's storage grant ` +
-    `(get_pdf_tool_storage_grant) so it lands in this request's index, then use the exact returned ArtifactReference ` +
+    `agent_outputs.artifactReferences. Generate the artifact through the site's Platform artifact bridge ` +
+    `(create_agent_artifact_job) so it lands in this request's index, then use the exact returned ArtifactReference ` +
     `blobKey — list_artifacts_for_request shows what exists.`
   );
 };

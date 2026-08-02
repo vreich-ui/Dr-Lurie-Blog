@@ -672,7 +672,7 @@ const validateAssetRef = (
       kind: 'existence',
       message:
         `${path} "${value}" is not in the artifact index (never uploaded, or the key is mistyped). ` +
-        `Generate it through pdf-tool under the site's storage grant (get_pdf_tool_storage_grant) and use the ` +
+        `Generate it through the site's Platform artifact bridge (create_agent_artifact_job) and use the ` +
         `exact returned ArtifactReference blobKey — list_artifacts_for_request shows what exists.`,
     };
   }
@@ -2540,6 +2540,87 @@ export const checkRenderability = (objectType: ObjectType, body: unknown): Readi
   ];
 };
 
+// The schemas deliberately admit taxonomy targets, but the Astro resolver has
+// no taxonomy-export-to-route implementation yet. Treat that mismatch exactly
+// like the rich-text splitter mismatches above: reject it at every governed
+// write boundary instead of discovering it as an all-site build failure during
+// release. Page targets are renderable now via the committed Page collection.
+const NAV_TARGET_RENDERED_OBJECT_TYPES = new Set<ObjectType>([
+  'navigation',
+  'page',
+  'section',
+  'template',
+  'section_template',
+]);
+
+export const checkRenderTargetSupport = (
+  objectType: ObjectType,
+  body: unknown,
+  context: ObjectValidationContext = {},
+  atPublish = false
+): ReadinessCriterion[] => {
+  if (!NAV_TARGET_RENDERED_OBJECT_TYPES.has(objectType)) {
+    return [crit('render_nav_targets', 'Navigation target renderability', 'complete', '')];
+  }
+
+  const taxonomyTargets: string[] = [];
+  const unpublishedPages: string[] = [];
+  let pageResolutionUnavailable = false;
+  walkObjects(body, (node) => {
+    if (
+      node.kind === 'taxonomy' &&
+      (node.termKind === 'category' || node.termKind === 'tag') &&
+      typeof node.term_id === 'string'
+    ) {
+      taxonomyTargets.push(`${node.termKind}/${node.term_id}`);
+    }
+    if (node.kind === 'page' && typeof node.page === 'string') {
+      const resolution = context.resolveObject?.('page', node.page);
+      if (resolution === undefined) pageResolutionUnavailable = true;
+      else if (resolution.exists && !resolution.published) unpublishedPages.push(node.page);
+    }
+  });
+
+  const criteria: ReadinessCriterion[] = [
+    taxonomyTargets.length === 0
+      ? crit('render_nav_targets', 'Navigation target renderability', 'complete', '')
+      : crit(
+          'render_nav_targets',
+          'Navigation target renderability',
+          'missing',
+          `Taxonomy target(s) are not renderable by the site yet: ${[...new Set(taxonomyTargets)].join(
+            ', '
+          )}. Use a route-kind target with the public category/tag URL until taxonomy target resolution is implemented.`
+        ),
+  ];
+
+  if (unpublishedPages.length > 0) {
+    criteria.push(
+      crit(
+        'render_page_targets_published',
+        'Page target exports available',
+        atPublish ? 'missing' : 'warning',
+        `Page target(s) are not published: ${[...new Set(unpublishedPages)].join(
+          ', '
+        )}. Publish each target Page first so its committed route export exists before this object is released.`
+      )
+    );
+  } else if (pageResolutionUnavailable) {
+    criteria.push(
+      crit(
+        'render_page_targets_published',
+        'Page target exports available',
+        'optional',
+        'No object resolver — published Page exports not verified here.'
+      )
+    );
+  } else {
+    criteria.push(crit('render_page_targets_published', 'Page target exports available', 'complete', ''));
+  }
+
+  return criteria;
+};
+
 // ─── check 8: deploy safety (trap 14 — content the secrets scanner blocks) ───
 //
 // Netlify's post-build secrets scan fails EVERY deploy when the value of a
@@ -2647,7 +2728,11 @@ export const validateObject = (
     {
       id: 'renderability',
       label: 'Component renderability',
-      criteria: [...checkRenderability(input.objectType, input.body), ...checkRenderableImageRefs(input.body)],
+      criteria: [
+        ...checkRenderability(input.objectType, input.body),
+        ...checkRenderTargetSupport(input.objectType, input.body, context, atPublish),
+        ...checkRenderableImageRefs(input.body),
+      ],
     },
     { id: 'deploy_safety', label: 'Deploy safety', criteria: checkDeploySafety(input.body) },
     {

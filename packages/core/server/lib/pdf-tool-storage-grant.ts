@@ -1,15 +1,15 @@
 /**
  * pdf-tool storage grants — Dr-Lurie is the storage-grant provider for the
  * (stateless) pdf-tool service. pdf-tool holds no blob credentials of its
- * own: agents fetch a short-lived grant from the get_pdf_tool_storage_grant
- * MCP tool and forward it with each pdf-tool MCP call, and pdf-tool uses it
+ * own: Platform mints a short-lived grant and forwards it through its trusted
+ * server-side pdf-tool bridge, and pdf-tool uses it
  * to write artifacts, templates, image-search state, and its job records
  * directly into this site's Netlify Blob stores.
  *
  * The grant shape below is the contract pdf-tool accepts. Keep it stable:
  * the future grantType 'exchange' (an opaque short-lived token plus a
- * server-to-server exchange endpoint, so the Netlify PAT never transits
- * agent context) must be a drop-in change of grantType/token only.
+ * server-to-server exchange endpoint) must be a drop-in change of
+ * grantType/token only.
  *
  * Credentials come from two server-side env vars (see
  * docs/agents/pdf-tool-storage-grant.md for the provisioning runbook):
@@ -19,8 +19,8 @@
  * - PDF_TOOL_STORAGE_SITE_ID — the Dr-Lurie site API id.
  *
  * Neither value may ever reach client-side code, logs, or any stored record
- * (workflow JSON, drafts, blobs). Rotation needs no code change: the tool
- * always serves the current env values.
+ * (agent responses, workflow JSON, drafts, blobs). Rotation needs no code
+ * change: the bridge always uses the current env values.
  *
  * The grant's projectId namespaces this site inside pdf-tool's stores. It
  * comes from the site-identity seam (env PDF_TOOL_PROJECT_ID, else the site

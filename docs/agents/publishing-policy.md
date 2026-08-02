@@ -48,7 +48,7 @@ Authoritative upstream sources, in order:
 | Authoring workflow (ideation → draft → review → article body) | CMS-Agent workspace (Publishing Conductor nodes) | `CMS-Agent/src/agent/workspace/nodes.ts` |
 | Authored grammar `article_body.v1` | CMS-Agent | `CMS-Agent/src/agent/mcp/workspace/store.ts` |
 | Governed object store, `content_item.v1`, validation, review, publish, release | Dr-Lurie-Blog MCP (`Dr_Lurie_MCP_Server`, `netlify/functions/mcp.ts`) | `Dr-Lurie-Blog/netlify/lib/object-verbs.ts`, `object-validate.ts`, `object-publish.ts` |
-| Artifact bytes (images/PDFs) | PDF-Tool via Dr-Lurie storage grant | `get_pdf_tool_storage_grant`; `Dr-Lurie-Blog/netlify/lib/artifact-trust.ts` |
+| Artifact bytes (images/PDFs) | PDF-Tool via Platform's server-side artifact bridge | `create_agent_artifact_job` / `get_agent_artifact_job_status`; `packages/core/server/lib/artifact-trust.ts` |
 | Serving images/PDFs to readers | Dr-Lurie-Blog Netlify redirects `/img/*`, `/pdf/*` → blob-backed functions | `Dr-Lurie-Blog/netlify.toml`, `netlify/functions/get-public-image.ts`, `get-public-pdf.ts` |
 | Production deploys (the paid step) | Dr-Lurie-Blog `release_to_production` (agent) and `admin-release.ts` (human button) — same code path | `Dr-Lurie-Blog/netlify/lib/production-release.ts` |
 
@@ -184,13 +184,13 @@ One routing note that has wasted probes before: `object_patch` **does** edit con
 
 ## 6. Media and artifact policy
 
-### 6.1 Production (fail-closed, grant-brokered)
+### 6.1 Production (fail-closed, server-bridged)
 
-1. `get_pdf_tool_storage_grant` once per session; pass the **entire grant** as the `storage` argument of every PDF-Tool call. **Never persist the grant or its token** into workflow JSON, drafts, article content, or artifact metadata. Expired grant → fetch fresh, retry **once** (`docs/agents/pdf-tool-storage-grant.md`).
-2. Generate via PDF-Tool `create_agent_artifact_job` → poll `get_agent_artifact_job_status`. Request `requirements.image.outputFormat:'webp'` and `requirements.maxBytes` within budget (may lower the cap, never raise it).
+1. Call Platform `create_agent_artifact_job` with the owning `site_id` and existing content-item `request_id`; Platform resolves the canonical PDF-Tool project and injects the grant server-side. The raw grant RPC is removed, so grants and tokens never enter agent context (`docs/agents/pdf-tool-storage-grant.md`).
+2. Poll Platform `get_agent_artifact_job_status` without recreating the job. Request `requirements.image.outputFormat:'webp'` and `requirements.maxBytes` within budget (may lower the cap, never raise it).
 3. Image formats: **JPEG/PNG/WebP only** (server-decoded by sharp; GIF/AVIF/SVG rejected — `image-validation.ts:19`). Budget: committed defaults `maxImageBytes` 153,600 (~150 KB), `preferredImageFormat` webp, over-budget **warns** (`src/config/media-policy.ts`) — read the live values from `object_contract.media_policy`, and treat the warning as a defect to fix, not noise.
 4. PDF jobs require a **published** PDF template — preflight `list_pdf_templates`, else `create_pdf_template` → `publish_pdf_template`.
-5. Verify materialization (PDF-Tool `verify_agent_artifact` and/or `list_artifacts_for_request`) **before** any object write. Media failure ⇒ stop; do not publish a degraded article.
+5. Platform verifies materialization server-side before returning a completed reference; cross-check `list_artifacts_for_request` when needed **before** any object write. Media failure ⇒ stop; do not publish a degraded article.
 
 ### 6.2 Trust scope
 
@@ -334,7 +334,7 @@ The blog's post collection was wiped (83 markdown posts deleted; `src/data/post/
 | `rendering.placement:"inline"` as the render gate (silent `image_not_rendered` drop) | Legacy markdown renderer semantics | object renderer renders `public` media directly; placement is optional metadata |
 | `published_time` future scheduling / `null` unpublish | `scheduling_not_supported` / `unpublish_not_supported` on the object path | immediate publish only; batch timing upstream; unpublish does not exist |
 | `trigger_netlify_build` as the agent's release verb | Excluded from allowlist; no production receipts | `release_to_production`, once per batch (interim, §7) |
-| `save_artifact`, `create_artifact_upload_intent`, `create_artifact_from_url` | Legacy transports (grant-only posture; CMS-Agent's executable policy already blocks them at call time) | PDF-Tool grant flow (§6.1) |
+| `save_artifact`, `create_artifact_upload_intent`, `create_artifact_from_url` | Legacy transports (server-bridge posture; CMS-Agent's executable policy already blocks them at call time) | Platform PDF-Tool bridge (§6.1) |
 | Standalone `mcp/save-json-blob-mcp` mirror (auto-generates `req_<uuid>` ids!) | Legacy mirror of a frozen pipeline; its auto-ids violate the id contract | main MCP object verbs |
 
 **Stale items inside CMS-Agent itself** (flagged for cleanup; this policy supersedes them):

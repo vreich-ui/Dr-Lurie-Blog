@@ -10,11 +10,6 @@ import {
 } from '../../packages/core/server/lib/pdf-tool-storage-grant.js';
 import { activeMediaPolicy, mediaPolicyLimits } from '../../packages/core/lib/media-policy.js';
 
-type ToolCallResult = {
-  isError?: boolean;
-  structuredContent?: Record<string, unknown>;
-};
-
 // The exact store mapping the pdf-tool grant contract names. The lib and the
 // provisioning script are each pinned to this literal so they cannot drift
 // from the contract (or from each other).
@@ -50,11 +45,11 @@ const withGrantEnv = async (
   }
 };
 
-const callGrantTool = async (headers: Record<string, string> = {}) => {
+const callRemovedGrantTool = async () => {
   const logs: Array<Record<string, unknown>> = [];
   const response = await handler({
     httpMethod: 'POST',
-    headers: { 'content-type': 'application/json', ...headers },
+    headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
       jsonrpc: '2.0',
       id: 1,
@@ -67,19 +62,16 @@ const callGrantTool = async (headers: Record<string, string> = {}) => {
   return { response, logs };
 };
 
-test('get_pdf_tool_storage_grant returns the exact grant contract when configured', async () => {
+test('buildPdfToolStorageGrant returns the exact internal grant contract when configured', async () => {
   await withGrantEnv(
     { PDF_TOOL_STORAGE_TOKEN: 'nfp_test_machine_pat', PDF_TOOL_STORAGE_SITE_ID: 'site-api-id-1234' },
     async () => {
       const before = Date.now();
-      const { response } = await callGrantTool();
+      const built = buildPdfToolStorageGrant();
       const after = Date.now();
 
-      assert.equal(response.statusCode, 200);
-      const result = (JSON.parse(response.body) as { result: ToolCallResult }).result;
-      assert.equal(result.isError, undefined);
-
-      const grant = result.structuredContent as Record<string, unknown>;
+      assert.ok(built.ok);
+      const grant = built.grant as unknown as Record<string, unknown>;
       assert.equal(grant.grantVersion, 1);
       assert.equal(grant.grantType, 'netlify-pat');
       assert.equal(grant.projectId, 'dr-lurie');
@@ -124,7 +116,7 @@ test('buildPdfToolStorageGrant computes expiresAt from the provided clock', asyn
   });
 });
 
-test('get_pdf_tool_storage_grant fails closed with a named error when env vars are missing', async () => {
+test('buildPdfToolStorageGrant fails closed with a named error when env vars are missing', async () => {
   const cases: Array<Partial<Record<(typeof GRANT_ENV_VARS)[number], string>>> = [
     {},
     { PDF_TOOL_STORAGE_TOKEN: 'tok' },
@@ -133,67 +125,30 @@ test('get_pdf_tool_storage_grant fails closed with a named error when env vars a
 
   for (const env of cases) {
     await withGrantEnv(env, async () => {
-      const { response, logs } = await callGrantTool();
+      const built = buildPdfToolStorageGrant();
 
-      assert.equal(response.statusCode, 200);
-      const result = (JSON.parse(response.body) as { result: ToolCallResult }).result;
-      assert.equal(result.isError, true);
-      assert.equal(result.structuredContent?.error_code, 'pdf_tool_storage_grant_not_configured');
-      assert.match(String(result.structuredContent?.error), /PDF_TOOL_STORAGE_/);
-      assert.doesNotMatch(response.body, /"token"\s*:/, 'a misconfigured server must never return a token field');
-      assert.ok(logs.some((log) => log.event === 'pdf_tool_storage_grant_not_configured'));
+      assert.equal(built.ok, false);
+      if (built.ok) return;
+      assert.equal(built.errorCode, 'pdf_tool_storage_grant_not_configured');
+      assert.match(built.error, /PDF_TOOL_STORAGE_/);
     });
   }
 });
 
-test('the storage token never appears in structured logs, and issuance is logged metadata-only', async () => {
+test('the removed raw grant RPC cannot return a storage token even when its name is guessed', async () => {
   const secret = 'nfp_super_secret_value_do_not_log';
 
   await withGrantEnv({ PDF_TOOL_STORAGE_TOKEN: secret, PDF_TOOL_STORAGE_SITE_ID: 'site-api-id-1234' }, async () => {
-    const { response, logs } = await callGrantTool();
+    const { response, logs } = await callRemovedGrantTool();
 
     assert.equal(response.statusCode, 200);
-    const serializedLogs = JSON.stringify(logs);
-    assert.ok(!serializedLogs.includes(secret), 'the storage token must never be logged');
-    assert.ok(!serializedLogs.includes('site-api-id-1234'), 'issuance logs should not need the site id either');
-
-    const issued = logs.find((log) => log.event === 'pdf_tool_storage_grant_issued');
-    assert.ok(issued, 'a grant issuance must leave a structured log entry');
-    assert.equal(issued.grantType, 'netlify-pat');
-    assert.equal(typeof issued.expiresAt, 'string');
-    assert.equal('token' in issued, false);
+    assert.match(response.body, /Unknown tool/);
+    assert.ok(!response.body.includes(secret), 'the removed route must never return the storage token');
+    assert.ok(!JSON.stringify(logs).includes(secret), 'the removed route must never log the storage token');
   });
 });
 
-test('get_pdf_tool_storage_grant sits behind the MCP endpoint auth gate', async () => {
-  const previousMcpToken = process.env.MCP_HTTP_AUTH_TOKEN;
-  process.env.MCP_HTTP_AUTH_TOKEN = 'mcp-endpoint-token';
-
-  try {
-    await withGrantEnv(
-      { PDF_TOOL_STORAGE_TOKEN: 'nfp_gate_test_secret', PDF_TOOL_STORAGE_SITE_ID: 'site-api-id-1234' },
-      async () => {
-        const unauthorized = await callGrantTool();
-        assert.equal(unauthorized.response.statusCode, 401);
-        assert.ok(
-          !unauthorized.response.body.includes('nfp_gate_test_secret'),
-          'an unauthorized call must never receive the storage token'
-        );
-
-        const authorized = await callGrantTool({ authorization: 'Bearer mcp-endpoint-token' });
-        assert.equal(authorized.response.statusCode, 200);
-        const result = (JSON.parse(authorized.response.body) as { result: ToolCallResult }).result;
-        assert.equal(result.isError, undefined);
-        assert.equal(result.structuredContent?.token, 'nfp_gate_test_secret');
-      }
-    );
-  } finally {
-    if (previousMcpToken === undefined) delete process.env.MCP_HTTP_AUTH_TOKEN;
-    else process.env.MCP_HTTP_AUTH_TOKEN = previousMcpToken;
-  }
-});
-
-test('tools/list keeps the internal pdf-tool storage grant out of agent discovery', async () => {
+test('tools/list does not advertise the removed raw pdf-tool storage grant', async () => {
   const response = await handler({
     httpMethod: 'POST',
     headers: { 'content-type': 'application/json' },

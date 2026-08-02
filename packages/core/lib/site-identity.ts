@@ -70,6 +70,8 @@ export const siteIdentityConfigSchema = z.strictObject({
   assetHost: nonEmpty.regex(/^https:\/\/[^\s/]+$/),
   /** This site's folder on assetHost. */
   assetFolder: nonEmpty.regex(/^[a-z0-9][a-z0-9-]*$/),
+  /** Canonical project registered by pdf-tool for this site. */
+  pdfToolProjectId: nonEmpty.regex(/^[a-z0-9][a-z0-9-]*$/).optional(),
   /** W11 T11.5: admin console label (defaults to `${brandName} admin`). */
   adminLabel: nonEmpty.optional(),
   /** W11 T11.5: git committer fallback (env GITHUB_COMMIT_AUTHOR_* wins). */
@@ -132,7 +134,7 @@ export const resolveSiteIdentity = (
     mcpDiagnosticName: envValue(env, 'MCP_SERVER_DIAGNOSTIC_NAME') ?? parsed.data.mcpDiagnosticName,
     assetHost: envValue(env, 'SITE_ASSET_HOST') ?? parsed.data.assetHost,
     assetFolder: envValue(env, 'SITE_ASSET_FOLDER') ?? parsed.data.assetFolder,
-    pdfToolProjectId: envValue(env, 'PDF_TOOL_PROJECT_ID') ?? siteSlug,
+    pdfToolProjectId: envValue(env, 'PDF_TOOL_PROJECT_ID') ?? parsed.data.pdfToolProjectId ?? siteSlug,
     adminLabel: parsed.data.adminLabel ?? `${parsed.data.brandName} admin`,
     committerName: parsed.data.committerName ?? `${parsed.data.brandName} Publisher`,
     committerEmail: parsed.data.committerEmail ?? `publisher@${siteSlug}.local`,

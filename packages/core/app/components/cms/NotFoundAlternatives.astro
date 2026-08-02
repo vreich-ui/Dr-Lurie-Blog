@@ -18,13 +18,14 @@
 import { getEntry } from 'astro:content';
 
 import { getSiteObject } from '~/utils/site-object';
-import { getBlogPermalink, getHomePermalink } from '~/utils/permalinks';
-import { createNavTargetResolver, navigationToHeaderProps, parseNavigationExport } from '~/utils/navigation-data';
+import { getHomePermalink } from '~/utils/permalinks';
+import { navigationToHeaderProps, parseNavigationExport } from '~/utils/navigation-data';
+import { buildSiteNavTargetResolver } from '~/utils/site-nav-targets';
 
 const site = getSiteObject();
 const headerNavId = site?.defaultNavigation?.header ?? 'nav_header';
 
-const resolve = createNavTargetResolver({ blogPermalink: getBlogPermalink() });
+const resolve = await buildSiteNavTargetResolver();
 let links: Array<{ text?: string; href?: string }> = [];
 try {
   const entry = await getEntry('navigationObject', headerNavId);

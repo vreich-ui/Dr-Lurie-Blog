@@ -19,23 +19,8 @@ import { getEntry } from 'astro:content';
 import { parseSharedSectionExport, type ResolvePageDeps } from '../../../lib/renderer/resolve';
 import type { NavTarget } from '../../../schema/bodies/navigation-v1';
 import type { ContentQuery, SectionInstance } from '../../../schema/bodies/section-v1';
-import { getBlogPermalink, getPermalink } from '~/utils/permalinks';
-
-const resolveActionHref = (target: NavTarget): string => {
-  switch (target.kind) {
-    case 'route':
-    case 'asset':
-      return getPermalink(target.href);
-    case 'external':
-      return target.href;
-    case 'listing':
-      return getBlogPermalink();
-    default:
-      throw new Error(
-        `section-resolve-deps: action target kind '${target.kind}' is not resolvable on a page body yet.`
-      );
-  }
-};
+import { getPermalink } from '~/utils/permalinks';
+import { buildSiteNavTargetResolver } from '~/utils/site-nav-targets';
 
 /**
  * Rendering context a surface can hand the resolver. `relatedToPostId` is the
@@ -54,6 +39,11 @@ export const buildSectionResolveDeps = async (
   sections: readonly SectionInstance[],
   context: SectionResolveContext = {}
 ): Promise<ResolvePageDeps> => {
+  const resolveNavTarget = await buildSiteNavTargetResolver();
+  const resolveActionHref = (target: NavTarget): string => {
+    if (target.kind === 'route' || target.kind === 'asset') return getPermalink(target.href);
+    return resolveNavTarget(target);
+  };
   // Pre-load every shared_ref target so the pure resolver gets a sync lookup.
   const sharedSectionCache = new Map<string, ReturnType<typeof parseSharedSectionExport>>();
   for (const section of sections) {
