@@ -1,8 +1,8 @@
 {
   "__generated": {
-    "at": "2026-07-26T17:52:55.293Z",
+    "at": "2026-08-02T18:33:38.688Z",
     "from": "objects/page/by-id/page_manual_taxonomy.json",
-    "record_version": 2
+    "record_version": 5
   },
   "pageType": "system",
   "route": "/manual/types/taxonomy",
@@ -16,7 +16,7 @@
     },
     {
       "data": {
-        "body": "<h2>Body fields</h2><ul><li><strong>tracking</strong></li><li><strong>kinds</strong> <em>(required)</em></li></ul><h2>Patch operations</h2><ul><li><strong>add_term</strong></li><li><strong>update_term</strong></li><li><strong>deprecate_term</strong></li><li><strong>reactivate_term</strong></li><li><strong>remove_term</strong></li><li><strong>set_tracking</strong></li></ul><p><em>This reference is generated from the live <strong>object_contract</strong>. If it disagrees with the contract, the manual is wrong and the drift guard fails the build of it.</em></p>"
+        "body": "<h2>Body fields</h2><ul><li><strong>tracking</strong></li><li><strong>kinds</strong> <em>(required)</em></li></ul><h2>Patch operations</h2><ul><li><strong>add_term</strong></li><li><strong>update_term</strong></li><li><strong>deprecate_term</strong></li><li><strong>reactivate_term</strong></li><li><strong>remove_term</strong></li><li><strong>set_tracking</strong></li></ul><p><em>This reference is generated from the live <strong>object_contract</strong>. If it disagrees with the contract, the manual is wrong and the drift guard fails the build of it.</em></p><h2>Worked example</h2><p><strong>tax_platform</strong> declares Guide and Reference categories plus architecture, publishing, multisite, and testing tags. Its former skincare test term is deprecated and merged into architecture so historical references do not strand.</p><h2>Lifecycle note</h2><p>Unknown content terms block validation. Prefer an active term or extend the registry before writing dependent content.</p>"
       },
       "id": "s_reference",
       "type": "prose"
