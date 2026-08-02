@@ -1,27 +1,95 @@
 {
   "__generated": {
-    "at": "2026-07-26T16:59:47.851Z",
+    "at": "2026-08-02T18:37:53.192Z",
     "from": "objects/navigation/by-id/nav_footer.json",
-    "record_version": 2
+    "record_version": 8
   },
   "brand": {
     "text": "Platform"
   },
-  "footNote": "© Platform",
+  "footNote": "Platform reference tenant · governed objects · verified releases",
   "groups": [
     {
       "id": "g_explore",
       "items": [
         {
-          "id": "i_home",
-          "label": "Home",
+          "id": "i_start",
+          "label": "Start here",
           "target": {
-            "href": "/",
+            "kind": "page",
+            "page": "page_start"
+          }
+        },
+        {
+          "id": "i_publishing",
+          "label": "V1 publishing",
+          "target": {
+            "kind": "page",
+            "page": "page_publishing_v1"
+          }
+        },
+        {
+          "id": "i_testing",
+          "label": "Testing",
+          "target": {
+            "kind": "page",
+            "page": "page_testing"
+          }
+        }
+      ],
+      "title": "Operate"
+    },
+    {
+      "id": "g_reference",
+      "items": [
+        {
+          "id": "i_objects",
+          "label": "Object types",
+          "target": {
+            "kind": "page",
+            "page": "page_manual"
+          }
+        },
+        {
+          "id": "i_multisite",
+          "label": "Multisite",
+          "target": {
+            "kind": "page",
+            "page": "page_multisite"
+          }
+        },
+        {
+          "id": "i_findings",
+          "label": "Findings",
+          "target": {
+            "kind": "page",
+            "page": "page_known_gaps"
+          }
+        }
+      ],
+      "title": "Reference"
+    },
+    {
+      "id": "g_examples",
+      "items": [
+        {
+          "id": "i_dtc",
+          "label": "DTC launch map",
+          "target": {
+            "kind": "page",
+            "page": "page_dtc_example"
+          }
+        },
+        {
+          "id": "i_objectarticle",
+          "label": "Everything is an object",
+          "target": {
+            "href": "/everything-is-an-object",
             "kind": "route"
           }
         }
       ],
-      "title": "Explore"
+      "title": "Examples"
     }
   ],
   "role": "footer"
