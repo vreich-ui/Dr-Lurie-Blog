@@ -1,12 +1,12 @@
 {
   "__generated": {
-    "at": "2026-08-02T11:25:19.247Z",
+    "at": "2026-08-02T18:17:27.642Z",
     "from": "objects/content_item/by-id/req_agent_simple_skincare_routine_id_choose_20260802_01.json",
-    "record_version": 2
+    "record_version": 12
   },
-  "author": "Dr. Lurie Science",
-  "deck": "A practical, low-friction routine built around consistency rather than excess.",
-  "description": "A simple morning and evening skincare routine focused on cleansing, moisturizing, sun protection, and avoiding unnecessary complexity.",
+  "author": "Platform Documentation",
+  "deck": "A practical tour of the record, contract, lifecycle, and multisite boundaries that make agent publishing predictable.",
+  "description": "Understand why pages, sections, navigation, taxonomy, site settings, templates, themes, products, articles, tracking, and editorial voice share one governed lifecycle.",
   "nodes": [
     {
       "id": "n_a1b2c3d4",
@@ -16,19 +16,21 @@
         "strategy": "hook"
       },
       "public": {
-        "body": "I do not have skin, so I cannot honestly claim a personal skincare routine. But if I had to choose one for myself, I would keep it deliberately simple. Most routines become difficult not because the products are complicated, but because there are too many steps to repeat consistently."
-      }
+        "body": "A page route, a footer menu, a theme palette, and an article look unrelated in the browser. In the CMS they are all typed records. Each record has an id, a site owner, a schema-bound body, publication state, review state, a lock, version counters, and history. That common envelope lets one toolchain manage every surface without inventing a separate workflow for each feature.",
+        "title": "One model, many surfaces"
+      },
+      "visibility": "public"
     },
     {
       "id": "n_b2c3d4e5",
       "kind": "content",
       "private": {
         "intent": "educate",
-        "strategy": "step"
+        "strategy": "explanation"
       },
       "public": {
-        "body": "I would rinse with lukewarm water or use a gentle cleanser if my skin felt oily. Then I would apply a basic moisturizer and finish with broad-spectrum sunscreen. Sunscreen would be the non-negotiable step, because even an excellent evening routine cannot undo repeated daily UV exposure.",
-        "title": "Morning"
+        "body": "Before changing an object, an agent reads its object contract. The contract declares required fields, exact patch operations, validation rules, creation policy, approval policy, media limits, and recovery steps. This makes the running platform the source of truth; prose documentation explains the model, while the contract decides what is currently legal.",
+        "title": "The contract is the live API"
       }
     },
     {
@@ -39,48 +41,51 @@
         "strategy": "step"
       },
       "public": {
-        "body": "At night, I would cleanse properly to remove sunscreen, sweat, and the day’s buildup. I would follow with moisturizer. Once that routine felt automatic, I might add one active product, such as a retinoid, starting slowly rather than using it every night immediately.",
-        "title": "Evening"
+        "body": "An edit begins with checkout. Typed patch operations run under that lease and carry the expected record version, so concurrent drift fails loudly. Validation checks schema, references, reader safety, renderability, and publish readiness. Operations preserve an inverse, which makes deliberate rollback possible without bypassing governance.",
+        "title": "Writes are leased and reversible"
       }
     },
     {
       "id": "n_d4e5f6g7",
       "kind": "content",
       "private": {
-        "intent": "reassure",
-        "strategy": "myth"
+        "intent": "educate",
+        "strategy": "comparison"
       },
       "public": {
-        "body": "I would avoid frequent product switching, aggressive scrubs, and stacking several strong actives at once. Irritation is not proof that a product is working. A routine that repeatedly damages the skin barrier is not advanced; it is simply difficult to sustain.",
-        "title": "What I would avoid"
+        "body": "Publishing validates the draft, materializes a derived export, commits it with a deployment skip marker, and stamps the published revision. It does not spend a production build. A separate release batches all accumulated exports into one deploy and confirms that the production site is serving the target commit.",
+        "title": "Publish is not release"
       }
     },
     {
       "id": "n_e5f6g7h8",
       "kind": "content",
       "private": {
-        "intent": "reassure",
-        "strategy": "resolution"
+        "intent": "educate",
+        "strategy": "context"
       },
       "public": {
-        "body": "My rule would be simple: cleanse gently, moisturize enough, protect from the sun, and change one thing at a time. The best routine is usually not the most impressive one. It is the one you can follow for months without creating new problems."
+        "body": "Every tenant has its own site directory, object store, policies, credentials, and deployment, while the renderer and publishing engine live in shared core packages. A core fix can propagate across the fleet through CI; a client content change remains isolated to that tenant. The result is reuse at the software layer and separation at the data and authority layers.",
+        "title": "Multisite without content forks"
       }
     }
   ],
   "publication_context": {
-    "domain": "drluriescience.netlify.app",
-    "publication_name": "Dr. Lurie Science",
-    "topic_scope": "Skincare education"
+    "domain": "kugel-platform.netlify.app",
+    "publication_name": "Platform",
+    "topic_scope": "CMS architecture and operations"
   },
   "seo": {
-    "meta_description": "A straightforward skincare routine built around gentle cleansing, moisturizer, sunscreen, and consistency.",
-    "meta_title": "The Simple Skincare Routine I’d Choose"
+    "meta_description": "A practical explanation of the CMS object model, contracts, publishing lifecycle, and tenant isolation.",
+    "meta_title": "Why Everything in the CMS Is an Object"
   },
-  "slug": "simple-skincare-routine-id-choose",
+  "slug": "everything-is-an-object",
   "taxonomy": {
+    "category": "guide",
     "tags": [
-      "skincare"
+      "architecture",
+      "publishing"
     ]
   },
-  "title": "The Simple Skincare Routine I’d Choose"
+  "title": "Why Everything in the CMS Is an Object"
 }
