@@ -1,8 +1,8 @@
 {
   "__generated": {
-    "at": "2026-07-26T18:06:13.197Z",
+    "at": "2026-08-02T18:35:44.572Z",
     "from": "objects/page/by-id/page_manual_content_item.json",
-    "record_version": 2
+    "record_version": 6
   },
   "pageType": "system",
   "route": "/manual/types/content-item",
@@ -16,7 +16,7 @@
     },
     {
       "data": {
-        "body": "<h2>Body fields</h2><ul><li><strong>tracking</strong></li><li><strong>slug</strong> <em>(required)</em></li><li><strong>title</strong> <em>(required)</em></li><li><strong>deck</strong></li><li><strong>description</strong></li><li><strong>author</strong></li><li><strong>image</strong></li><li><strong>taxonomy</strong></li><li><strong>seo</strong></li><li><strong>nodes</strong> <em>(required)</em></li><li><strong>chat</strong></li><li><strong>editorial</strong></li><li><strong>emotional_strategy</strong></li><li><strong>sources</strong></li><li><strong>claims</strong></li><li><strong>compliance</strong></li><li><strong>publication_context</strong></li><li><strong>lineage</strong></li><li><strong>scores</strong></li></ul><h2>Patch operations</h2><ul><li><strong>set_article_meta</strong> — Merge article meta fields (title/slug/author/taxonomy/seo/scores/…); nodes are edited only via node ops.</li><li><strong>upsert_node</strong></li><li><strong>update_node</strong></li><li><strong>move_node</strong></li><li><strong>set_node_visibility</strong></li><li><strong>remove_node</strong></li><li><strong>set_tracking</strong></li></ul><p><em>This reference is generated from the live <strong>object_contract</strong>. If it disagrees with the contract, the manual is wrong and the drift guard fails the build of it.</em></p>"
+        "body": "<h2>Body fields</h2><ul><li><strong>tracking</strong></li><li><strong>slug</strong> <em>(required)</em></li><li><strong>title</strong> <em>(required)</em></li><li><strong>deck</strong></li><li><strong>description</strong></li><li><strong>author</strong></li><li><strong>image</strong></li><li><strong>taxonomy</strong></li><li><strong>seo</strong></li><li><strong>nodes</strong> <em>(required)</em></li><li><strong>chat</strong></li><li><strong>editorial</strong></li><li><strong>emotional_strategy</strong></li><li><strong>sources</strong></li><li><strong>claims</strong></li><li><strong>compliance</strong></li><li><strong>publication_context</strong></li><li><strong>lineage</strong></li><li><strong>scores</strong></li></ul><h2>Patch operations</h2><ul><li><strong>set_article_meta</strong> — Merge article meta fields (title/slug/author/taxonomy/seo/scores/…); nodes are edited only via node ops.</li><li><strong>upsert_node</strong></li><li><strong>update_node</strong></li><li><strong>move_node</strong></li><li><strong>set_node_visibility</strong></li><li><strong>remove_node</strong></li><li><strong>set_tracking</strong></li></ul><p><em>This reference is generated from the live <strong>object_contract</strong>. If it disagrees with the contract, the manual is wrong and the drift guard fails the build of it.</em></p><h2>Worked example</h2><p><strong>Why Everything in the CMS Is an Object</strong> was converted from misplaced tenant test content by typed metadata and node operations. Its public nodes explain architecture while private annotations remain outside reader HTML.</p><h2>Lifecycle note</h2><p>Slug and taxonomy must resolve, at least one public node must remain, and media references must follow the tenant artifact trust rules.</p>"
       },
       "id": "s_reference",
       "type": "prose"
