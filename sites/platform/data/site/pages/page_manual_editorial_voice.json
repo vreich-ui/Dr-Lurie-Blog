@@ -1,0 +1,49 @@
+{
+  "__generated": {
+    "at": "2026-08-02T18:25:55.591Z",
+    "from": "objects/page/by-id/page_manual_editorial_voice.json",
+    "record_version": 4
+  },
+  "pageType": "standard",
+  "route": "/manual/types/editorial-voice",
+  "sections": [
+    {
+      "data": {
+        "actions": [
+          {
+            "label": "Voice and roles",
+            "style": "secondary",
+            "target": {
+              "href": "/manual/roles",
+              "kind": "route"
+            }
+          }
+        ],
+        "body": "<p>The editorial voice singleton declares how a tenant communicates: audience, tone, cadence, preferred and avoided language, claim boundaries, CTA rules, reader safety, and reusable article frameworks.</p>",
+        "heading": "editorial_voice",
+        "kicker": "Object reference"
+      },
+      "id": "s_1873227ff32d",
+      "type": "lede"
+    },
+    {
+      "data": {
+        "body": "<h2>Function</h2><p>Editorial voice is governed data, not an instruction prompt. Agents and humans can read the same reviewable identity through the ordinary object surface, while the renderer keeps the record off public routes.</p><h2>Required attributes</h2><ul><li><strong>name, audience, tone, cadence</strong> define the publication’s reader-facing character.</li><li><strong>lexicon</strong> carries preferred and avoided terms.</li><li><strong>claim_policy, cta_policy, reader_safety_notes</strong> state content boundaries.</li><li><strong>frameworks</strong> is a plural set of declared structures; <strong>default_framework</strong> must name one of them.</li></ul><h2>Operations and gates</h2><p>The type is a one-per-site singleton edited with <strong>set_voice_fields</strong>. Creation is allowlisted, prompt-formatted text is rejected at write time, and publishing requires a current approval pinned to the exact action. In this Platform test, creation and review submission passed; an unapproved publish correctly returned <strong>approval_required</strong>.</p><h2>Worked example</h2><p><strong>voice_platform</strong> defines a plain-spoken, evidence-led documentation voice with concept and runbook frameworks. It remains in open review until an authorized reviewer approves publication.</p>"
+      },
+      "id": "s_6d71ff8283ab",
+      "type": "prose"
+    }
+  ],
+  "seo": {
+    "description": "Reference for the editorial_voice object type: fields, operations, approval policy, and safe usage.",
+    "robots": {
+      "follow": false,
+      "index": false
+    }
+  },
+  "template": {
+    "instantiated_at": "2026-08-02T18:25:20.200Z",
+    "ref": "tpl_object_reference"
+  },
+  "title": "Manual — editorial_voice"
+}
