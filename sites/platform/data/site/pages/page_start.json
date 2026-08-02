@@ -1,0 +1,128 @@
+{
+  "__generated": {
+    "at": "2026-08-02T18:26:46.896Z",
+    "from": "objects/page/by-id/page_start.json",
+    "record_version": 2
+  },
+  "pageType": "standard",
+  "route": "/start",
+  "sections": [
+    {
+      "data": {
+        "actions": [
+          {
+            "label": "Open the manual",
+            "style": "primary",
+            "target": {
+              "href": "/manual",
+              "kind": "route"
+            }
+          },
+          {
+            "label": "See publishing V1",
+            "style": "secondary",
+            "target": {
+              "href": "/manual/publishing-schema-v1",
+              "kind": "route"
+            }
+          }
+        ],
+        "body": "<p>The CMS is easiest to operate when you separate <strong>what the object is</strong>, <strong>how it may change</strong>, and <strong>when it becomes live</strong>.</p>",
+        "heading": "Read the contract, change one object, verify the release",
+        "kicker": "Getting started"
+      },
+      "id": "s_startlede",
+      "type": "lede"
+    },
+    {
+      "data": {
+        "columns": 3,
+        "heading": "A safe six-step loop",
+        "items": [
+          {
+            "description": "Find the existing record before creating a duplicate.",
+            "title": "1. Inventory"
+          },
+          {
+            "description": "Read fields, operations, constraints, policy, and side-data.",
+            "title": "2. Contract"
+          },
+          {
+            "description": "Dry-run the exact candidate patch and resolve blockers.",
+            "title": "3. Validate"
+          },
+          {
+            "description": "Acquire a lease and retain the returned record version.",
+            "title": "4. Checkout"
+          },
+          {
+            "description": "Apply typed operations, publish a dark export, then check in.",
+            "title": "5. Patch and publish"
+          },
+          {
+            "description": "Trigger one batch build and confirm production serves its commit.",
+            "title": "6. Release and verify"
+          }
+        ],
+        "kicker": "First governed change"
+      },
+      "id": "s_startsteps",
+      "type": "steps"
+    },
+    {
+      "data": {
+        "heading": "Minimum prerequisites",
+        "items": [
+          "Correct tenant connection",
+          "Object id and type",
+          "Live object contract",
+          "Referenced objects already exist",
+          "No secrets in reader-visible fields",
+          "A release and verification plan"
+        ],
+        "kicker": "Before you write"
+      },
+      "id": "s_startcheck",
+      "type": "checklist"
+    },
+    {
+      "data": {
+        "heading": "Continue",
+        "links": [
+          {
+            "label": "Architecture",
+            "target": {
+              "href": "/architecture",
+              "kind": "route"
+            }
+          },
+          {
+            "label": "Multisite generation",
+            "target": {
+              "href": "/manual/multisite",
+              "kind": "route"
+            }
+          },
+          {
+            "label": "Testing evidence",
+            "target": {
+              "href": "/manual/testing",
+              "kind": "route"
+            }
+          }
+        ]
+      },
+      "id": "s_startlinks",
+      "type": "link_list"
+    }
+  ],
+  "seo": {
+    "description": "The shortest safe path from a CMS task to a verified production change.",
+    "robots": {
+      "follow": false,
+      "index": false
+    },
+    "title": "Start here"
+  },
+  "title": "Start here"
+}
