@@ -1,0 +1,127 @@
+{
+  "__generated": {
+    "at": "2026-08-02T18:27:32.331Z",
+    "from": "objects/page/by-id/page_multisite.json",
+    "record_version": 5
+  },
+  "pageType": "standard",
+  "route": "/manual/multisite",
+  "sections": [
+    {
+      "data": {
+        "actions": [
+          {
+            "label": "Genesis overview",
+            "style": "primary",
+            "target": {
+              "href": "/manual/genesis",
+              "kind": "route"
+            }
+          },
+          {
+            "label": "Architecture",
+            "style": "secondary",
+            "target": {
+              "href": "/architecture",
+              "kind": "route"
+            }
+          }
+        ],
+        "body": "<p>A new site gets its own configuration, data, policies, credentials, stores, and deployment. It imports the same core engine as every other tenant.</p>",
+        "heading": "Generate a tenant; do not fork the product",
+        "kicker": "Fleet"
+      },
+      "id": "s_multilede",
+      "type": "lede"
+    },
+    {
+      "data": {
+        "columns": 2,
+        "heading": "Four boundaries in the create-site flow",
+        "items": [
+          {
+            "description": "Dry-run, then create a client directory with bindings, configuration, empty export roots, and baseline seed data.",
+            "title": "1. Scaffold"
+          },
+          {
+            "description": "Create or resolve the Netlify project, probe tenant stores, install generated secrets, and connect shared services.",
+            "title": "2. Provision"
+          },
+          {
+            "description": "Drive starter objects through the tenant MCP in dependency order: navigation, site singleton, taxonomy, theme and recipes, then pages.",
+            "title": "3. Seed"
+          },
+          {
+            "description": "Publish dark exports, release once, verify the production deploy, and confirm another tenant inventory did not change.",
+            "title": "4. Prove"
+          }
+        ],
+        "kicker": "Tenant genesis"
+      },
+      "id": "s_multisteps",
+      "type": "steps"
+    },
+    {
+      "data": {
+        "columns": [
+          {
+            "label": "Core owns"
+          },
+          {
+            "label": "Tenant owns"
+          }
+        ],
+        "heading": "The fleet contract",
+        "kicker": "Isolation",
+        "rows": [
+          {
+            "cells": [
+              "Components, validators, tools",
+              "Bindings and policy values"
+            ],
+            "label": "Code"
+          },
+          {
+            "cells": [
+              "Schemas and export format",
+              "Object store and committed exports"
+            ],
+            "label": "Data"
+          },
+          {
+            "cells": [
+              "Authorization mechanisms",
+              "Users, agent keys, secrets"
+            ],
+            "label": "Authority"
+          },
+          {
+            "cells": [
+              "Build conventions and CI",
+              "Netlify project, hook, production deploy"
+            ],
+            "label": "Delivery"
+          }
+        ]
+      },
+      "id": "s_multitable",
+      "type": "comparison_table"
+    },
+    {
+      "data": {
+        "body": "<h2>Dependency order matters</h2><p>The site singleton references default navigation, so navigation must exist first. Pages may reference navigation, shared sections, taxonomy terms, templates, or content items, so those targets must exist before a page or menu that names them can publish.</p><h2>Fleet propagation is tested, not assumed</h2><p>CI discovers site directories dynamically. Core changes fan out across the fleet; tenant-only content changes remain scoped. A multisite acceptance proof includes an isolation check against a second tenant’s inventory.</p>"
+      },
+      "id": "s_multiprose",
+      "type": "prose"
+    }
+  ],
+  "seo": {
+    "description": "How a new tenant is scaffolded, provisioned, seeded, released, and kept isolated while sharing the core platform.",
+    "robots": {
+      "follow": false,
+      "index": false
+    },
+    "title": "Multisite generation"
+  },
+  "title": "Multisite generation"
+}
