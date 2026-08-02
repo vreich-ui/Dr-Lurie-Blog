@@ -132,12 +132,14 @@ export const ENV_CHECKLIST = [
       {
         name: 'PDF_TOOL_BASE_URL',
         cls: 'fleet-shared',
-        note: 'Base URL of the shared pdf-tool service used by the server-side artifact bridge.',
+        inheritFromPdfTool: true,
+        note: 'Inherited automatically from the shared pdf-tool Netlify service for the server-side artifact bridge.',
       },
       {
         name: 'PDF_TOOL_AGENT_RUN_TOKEN',
         cls: 'fleet-shared',
-        note: 'Server-to-server bearer for the shared pdf-tool artifact bridge.',
+        inheritFromPdfTool: true,
+        note: 'Inherited automatically and stored as a Functions-only secret; never written to the scaffold or printed.',
       },
       {
         name: 'PDF_TOOL_STORAGE_SITE_ID',
@@ -1387,7 +1389,9 @@ export const renderEnvChecklist = (executed) => {
     lines.push(`  ${group}:`);
     for (const row of rows) {
       let status;
-      if (executed && row.generate) status = '✓ generated + set on the new site (value not shown)';
+      if (executed && row.inheritFromPdfTool) status = '✓ inherited + set on the new site (value not shown)';
+      else if (executed && row.generate) status = '✓ generated + set on the new site (value not shown)';
+      else if (row.inheritFromPdfTool) status = 'inherited automatically from the shared pdf-tool service';
       else if (row.cls === 'fleet-shared') status = 'reuse the fleet value — do not create a new one';
       else status = '☐ human-supplied — see the provisioning runbook';
       lines.push(`    ${row.name.padEnd(32)} [${row.cls}]  ${status}`);
@@ -1418,6 +1422,9 @@ export const renderPlan = (plan, { netlifyToken }) => {
     );
     lines.push(
       '  - generate + push per-site secrets (PUBLISH_SECRET, MCP_HTTP_AUTH_TOKEN, ARTIFACT_UPLOAD_TOKEN_SECRET, TRACKING_SALT) directly to the new site (never printed)'
+    );
+    lines.push(
+      '  - inherit PDF_TOOL_BASE_URL + PDF_TOOL_AGENT_RUN_TOKEN from the shared pdf-tool service; store the token as a Functions-only production secret'
     );
   } else {
     lines.push('Netlify actions: none (no --netlify-token supplied — scaffold only).');
@@ -1480,29 +1487,102 @@ const probeStore = async (getStore, { siteID, token }, storeName) => {
   await store.delete(probeKey);
 };
 
-const setNetlifyEnvVar = async (fetchImpl, token, accountId, siteId, key, value) => {
-  const response = await fetchImpl(
-    `https://api.netlify.com/api/v1/accounts/${accountId}/env?site_id=${encodeURIComponent(siteId)}`,
-    {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      // The endpoint takes an ARRAY of variables. A bare object comes back as
-      // 400 "param is missing or the value is empty: _json" — which is what the
-      // first live run of this path hit (W14 T14.3). Scopes cover every context
-      // so a preview/branch deploy is not silently missing its secrets.
-      body: JSON.stringify([
-        {
-          key,
-          scopes: ['builds', 'functions', 'runtime', 'post_processing'],
-          values: [{ value, context: 'all' }],
-        },
-      ]),
-    }
-  );
+const setNetlifyEnvVar = async (
+  fetchImpl,
+  token,
+  accountId,
+  siteId,
+  key,
+  value,
+  { scopes = ['builds', 'functions', 'runtime', 'post_processing'], context = 'all', isSecret = false } = {}
+) => {
+  const collectionUrl = `https://api.netlify.com/api/v1/accounts/${accountId}/env?site_id=${encodeURIComponent(siteId)}`;
+  const keyUrl = `https://api.netlify.com/api/v1/accounts/${accountId}/env/${encodeURIComponent(key)}?site_id=${encodeURIComponent(siteId)}`;
+  const existing = await fetchImpl(keyUrl, { headers: { Authorization: `Bearer ${token}` } });
+  if (!existing.ok && existing.status !== 404) {
+    throw new Error(`Netlify env-var lookup failed for ${key}: ${existing.status}`);
+  }
+  const variable = {
+    key,
+    scopes,
+    values: [{ value, context }],
+    ...(isSecret ? { is_secret: true } : {}),
+  };
+  const updating = existing.ok;
+  const response = await fetchImpl(updating ? keyUrl : collectionUrl, {
+    method: updating ? 'PUT' : 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    // POST takes an ARRAY; PUT replaces one existing variable with one object.
+    // Checking first makes --provision-only a real repair path after a partial
+    // run, instead of failing on whichever variables the first run did set.
+    body: JSON.stringify(updating ? variable : [variable]),
+  });
   if (!response.ok) {
-    const body = await response.text().catch(() => '');
+    // A secret-setting error body must not be allowed to echo the submitted
+    // bearer back into terminal logs or CI output.
+    const body = isSecret ? '' : await response.text().catch(() => '');
     throw new Error(`Netlify env-var set failed for ${key}: ${response.status} ${body}`);
   }
+};
+
+const getNetlifyEnvVars = async (fetchImpl, token, accountId, siteId) => {
+  const response = await fetchImpl(
+    `https://api.netlify.com/api/v1/accounts/${accountId}/env?site_id=${encodeURIComponent(siteId)}`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+  if (!response.ok) {
+    throw new Error(`Netlify env-var read failed for shared pdf-tool service: ${response.status}`);
+  }
+  const variables = await response.json().catch(() => []);
+  return Array.isArray(variables) ? variables : [];
+};
+
+const contextValue = (variable) => {
+  const values = Array.isArray(variable?.values) ? variable.values : [];
+  return (
+    values.find((entry) => entry?.context === 'production' && typeof entry.value === 'string')?.value ||
+    values.find((entry) => entry?.context === 'all' && typeof entry.value === 'string')?.value
+  );
+};
+
+const resolvePdfToolBridgeEnv = async (
+  fetchImpl,
+  token,
+  { fleetEnv = process.env, pdfToolSiteName = 'pdf-x' } = {}
+) => {
+  let baseUrl = fleetEnv.PDF_TOOL_BASE_URL;
+  let agentRunToken = fleetEnv.PDF_TOOL_AGENT_RUN_TOKEN;
+
+  if (!baseUrl || !agentRunToken) {
+    const serviceSite = await findNetlifySite(fetchImpl, token, pdfToolSiteName);
+    if (!serviceSite) {
+      throw new Error(
+        `shared pdf-tool Netlify site '${pdfToolSiteName}' was not found; set PDF_TOOL_BASE_URL and PDF_TOOL_AGENT_RUN_TOKEN in the provisioning environment`
+      );
+    }
+    baseUrl ||= serviceSite.ssl_url || serviceSite.url;
+    if (!agentRunToken) {
+      const serviceAccountId = serviceSite.account_id;
+      const serviceSiteId = serviceSite.id || serviceSite.site_id;
+      if (!serviceAccountId || !serviceSiteId) {
+        throw new Error(`shared pdf-tool Netlify site '${pdfToolSiteName}' has no account/site id`);
+      }
+      const variables = await getNetlifyEnvVars(fetchImpl, token, serviceAccountId, serviceSiteId);
+      agentRunToken = contextValue(variables.find((variable) => variable?.key === 'AGENT_RUN_TOKEN'));
+    }
+  }
+
+  if (!baseUrl) {
+    throw new Error(
+      `shared pdf-tool base URL is unavailable; set PDF_TOOL_BASE_URL in the provisioning environment`
+    );
+  }
+  if (!agentRunToken) {
+    throw new Error(
+      `shared pdf-tool AGENT_RUN_TOKEN is unavailable or secret; set PDF_TOOL_AGENT_RUN_TOKEN in the provisioning environment`
+    );
+  }
+  return { baseUrl: baseUrl.replace(/\/$/, ''), agentRunToken };
 };
 
 /**
@@ -1511,7 +1591,10 @@ const setNetlifyEnvVar = async (fetchImpl, token, accountId, siteId, key, value)
  * real network call — mirroring the object-publish.ts / provision-pdf-tool-
  * stores.mjs testing seam pattern used elsewhere in this repo.
  */
-export const executeNetlifyProvisioning = async (plan, { token, fetchImpl = fetch, getStoreImpl, siteName }) => {
+export const executeNetlifyProvisioning = async (
+  plan,
+  { token, fetchImpl = fetch, getStoreImpl, siteName = undefined, fleetEnv = process.env, pdfToolSiteName = 'pdf-x' }
+) => {
   // The Netlify subdomain is globally unique, so it cannot always equal the
   // client slug (W14 T14.3: `platform.netlify.app` was taken). `siteName`
   // overrides it; the in-repo slug — which every id, store, and path is derived
@@ -1557,6 +1640,39 @@ export const executeNetlifyProvisioning = async (plan, { token, fetchImpl = fetc
           secretsFailed.push({ name: row.name, message: error instanceof Error ? error.message : String(error) });
         }
       }
+    }
+
+    try {
+      const bridgeEnv = await resolvePdfToolBridgeEnv(fetchImpl, token, { fleetEnv, pdfToolSiteName });
+      await setNetlifyEnvVar(
+        fetchImpl,
+        token,
+        accountId,
+        siteId,
+        'PDF_TOOL_BASE_URL',
+        bridgeEnv.baseUrl,
+        { scopes: ['functions'], context: 'production' }
+      );
+      secretsSet.push('PDF_TOOL_BASE_URL');
+      await setNetlifyEnvVar(
+        fetchImpl,
+        token,
+        accountId,
+        siteId,
+        'PDF_TOOL_AGENT_RUN_TOKEN',
+        bridgeEnv.agentRunToken,
+        { scopes: ['functions'], context: 'production', isSecret: true }
+      );
+      secretsSet.push('PDF_TOOL_AGENT_RUN_TOKEN');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      for (const name of ['PDF_TOOL_BASE_URL', 'PDF_TOOL_AGENT_RUN_TOKEN']) {
+        if (!secretsSet.includes(name)) secretsFailed.push({ name, message });
+      }
+    }
+  } else {
+    for (const name of ['PDF_TOOL_BASE_URL', 'PDF_TOOL_AGENT_RUN_TOKEN']) {
+      secretsFailed.push({ name, message: 'new Netlify site response has no account id' });
     }
   }
 
@@ -1637,6 +1753,14 @@ export const main = async (argv) => {
     if (result.secretsFailed.length) {
       console.log('[create-site] secret-set FAILURES (fix and set these by hand in the Netlify UI):');
       for (const failure of result.secretsFailed) console.log(`  FAILED   ${failure.name}: ${failure.message}`);
+    }
+    const bridgeFailures = result.secretsFailed.filter((failure) =>
+      ['PDF_TOOL_BASE_URL', 'PDF_TOOL_AGENT_RUN_TOKEN'].includes(failure.name)
+    );
+    if (bridgeFailures.length) {
+      throw new Error(
+        'required pdf-tool bridge environment was not provisioned; set the provisioning fallback values and retry with --provision-only'
+      );
     }
   } else {
     console.log(
