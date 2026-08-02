@@ -1,18 +1,130 @@
 {
   "__generated": {
-    "at": "2026-07-26T17:51:43.308Z",
+    "at": "2026-08-02T18:31:35.812Z",
     "from": "objects/page/by-id/page_manual.json",
-    "record_version": 2
+    "record_version": 7
   },
   "pageType": "system",
   "route": "/manual",
   "sections": [
     {
       "data": {
-        "body": "<h2>How this system works</h2><p>Everything on every site is an <strong>object</strong> in a governed store, edited through one MCP contract. This manual is itself made of those objects, published through the same front door agents use.</p><ul><li><a href=\"https://kugel-platform.netlify.app/manual/lifecycle\">The object lifecycle</a> — checkout, patch, publish, release.</li><li><a href=\"https://kugel-platform.netlify.app/manual/roles\">Roles and access</a> — who may do what, and how it is enforced.</li><li><a href=\"https://kugel-platform.netlify.app/manual/genesis\">How a site is born</a> — from one command to a live tenant.</li></ul><h2>Type reference</h2><ul><li><a href=\"https://kugel-platform.netlify.app/manual/types/page\">page</a></li><li><a href=\"https://kugel-platform.netlify.app/manual/types/section\">section</a></li><li><a href=\"https://kugel-platform.netlify.app/manual/types/navigation\">navigation</a></li><li><a href=\"https://kugel-platform.netlify.app/manual/types/taxonomy\">taxonomy</a></li><li><a href=\"https://kugel-platform.netlify.app/manual/types/site\">site</a></li><li><a href=\"https://kugel-platform.netlify.app/manual/types/template\">template</a></li><li><a href=\"https://kugel-platform.netlify.app/manual/types/section-template\">section_template</a></li><li><a href=\"https://kugel-platform.netlify.app/manual/types/theme\">theme</a></li><li><a href=\"https://kugel-platform.netlify.app/manual/types/product\">product</a></li><li><a href=\"https://kugel-platform.netlify.app/manual/types/content-item\">content_item</a></li><li><a href=\"https://kugel-platform.netlify.app/manual/types/tracking-config\">tracking_config</a></li></ul>"
+        "body": "<h2>How this system works</h2><p>Everything on every tenant is a <strong>governed object</strong> edited through one contract surface. This manual is itself made of those objects and published through the same front door.</p><h2>Operate the platform</h2><ul><li><a href=\"https://kugel-platform.netlify.app/start\">Start here</a> — the shortest safe first change.</li><li><a href=\"https://kugel-platform.netlify.app/architecture\">Architecture</a> — shared core, isolated tenants, common envelope.</li><li><a href=\"https://kugel-platform.netlify.app/manual/publishing-schema-v1\">V1 publishing schema</a> — versions, locks, validation, review, publish, release.</li><li><a href=\"https://kugel-platform.netlify.app/manual/multisite\">Multisite generation</a> — scaffold, provision, seed, prove.</li><li><a href=\"https://kugel-platform.netlify.app/manual/testing\">Testing</a> — evidence across contract, store, export, deploy, and browser.</li><li><a href=\"https://kugel-platform.netlify.app/manual/known-gaps\">Findings</a> — verified gaps and current status.</li></ul><h2>Object type reference</h2><p>The live V1 surface has twelve governed types: <strong>page, section, navigation, taxonomy, site, template, section_template, theme, product, content_item, tracking_config, and editorial_voice</strong>.</p>"
       },
       "id": "s_index",
       "type": "prose"
+    },
+    {
+      "data": {
+        "heading": "All governed object types",
+        "links": [
+          {
+            "label": "page",
+            "target": {
+              "kind": "page",
+              "page": "page_manual_page"
+            }
+          },
+          {
+            "label": "section",
+            "target": {
+              "kind": "page",
+              "page": "page_manual_section"
+            }
+          },
+          {
+            "label": "navigation",
+            "target": {
+              "kind": "page",
+              "page": "page_manual_navigation"
+            }
+          },
+          {
+            "label": "taxonomy",
+            "target": {
+              "kind": "page",
+              "page": "page_manual_taxonomy"
+            }
+          },
+          {
+            "label": "site",
+            "target": {
+              "kind": "page",
+              "page": "page_manual_site"
+            }
+          },
+          {
+            "label": "template",
+            "target": {
+              "kind": "page",
+              "page": "page_manual_template"
+            }
+          },
+          {
+            "label": "section_template",
+            "target": {
+              "kind": "page",
+              "page": "page_manual_section_template"
+            }
+          },
+          {
+            "label": "theme",
+            "target": {
+              "kind": "page",
+              "page": "page_manual_theme"
+            }
+          },
+          {
+            "label": "product",
+            "target": {
+              "kind": "page",
+              "page": "page_manual_product"
+            }
+          },
+          {
+            "label": "content_item",
+            "target": {
+              "kind": "page",
+              "page": "page_manual_content_item"
+            }
+          },
+          {
+            "label": "tracking_config",
+            "target": {
+              "kind": "page",
+              "page": "page_manual_tracking_config"
+            }
+          },
+          {
+            "label": "editorial_voice",
+            "target": {
+              "kind": "page",
+              "page": "page_manual_editorial_voice"
+            }
+          }
+        ]
+      },
+      "id": "s_typelinks",
+      "type": "link_list"
+    },
+    {
+      "data": {
+        "actions": [
+          {
+            "label": "Open the DTC example",
+            "style": "primary",
+            "target": {
+              "kind": "page",
+              "page": "page_dtc_example"
+            }
+          }
+        ],
+        "body": "<p>The DTC launch example connects a page, shared section, product, article, and tracking posture without turning them into one monolithic document.</p>",
+        "compact": true,
+        "heading": "See the model working"
+      },
+      "id": "s_manualcta",
+      "type": "cta_banner"
     }
   ],
   "seo": {
