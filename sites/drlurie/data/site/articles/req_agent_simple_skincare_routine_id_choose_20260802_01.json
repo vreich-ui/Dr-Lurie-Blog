@@ -1,0 +1,93 @@
+{
+  "__generated": {
+    "at": "2026-08-02T11:14:58.386Z",
+    "from": "objects/content_item/by-id/req_agent_simple_skincare_routine_id_choose_20260802_01.json",
+    "record_version": 2
+  },
+  "author": "Dr. Lurie Skincare",
+  "deck": "A practical morning-and-evening routine built around consistency, comfort, and sun protection.",
+  "description": "A concise, first-person guide to a simple skincare routine with gentle cleansing, moisturizing, sunscreen, and cautious use of optional treatments.",
+  "nodes": [
+    {
+      "id": "n_start",
+      "kind": "content",
+      "public": {
+        "body": "If I were building a skincare routine for myself, I would make it deliberately boring. Skin usually does not need a crowded shelf or a new experiment every week. I would choose a few comfortable products, use them consistently, and change only one thing at a time.",
+        "title": "Simple on purpose"
+      },
+      "rendering": {
+        "emphasis": "medium",
+        "placement": "section",
+        "presentation": "plain"
+      },
+      "visibility": "public"
+    },
+    {
+      "id": "n_morning",
+      "kind": "content",
+      "public": {
+        "body": "I would start with a gentle cleanse, or simply rinse if my skin felt dry or comfortable from the night before. Next would come a plain moisturizer when needed. The final step would be broad-spectrum sunscreen with SPF 30 or higher on exposed skin. I would treat sunscreen as the non-negotiable part, not the decorative finale.",
+        "title": "Morning"
+      },
+      "rendering": {
+        "emphasis": "medium",
+        "placement": "section",
+        "presentation": "section"
+      },
+      "visibility": "public"
+    },
+    {
+      "id": "n_evening",
+      "kind": "content",
+      "public": {
+        "body": "At night, I would remove sunscreen, makeup, and the day with a gentle cleanser. Then I would moisturize while the routine was still easy to remember. If I wanted to address a specific concern, I would add only one targeted product, introduce it slowly, and watch for persistent stinging, redness, or peeling instead of assuming discomfort means it is working.",
+        "title": "Evening"
+      },
+      "rendering": {
+        "emphasis": "medium",
+        "placement": "section",
+        "presentation": "section"
+      },
+      "visibility": "public"
+    },
+    {
+      "id": "n_habits",
+      "kind": "content",
+      "public": {
+        "body": "I would skip harsh scrubs, frequent product switching, and the urge to copy every trending routine. A short routine is easier to evaluate: when something helps or irritates, the cause is clearer. I would also give ordinary habits time to work before buying another solution.",
+        "title": "What I would skip"
+      },
+      "rendering": {
+        "emphasis": "low",
+        "placement": "section",
+        "presentation": "section"
+      },
+      "visibility": "public"
+    },
+    {
+      "id": "n_note",
+      "kind": "content",
+      "public": {
+        "body": "This is a general routine, not individualized medical advice. Ongoing acne, rashes, pain, or significant irritation deserve guidance from a qualified clinician.",
+        "title": "A final note"
+      },
+      "rendering": {
+        "emphasis": "low",
+        "placement": "footer",
+        "presentation": "callout"
+      },
+      "visibility": "public"
+    }
+  ],
+  "publication_context": {
+    "domain": "drlurie.com",
+    "publication_name": "Dr. Lurie Skincare",
+    "topic_scope": "Everyday skincare routines"
+  },
+  "seo": {
+    "meta_description": "A straightforward morning and evening skincare routine focused on gentle cleansing, moisturizing, sunscreen, and consistency.",
+    "meta_title": "The Simple Skincare Routine I’d Choose"
+  },
+  "slug": "simple-skincare-routine-id-choose",
+  "title": "The Simple Skincare Routine I’d Choose"
+}
