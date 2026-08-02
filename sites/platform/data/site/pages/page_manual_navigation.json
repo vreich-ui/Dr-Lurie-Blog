@@ -1,8 +1,8 @@
 {
   "__generated": {
-    "at": "2026-07-26T17:52:43.661Z",
+    "at": "2026-08-02T18:33:20.337Z",
     "from": "objects/page/by-id/page_manual_navigation.json",
-    "record_version": 2
+    "record_version": 5
   },
   "pageType": "system",
   "route": "/manual/types/navigation",
@@ -16,7 +16,7 @@
     },
     {
       "data": {
-        "body": "<h2>Body fields</h2><ul><li><strong>tracking</strong></li><li><strong>role</strong> <em>(required)</em></li><li><strong>brand</strong></li><li><strong>groups</strong> <em>(required)</em></li><li><strong>actions</strong></li><li><strong>footNote</strong></li></ul><h2>Patch operations</h2><ul><li><strong>set_nav_meta</strong></li><li><strong>upsert_group</strong></li><li><strong>move_group</strong></li><li><strong>remove_group</strong></li><li><strong>upsert_item</strong></li><li><strong>update_item</strong></li><li><strong>move_item</strong></li><li><strong>remove_item</strong></li><li><strong>upsert_action</strong></li><li><strong>remove_action</strong></li><li><strong>set_tracking</strong></li></ul><p><em>This reference is generated from the live <strong>object_contract</strong>. If it disagrees with the contract, the manual is wrong and the drift guard fails the build of it.</em></p>"
+        "body": "<h2>Body fields</h2><ul><li><strong>tracking</strong></li><li><strong>role</strong> <em>(required)</em></li><li><strong>brand</strong></li><li><strong>groups</strong> <em>(required)</em></li><li><strong>actions</strong></li><li><strong>footNote</strong></li></ul><h2>Patch operations</h2><ul><li><strong>set_nav_meta</strong></li><li><strong>upsert_group</strong></li><li><strong>move_group</strong></li><li><strong>remove_group</strong></li><li><strong>upsert_item</strong></li><li><strong>update_item</strong></li><li><strong>move_item</strong></li><li><strong>remove_item</strong></li><li><strong>upsert_action</strong></li><li><strong>remove_action</strong></li><li><strong>set_tracking</strong></li></ul><p><em>This reference is generated from the live <strong>object_contract</strong>. If it disagrees with the contract, the manual is wrong and the drift guard fails the build of it.</em></p><h2>Worked example</h2><p><strong>nav_header</strong> uses page-kind targets for published README pages; <strong>nav_footer</strong> groups operational, reference, and example links. Navigation publishes only when page targets already exist and are published.</p><h2>Lifecycle note</h2><p>Groups cannot be empty, menu depth is bounded, and duplicate targets warn without blocking legitimate designs.</p>"
       },
       "id": "s_reference",
       "type": "prose"
