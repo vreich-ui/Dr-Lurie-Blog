@@ -1,0 +1,52 @@
+{
+  "__generated": {
+    "at": "2026-08-02T18:19:38.285Z",
+    "from": "objects/template/by-id/tpl_object_reference.json",
+    "record_version": 2
+  },
+  "appliesTo": [
+    "standard"
+  ],
+  "description": "A reusable page recipe for documenting one governed CMS object.",
+  "name": "Object reference page",
+  "scope": "evergreen",
+  "slots": [
+    {
+      "allowed": [
+        "lede"
+      ],
+      "blueprint": {
+        "data": {
+          "actions": [],
+          "body": "<p>Explain what the object owns, what depends on it, and what its contract requires.</p>",
+          "heading": "Object type",
+          "kicker": "Object reference"
+        },
+        "id": "s_referenceintro",
+        "type": "lede"
+      },
+      "repeatable": false,
+      "required": true,
+      "slotId": "introduction"
+    },
+    {
+      "allowed": [
+        "prose",
+        "steps",
+        "comparison_table",
+        "link_list"
+      ],
+      "blueprint": {
+        "data": {
+          "body": "<h2>Function</h2><p>Describe what the object owns and which surfaces consume it.</p><h2>Contract</h2><p>List required attributes, typed operations, references, and publish gates from the live object contract.</p>"
+        },
+        "id": "s_referencedetails",
+        "type": "prose"
+      },
+      "repeatable": true,
+      "required": true,
+      "slotId": "details"
+    }
+  ],
+  "whenToUse": "Use for a type reference that needs an introduction followed by repeatable explanation, examples, or comparison blocks."
+}
