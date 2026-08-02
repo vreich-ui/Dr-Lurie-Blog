@@ -1,8 +1,8 @@
 {
   "__generated": {
-    "at": "2026-07-26T17:53:56.318Z",
+    "at": "2026-08-02T18:35:25.021Z",
     "from": "objects/page/by-id/page_manual_product.json",
-    "record_version": 2
+    "record_version": 5
   },
   "pageType": "system",
   "route": "/manual/types/product",
@@ -16,7 +16,7 @@
     },
     {
       "data": {
-        "body": "<h2>Body fields</h2><ul><li><strong>tracking</strong></li><li><strong>slug</strong> <em>(required)</em></li><li><strong>presentation</strong> <em>(required)</em></li><li><strong>commerce</strong> <em>(required)</em></li><li><strong>fulfillment</strong> <em>(required)</em></li></ul><h2>Patch operations</h2><ul><li><strong>set_product_fields</strong></li><li><strong>set_product_price</strong></li><li><strong>set_tracking</strong></li></ul><p><em>This reference is generated from the live <strong>object_contract</strong>. If it disagrees with the contract, the manual is wrong and the drift guard fails the build of it.</em></p>"
+        "body": "<h2>Body fields</h2><ul><li><strong>tracking</strong></li><li><strong>slug</strong> <em>(required)</em></li><li><strong>presentation</strong> <em>(required)</em></li><li><strong>commerce</strong> <em>(required)</em></li><li><strong>fulfillment</strong> <em>(required)</em></li></ul><h2>Patch operations</h2><ul><li><strong>set_product_fields</strong></li><li><strong>set_product_price</strong></li><li><strong>set_tracking</strong></li></ul><p><em>This reference is generated from the live <strong>object_contract</strong>. If it disagrees with the contract, the manual is wrong and the drift guard fails the build of it.</em></p><h2>Worked example</h2><p><strong>prod_platform_review</strong> is a coming-soon, no-checkout example of presentation, commerce, fulfillment, and approval boundaries. Creation passed and review is open.</p><h2>Lifecycle note</h2><p>Products require approval. The Platform test intentionally attempted publication before approval and received <strong>approval_required</strong>.</p>"
       },
       "id": "s_reference",
       "type": "prose"
