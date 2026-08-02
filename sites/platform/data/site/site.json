@@ -1,12 +1,12 @@
 {
   "__generated": {
-    "at": "2026-07-26T17:00:21.907Z",
+    "at": "2026-08-02T18:21:31.959Z",
     "from": "objects/site/by-id/site_platform.json",
-    "record_version": 2
+    "record_version": 6
   },
   "blog": {
     "categoryBase": "category",
-    "listPath": "learn/library",
+    "listPath": "library",
     "postsPerPage": 6,
     "tagBase": "tag"
   },
@@ -27,6 +27,19 @@
       "heading": "Georgia, serif",
       "sans": "system-ui, sans-serif",
       "serif": "Georgia, serif"
+    },
+    "layout": {
+      "containerWidth": "wide",
+      "sectionRhythm": "default"
+    },
+    "shape": {
+      "buttonShape": "soft",
+      "radius": "soft",
+      "shadow": "soft"
+    },
+    "type": {
+      "headingWeight": "medium",
+      "scale": "default"
     }
   },
   "chrome": {
@@ -41,13 +54,13 @@
     "text": "PLATFORM"
   },
   "metadataDefaults": {
-    "description": "Platform — a starter site, ready for real content.",
+    "description": "Platform is the live reference tenant for the governed CMS: object contracts, publishing, multisite generation, and verified examples.",
     "ogImage": "/Social/og-default.jpg",
     "titleTemplate": "%s - Platform"
   },
   "name": "Platform",
   "urls": {
     "base": "/",
-    "canonicalHost": "https://platform.netlify.app"
+    "canonicalHost": "https://kugel-platform.netlify.app"
   }
 }
