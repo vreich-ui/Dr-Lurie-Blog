@@ -1,12 +1,16 @@
 {
   "__generated": {
-    "at": "2026-08-02T16:47:59.006Z",
+    "at": "2026-08-02T17:23:25.937Z",
     "from": "objects/content_item/by-id/req_agent_simple_skincare_routine_id_choose_20260802_01.json",
-    "record_version": 6
+    "record_version": 10
   },
   "author": "Dr. Lurie Skincare",
   "deck": "A practical morning-and-evening routine built around consistency, comfort, and sun protection.",
   "description": "A concise, first-person guide to a simple skincare routine with gentle cleansing, moisturizing, sunscreen, and cautious use of optional treatments.",
+  "image": {
+    "alt": "A simple morning skincare routine with cleanser, moisturizer, and sunscreen",
+    "src": "/img/req_agent_simple_skincare_routine_id_choose_20260802_01/aa5af8044647af6c30e0f7d0e2e79ccb371a8245754108b7a2aeb55e21387b63.webp"
+  },
   "nodes": [
     {
       "id": "n_start",
