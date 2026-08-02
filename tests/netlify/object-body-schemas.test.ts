@@ -7,7 +7,12 @@ import {
   navTargetSchema,
   type NavigationBody,
 } from '../../packages/core/schema/bodies/navigation-v1.js';
-import { PAGE_SCHEMA_VERSION, pageBodySchema, pageTypeIds, type PageBody } from '../../packages/core/schema/bodies/page-v1.js';
+import {
+  PAGE_SCHEMA_VERSION,
+  pageBodySchema,
+  pageTypeIds,
+  type PageBody,
+} from '../../packages/core/schema/bodies/page-v1.js';
 import {
   SECTION_SCHEMA_VERSION,
   contentGridSourceSchema,
@@ -16,10 +21,22 @@ import {
   sectionTypes,
   type SectionInstance,
 } from '../../packages/core/schema/bodies/section-v1.js';
-import { PRODUCT_SCHEMA_VERSION, productBodySchema, type ProductBody } from '../../packages/core/schema/bodies/product-v1.js';
+import {
+  PRODUCT_SCHEMA_VERSION,
+  productBodySchema,
+  type ProductBody,
+} from '../../packages/core/schema/bodies/product-v1.js';
 import { SITE_SCHEMA_VERSION, siteBodySchema, type SiteBody } from '../../packages/core/schema/bodies/site-v1.js';
-import { TAXONOMY_SCHEMA_VERSION, taxonomyBodySchema, type TaxonomyBody } from '../../packages/core/schema/bodies/taxonomy-v1.js';
-import { TEMPLATE_SCHEMA_VERSION, templateBodySchema, type TemplateBody } from '../../packages/core/schema/bodies/template-v1.js';
+import {
+  TAXONOMY_SCHEMA_VERSION,
+  taxonomyBodySchema,
+  type TaxonomyBody,
+} from '../../packages/core/schema/bodies/taxonomy-v1.js';
+import {
+  TEMPLATE_SCHEMA_VERSION,
+  templateBodySchema,
+  type TemplateBody,
+} from '../../packages/core/schema/bodies/template-v1.js';
 
 // ---------------------------------------------------------------------------
 // Navigation ('navigation.v1', D§3.8 + amendments M-1/M-2/M-5/M-7 and the
@@ -634,6 +651,24 @@ test('template: unknown allowed section types and unknown PageTypes are rejected
     false
   );
   assert.equal(templateBodySchema.safeParse({ ...templateFixture, appliesTo: ['landing'] }).success, false);
+});
+
+test('template: allowed types expose concrete registered sections only', () => {
+  for (const pointerOrLeaf of ['shared_ref', 'card']) {
+    const parsed = templateBodySchema.safeParse({
+      ...templateFixture,
+      slots: [{ slotId: 's', allowed: [pointerOrLeaf], required: false, repeatable: false }],
+    });
+    assert.equal(parsed.success, false, `${pointerOrLeaf} must not be advertised as a template slot type`);
+  }
+
+  assert.equal(
+    templateBodySchema.safeParse({
+      ...templateFixture,
+      slots: [{ slotId: 's', allowed: ['comparison_table'], required: false, repeatable: false }],
+    }).success,
+    true
+  );
 });
 
 // ---------------------------------------------------------------------------

@@ -48,6 +48,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
+import { siteReaderRouteTemplates } from './site-reader-route-templates.mjs';
+
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 
 // ─── the per-site env checklist (T11.7-provisioning-cli.md's table; keep in
@@ -1361,6 +1363,10 @@ export const buildPlan = (opts) => {
       ),
     },
     { path: `${dir}/app/pages/[...objectPage].astro`, content: objectPageCatchAllTemplate() },
+    ...siteReaderRouteTemplates().map((route) => ({
+      path: `${dir}/app/pages/${route.path}`,
+      content: route.content,
+    })),
     ...coreFunctionNames().map((fnName) => ({
       path: `${dir}/netlify/functions/${fnName}.ts`,
       content: fnName === 'mcp' ? mcpShimTemplate(ids) : functionShimTemplate(ids, fnName),
@@ -1573,9 +1579,7 @@ const resolvePdfToolBridgeEnv = async (
   }
 
   if (!baseUrl) {
-    throw new Error(
-      `shared pdf-tool base URL is unavailable; set PDF_TOOL_BASE_URL in the provisioning environment`
-    );
+    throw new Error(`shared pdf-tool base URL is unavailable; set PDF_TOOL_BASE_URL in the provisioning environment`);
   }
   if (!agentRunToken) {
     throw new Error(
@@ -1644,25 +1648,16 @@ export const executeNetlifyProvisioning = async (
 
     try {
       const bridgeEnv = await resolvePdfToolBridgeEnv(fetchImpl, token, { fleetEnv, pdfToolSiteName });
-      await setNetlifyEnvVar(
-        fetchImpl,
-        token,
-        accountId,
-        siteId,
-        'PDF_TOOL_BASE_URL',
-        bridgeEnv.baseUrl,
-        { scopes: ['functions'], context: 'production' }
-      );
+      await setNetlifyEnvVar(fetchImpl, token, accountId, siteId, 'PDF_TOOL_BASE_URL', bridgeEnv.baseUrl, {
+        scopes: ['functions'],
+        context: 'production',
+      });
       secretsSet.push('PDF_TOOL_BASE_URL');
-      await setNetlifyEnvVar(
-        fetchImpl,
-        token,
-        accountId,
-        siteId,
-        'PDF_TOOL_AGENT_RUN_TOKEN',
-        bridgeEnv.agentRunToken,
-        { scopes: ['functions'], context: 'production', isSecret: true }
-      );
+      await setNetlifyEnvVar(fetchImpl, token, accountId, siteId, 'PDF_TOOL_AGENT_RUN_TOKEN', bridgeEnv.agentRunToken, {
+        scopes: ['functions'],
+        context: 'production',
+        isSecret: true,
+      });
       secretsSet.push('PDF_TOOL_AGENT_RUN_TOKEN');
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);

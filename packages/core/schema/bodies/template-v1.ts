@@ -13,17 +13,25 @@
  */
 import { z } from 'zod';
 
+import { REGISTERED_SECTION_TYPES } from '../../lib/registry/components/registered-types.js';
 import { pageTypeIdSchema } from './page-v1.js';
 import { recipeMetadataShape } from './recipe-metadata-v1.js';
-import { sectionInstanceSchema, sectionTypeSchema } from './section-v1.js';
+import { sectionInstanceSchema } from './section-v1.js';
 import { trackingAttributeShape } from './tracking-attribute-v1.js';
 
 export const TEMPLATE_SCHEMA_VERSION = 'template.v1';
 
+// Template slots describe concrete sections an instantiation can copy. The
+// page-level union also contains the `card` leaf and `shared_ref` pointer, but
+// neither has a standalone component and both are invalid recipe choices.
+// Deriving this enum from the component registry keeps the MCP JSON schema and
+// the structural validator on the same advertised set.
+export const templateAllowedSectionTypeSchema = z.enum(REGISTERED_SECTION_TYPES);
+
 export const templateSlotSchema = z
   .object({
     slotId: z.string().min(1),
-    allowed: z.array(sectionTypeSchema),
+    allowed: z.array(templateAllowedSectionTypeSchema),
     required: z.boolean(),
     repeatable: z.boolean(),
     // Default section: registry editor.defaultData, customized (D§3.6).

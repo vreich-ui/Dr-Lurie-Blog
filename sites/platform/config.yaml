@@ -40,7 +40,7 @@ apps:
 
     list:
       isEnabled: true
-      pathname: 'learn/library'
+      pathname: 'library'
       robots:
         index: true
 

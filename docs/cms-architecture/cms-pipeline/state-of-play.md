@@ -7,6 +7,41 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-08-02 (Platform README corpus + live object/fleet audit)
+
+The Platform tenant was expanded from a sparse shell into executable product
+documentation through the production MCP. The live store now has **45 records
+across all 12 governed types**: 26 pages, 2 navigation objects, 1 taxonomy, 1
+site singleton, 1 shared section, 1 page template, 6 section templates, 2
+themes, 1 product, 2 content items, 1 tracking config, and 1 editorial voice.
+All 45 pass `object_validate` with no blocker, warning, or held lock. Product
+and editorial voice exercised the approval gate and remain in human review;
+the other changed objects were published dark and released once at commit
+`41784071cfedbf719307f7fc2689074477b96442` (Netlify deploy
+`6a6f8ffb76955a0008e9a141`, ready and production-confirmed).
+
+The manual now covers architecture, V1 publishing, multisite generation,
+testing, known gaps, a DTC launch object map, every object type, and two
+object-backed articles. The drive exercised create, candidate validation,
+checkout, typed patch, theme apply, page-template instantiation,
+section-template stamping, publish, checkin, approval refusal, batch release,
+and public route verification. It also corrected Platform's canonical host,
+blog-path metadata, taxonomy vocabulary, header, and footer.
+
+Two code defects surfaced. **F11:** generated sites omitted the blog route
+loaders, leaving valid `content_item` records and the listing object
+unreachable even though the build succeeded. Platform and `create-site` now
+carry the four route loaders, and Platform's routing file agrees with its site
+object at `/library`. **F12:** the template schema advertised `shared_ref` and
+`card` as allowed slot types although the structural validator rejects them;
+the slot enum now derives from the registered concrete component list. Both
+fixes have focused regression coverage and are recorded in `w14-findings.md`.
+The create-site suite is green (14/14) and the body-schema suite is green
+(20/20). Two local Platform build attempts spent 80 and 100 minutes hydrating
+dependencies through macOS File Provider, emitted no Astro diagnostic, and
+created no `dist`; the full render gate is therefore recorded as
+infrastructure-inconclusive, not passed.
+
 ## Session 2026-08-02 (platform Netlify build incident — NavTarget renderability closed)
 
 An autonomous publish added `Library` to platform `nav_header` with the

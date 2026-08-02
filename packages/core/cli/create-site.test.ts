@@ -98,9 +98,18 @@ test('buildPlan scaffolds the full baseline pack: config bundle + empty export t
     'sites/acme/app/pages/index.astro',
     'sites/acme/app/pages/404.astro',
     'sites/acme/app/pages/[...objectPage].astro',
+    'sites/acme/app/pages/[...blog]/index.astro',
+    'sites/acme/app/pages/[...blog]/[...page].astro',
+    'sites/acme/app/pages/[...blog]/[category]/[...page].astro',
+    'sites/acme/app/pages/[...blog]/[tag]/[...page].astro',
   ]) {
     assert.ok(relPaths.includes(expected), `expected ${expected} in the plan`);
   }
+
+  const articleRoute = plan.files.find((file) => file.path === 'sites/acme/app/pages/[...blog]/index.astro');
+  const listRoute = plan.files.find((file) => file.path === 'sites/acme/app/pages/[...blog]/[...page].astro');
+  assert.match(articleRoute?.content ?? '', /getStaticPathsBlogPost/);
+  assert.match(listRoute?.content ?? '', /getStaticPathsBlogList/);
 });
 
 test('the committed-export tree ships as BOOTSTRAP only — enough to build, nothing store-backed', () => {
@@ -220,9 +229,7 @@ test('Netlify provisioning inherits the pdf-tool bridge env and stores the beare
       ]);
     }
     if (method === 'GET' && url.includes('/accounts/account-pdf-tool/env?site_id=site-pdf-tool')) {
-      return Response.json([
-        { key: 'AGENT_RUN_TOKEN', values: [{ context: 'all', value: inheritedToken }] },
-      ]);
+      return Response.json([{ key: 'AGENT_RUN_TOKEN', values: [{ context: 'all', value: inheritedToken }] }]);
     }
     if (method === 'GET' && url.includes('/accounts/account-target/env/')) {
       if (url.includes('/PDF_TOOL_BASE_URL?')) {
