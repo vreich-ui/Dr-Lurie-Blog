@@ -1,8 +1,8 @@
 {
   "__generated": {
-    "at": "2026-07-26T16:59:45.268Z",
+    "at": "2026-08-02T11:32:25.280Z",
     "from": "objects/navigation/by-id/nav_header.json",
-    "record_version": 2
+    "record_version": 5
   },
   "groups": [
     {
@@ -14,6 +14,14 @@
           "target": {
             "href": "/",
             "kind": "route"
+          }
+        },
+        {
+          "id": "i_library",
+          "label": "Library",
+          "target": {
+            "kind": "page",
+            "page": "page_library"
           }
         }
       ]
