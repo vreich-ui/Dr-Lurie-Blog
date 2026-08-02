@@ -1,8 +1,8 @@
 {
   "__generated": {
-    "at": "2026-08-02T11:32:25.280Z",
+    "at": "2026-08-02T18:37:34.434Z",
     "from": "objects/navigation/by-id/nav_header.json",
-    "record_version": 5
+    "record_version": 9
   },
   "groups": [
     {
@@ -12,8 +12,32 @@
           "id": "i_home",
           "label": "Home",
           "target": {
-            "href": "/",
-            "kind": "route"
+            "kind": "page",
+            "page": "page_home"
+          }
+        },
+        {
+          "id": "i_start",
+          "label": "Start",
+          "target": {
+            "kind": "page",
+            "page": "page_start"
+          }
+        },
+        {
+          "id": "i_manual",
+          "label": "Manual",
+          "target": {
+            "kind": "page",
+            "page": "page_manual"
+          }
+        },
+        {
+          "id": "i_architecture",
+          "label": "Architecture",
+          "target": {
+            "kind": "page",
+            "page": "page_architecture"
           }
         },
         {
