@@ -124,8 +124,10 @@
   status = 200
   force = true
 
+# W15 S1: one path segment (`:objectId`), unforced — the splat + force pair
+# shadowed the static content library index at /admin/content (root
+# netlify.toml's comment has the full story).
 [[redirects]]
-  from = "/admin/content/*"
+  from = "/admin/content/:objectId"
   to = "/admin/content/__workspace"
   status = 200
-  force = true

@@ -69,7 +69,9 @@ export const siteConfig: SiteConfig = siteConfigSchema.parse({
     { from: '/oauth/token', to: '/.netlify/functions/mcp-oauth?oauth_endpoint=token', status: 200 },
     { from: '/oauth/revoke', to: '/.netlify/functions/mcp-oauth?oauth_endpoint=revoke', status: 200 },
     { from: '/api/t', to: '/.netlify/functions/track-ingest', status: 200 },
-    { from: '/admin/content/*', to: '/admin/content/__workspace', status: 200 },
+    // W15 S1: one path segment, so /admin/content itself keeps serving the
+    // static content library (the splat form swallowed the library index).
+    { from: '/admin/content/:objectId', to: '/admin/content/__workspace', status: 200 },
   ],
 });
 

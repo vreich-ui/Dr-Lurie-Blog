@@ -132,12 +132,15 @@
   status = 200
   force = true
 
-# T9.9: serve the object workspace for any /admin/content/<id>. status 200
-# without force, so the static content library at /admin/content/ and the
-# placeholder page itself are not shadowed; only paths with no static file
-# (real object ids) rewrite to the workspace, which reads the id client-side.
+# T9.9 / W15 S1: serve the object workspace for /admin/content/<id> — ONE
+# path segment (`:objectId`), never the splat. The splat form also matched
+# /admin/content/ itself and swallowed the static content library index in
+# production (the "Back to library" dead-end loop). status 200 without force,
+# so the static library index and the __workspace placeholder page are never
+# shadowed; only single-segment object ids with no static file rewrite to the
+# workspace, which reads the id client-side.
 [[redirects]]
-  from = "/admin/content/*"
+  from = "/admin/content/:objectId"
   to = "/admin/content/__workspace"
   status = 200
 

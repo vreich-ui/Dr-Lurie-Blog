@@ -378,7 +378,9 @@ export const siteConfig: SiteConfig = siteConfigSchema.parse({
     { from: '/oauth/token', to: '/.netlify/functions/mcp-oauth?oauth_endpoint=token', status: 200 },
     { from: '/oauth/revoke', to: '/.netlify/functions/mcp-oauth?oauth_endpoint=revoke', status: 200 },
     { from: '/api/t', to: '/.netlify/functions/track-ingest', status: 200 },
-    { from: '/admin/content/*', to: '/admin/content/__workspace', status: 200 },
+    // W15 S1: one path segment, so /admin/content itself keeps serving the
+    // static content library (the splat form swallowed the library index).
+    { from: '/admin/content/:objectId', to: '/admin/content/__workspace', status: 200 },
   ],
 });
 
@@ -512,11 +514,13 @@ const netlifyTomlTemplate = (ids) => `# Per-site Netlify config. The redirects h
   status = 200
   force = true
 
+# W15 S1: one path segment (\`:objectId\`), unforced — the splat + force pair
+# shadowed the static content library index at /admin/content (root
+# netlify.toml's comment has the full story).
 [[redirects]]
-  from = "/admin/content/*"
+  from = "/admin/content/:objectId"
   to = "/admin/content/__workspace"
   status = 200
-  force = true
 `;
 
 const packageJsonTemplate = (ids) =>

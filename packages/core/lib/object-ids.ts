@@ -39,6 +39,23 @@ const OBJECT_TYPE_PREFIXES = {
 
 export const isObjectIdWithinCeiling = (value: string): boolean => OBJECT_ID_CEILING_RE.test(value);
 
+/**
+ * W15 S1 — reverse lookup: derive the object type from an id's prefix, for
+ * surfaces that receive a bare id (e.g. a /admin/content/<id> deep link with
+ * no `?type=`). Deliberately EXCLUDES content_item: `req_*` ids historically
+ * also named canvas upload requests and legacy workflow records, so a `req_*`
+ * id is resolved against the live inventory by the caller instead of assumed.
+ * Returns undefined when no governed prefix matches (callers fall back to an
+ * inventory lookup or an honest not-found).
+ */
+export const objectTypeFromId = (value: string): Exclude<ObjectType, 'content_item'> | undefined => {
+  for (const [objectType, prefix] of Object.entries(OBJECT_TYPE_PREFIXES) as Array<[ObjectType, string]>) {
+    if (objectType === 'content_item') continue;
+    if (value.startsWith(prefix)) return objectType as Exclude<ObjectType, 'content_item'>;
+  }
+  return undefined;
+};
+
 const validatePattern = (value: string, objectType: Exclude<ObjectType, 'content_item'>): ObjectIdValidationResult => {
   const prefix = OBJECT_TYPE_PREFIXES[objectType];
   if (!value) return { ok: false, error: `${objectType} id is required.` };
