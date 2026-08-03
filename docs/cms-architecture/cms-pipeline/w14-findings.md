@@ -26,8 +26,9 @@ today) · **LOW** (constraint / infra).
 | F8  | LOW      | **FIXED + verified.** Two real type holes repaired (string guard; cast the context-validated event); `npm run test:opt-in` now compiles and is gated in the CI `check` job so it can't rot again.                                                                                                                                                                                                                                            | commit `09fb09d`    |
 | F9  | HIGH     | **FIXED + verified.** F1's fail-closed gate locked out the one client that cannot send headers — claude.ai's custom connector. The shared token now also rides the URL (`/mcp?key=<token>`), same constant-time compare, same secret, never logged. Header carriers stay preferred and documented as such.                                                                                                                                   | commit `f9-url-key` |
 | F10 | HIGH     | **BUILT + verified.** Wolf's call: implement OAuth, keep the URL key too. Every site is now its own OAuth 2.1 authorization server — RFC 9728/8414 metadata, RFC 7591 registration, PKCE S256, a human consent screen inside `/admin`, rotating refresh tokens, RFC 7009 revocation — and `/mcp` validates those tokens as a resource server, challenge header included. 25 tests.                                                           | commit `f10-oauth`  |
-| F11 | HIGH     | **IMPLEMENTED + focused tests green; render/deploy pending.** `create-site` generated the object-page catch-all but omitted the four blog loaders, so valid published `content_item` objects were deliberately reserved from the catch-all and had no route owner. Platform now carries the loaders, its file-owned blog base matches the `site` object at `/library`, and new scaffolds generate all four loaders with regression coverage. | T14.7 follow-up     |
-| F12 | MEDIUM   | **FIXED in the Platform README follow-up.** The template JSON schema advertised the broad page-section union, including `shared_ref` and the `card` leaf, while `template_registry` correctly required a concrete registered component. Template slot `allowed` now derives from `REGISTERED_SECTION_TYPES`, so discovery and validation expose the same set.                                                                                | T14.7 follow-up     |
+| F11 | HIGH     | **IMPLEMENTED + focused tests green; render/deploy pending.** `create-site` generated the object-page catch-all but omitted the four blog loaders, so valid published `content_item` objects were deliberately reserved from the catch-all and had no route owner. Platform now carries the loaders, its file-owned blog base matches the `site` object at `/library`, and new scaffolds generate all four loaders with regression coverage. | PR #499             |
+| F12 | MEDIUM   | **FIXED in the Platform README follow-up.** The template JSON schema advertised the broad page-section union, including `shared_ref` and the `card` leaf, while `template_registry` correctly required a concrete registered component. Template slot `allowed` now derives from `REGISTERED_SECTION_TYPES`; downstream instantiation uses the same type guard and obsolete pointer-recipe fixtures are gone.                                | PR #499             |
+| F13 | HIGH     | **FIXED + focused tests green; fleet CI pending.** The shared Astro image optimizer calculated a height for string-backed public/remote images but dropped it when calling `getImage` at each responsive breakpoint. Valid new CMS articles could therefore break any listing page that rendered their hero image. Breakpoint dimensions now come from one pure helper shared by the Astro and CDN paths.                                    | PR #499             |
 
 Net: six fixed-and-verified (F2, F4, F5-doc, F8, F9, F10), one CRITICAL assigned
 to its designated task (F1 → T14.8), two scoped to dedicated follow-ups (F3
@@ -368,6 +369,26 @@ recipe and the structural validator accepts registered components only.
 non-standalone members, while the existing registry criterion remains a drift
 guard. Regression coverage rejects `shared_ref` and `card` and accepts a recent
 registered component (`comparison_table`).
+
+---
+
+## F13 — HIGH — public-path article images could break static generation
+
+**Found:** 2026-08-03 in PR #499 CI after the Platform README route fix caused
+the fleet build to render newly published article cards. Dr-Lurie failed with
+Astro `MissingImageDimension` on a valid `/img/...webp` hero path.
+
+**Root cause:** `getImagesOptimized` correctly derived a height from the
+caller's width/aspect ratio, but `astroAssetsOptimizer` passed only `src` and
+each breakpoint width to `getImage`. Imported image metadata can supply its own
+height; public and remote string paths cannot. The calculation existed but was
+dropped at the final API boundary.
+
+**Fix:** one pure `imageDimensionsAtBreakpoint` helper now scales width and
+height for both the Astro-assets and CDN optimizer paths. Astro receives both
+dimensions for every responsive string-image candidate. Focused coverage pins
+16:9 scaling and the no-source-dimensions fallback without tenant-specific
+content patches.
 
 ---
 

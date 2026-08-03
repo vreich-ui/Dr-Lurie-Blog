@@ -4,6 +4,8 @@ import { transformUrl, parseUrl } from 'unpic';
 import type { ImageMetadata } from 'astro';
 import type { HTMLAttributes } from 'astro/types';
 
+import { imageDimensionsAtBreakpoint } from './image-dimensions';
+
 type Layout = 'fixed' | 'constrained' | 'fullWidth' | 'cover' | 'responsive' | 'contained';
 
 export interface ImageProps extends Omit<HTMLAttributes<'img'>, 'src'> {
@@ -58,10 +60,6 @@ const config = {
   ],
 
   formats: ['image/webp'],
-};
-
-const computeHeight = (width: number, aspectRatio: number) => {
-  return Math.floor(width / aspectRatio);
 };
 
 const parseAspectRatio = (aspectRatio: number | string | null | undefined): number | undefined => {
@@ -225,7 +223,8 @@ export const astroAssetsOptimizer: ImagesOptimizer = async (
 
   return Promise.all(
     breakpoints.map(async (w: number) => {
-      const result = await getImage({ src: image, width: w, ...(format ? { format: format } : {}) });
+      const dimensions = imageDimensionsAtBreakpoint(w, _width, _height);
+      const result = await getImage({ src: image, ...dimensions, ...(format ? { format: format } : {}) });
 
       return {
         src: result?.src,
@@ -253,7 +252,7 @@ export const unpicOptimizer: ImagesOptimizer = async (image, breakpoints, width,
 
   return Promise.all(
     breakpoints.map(async (w: number) => {
-      const _height = width && height ? computeHeight(w, width / height) : height;
+      const { height: _height } = imageDimensionsAtBreakpoint(w, width, height);
       const url =
         transformUrl({
           url: image,
@@ -291,7 +290,8 @@ export async function getImagesOptimized(
 ): Promise<{ src: string; attributes: HTMLAttributes<'img'> }> {
   if (typeof image !== 'string') {
     width ||= Number(image.width) || undefined;
-    height ||= typeof width === 'number' ? computeHeight(width, image.width / image.height) : undefined;
+    height ||=
+      typeof width === 'number' ? imageDimensionsAtBreakpoint(width, image.width, image.height).height : undefined;
   }
 
   width = (width && Number(width)) || undefined;

@@ -7,6 +7,24 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-08-03 (Platform README integration and forward-contract cleanup)
+
+PR #499 carries the Platform README routing and template-contract fixes. Its
+first CI run exposed two downstream assumptions that were intentionally
+removed rather than preserved: template instantiation still compiled against
+the broad page-section union, and a legacy test still constructed a
+`shared_ref` recipe even though V1 recipes now advertise concrete registered
+components only. Instantiation now narrows referenced recipe types through the
+same component-bound predicate and the obsolete fixture is gone.
+
+The fleet build also exposed F13: the shared image optimizer calculated a
+responsive height for public/remote string images, then omitted that height
+from Astro's `getImage` request. New object-backed article images could
+therefore validate and publish but break a listing page at static generation.
+The Astro and CDN paths now share a pure breakpoint-dimension helper; focused
+template, body-schema, and image tests pass 33/33. Full fleet CI remains the
+merge gate.
+
 ## Session 2026-08-02 (Platform README corpus + live object/fleet audit)
 
 The Platform tenant was expanded from a sparse shell into executable product

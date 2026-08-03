@@ -111,15 +111,6 @@ test('empty appliesTo with no explicit page_type is an error', () => {
   assert.match(result.error, /pass page_type explicitly/);
 });
 
-test('required slot whose first allowed type has no registry defaultData is an error naming the slot', () => {
-  const result = buildPageBodyFromTemplate(
-    template({ slots: [{ slotId: 'slot_shared', allowed: ['shared_ref'], required: true, repeatable: false }] }),
-    REQUEST
-  );
-  assert.ok(!result.ok);
-  assert.match(result.error, /slot "slot_shared".*"shared_ref" has no registry defaultData/);
-});
-
 test('required slot with no allowed types is an error', () => {
   const result = buildPageBodyFromTemplate(
     template({ slots: [{ slotId: 'slot_empty', allowed: [], required: true, repeatable: false }] }),
