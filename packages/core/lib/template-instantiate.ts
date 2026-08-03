@@ -22,9 +22,8 @@
  *                            `request.resolvedBlueprints`; a ref missing from
  *                            the map is an instantiation error.
  * - required, no blueprint → the registry editor `defaultData` of the slot's
- *                            FIRST allowed type. A required slot whose first
- *                            allowed type has no defaultData (shared_ref) is
- *                            an instantiation error — fix the template.
+ *                            FIRST allowed component-bound type. The template
+ *                            schema excludes pointer/leaf-only section types.
  * - optional, no blueprint → skipped; the slot documents what MAY go there.
  * - repeatable slots seed ONE instance; repetition is a post-create edit.
  */

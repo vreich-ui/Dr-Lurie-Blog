@@ -14,18 +14,21 @@ today) · **LOW** (constraint / infra).
 
 ## Disposition (T14.7 fix wave) — every finding accounted for
 
-| #   | Sev      | Disposition                                                                                                                                                                                                                                                                                                                                                                                                                              | Where               |
-| --- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- |
-| F1  | CRITICAL | **→ T14.8.** The one-line code fix (fail-closed) CLOSES Dr-Lurié's live `/mcp` on deploy, which breaks any connector currently sending no token. That must land in lockstep with setting Dr-Lurié's token AND updating its connector's bearer — exactly T14.8's per-site-key scope. Not deploy-safe alone; flagged to Wolf as top priority.                                                                                              | T14.8               |
-| F2  | HIGH     | **FIXED + verified.** create-site now picks the export form from each core function's generation; platform artifact-upload shim corrected; regression test.                                                                                                                                                                                                                                                                              | commit `de89b79`    |
-| F3  | MEDIUM   | **PARTLY FALSE, remainder FIXED + verified.** The "empty footer" was an artifact of the agent's own screenshot tool (hidden tab → zero rAF ticks → IntersectionObserver never fires → the fade-in never runs). A real browser renders it correctly. The real defects the proper render exposed: core's Footer hardcoded Dr-Lurié's descriptor as the fleet default, and a titleless nav group rendered as an empty dropdown. Both fixed. | commit `f3-chrome`  |
-| F4  | MEDIUM   | **FIXED + verified.** Reader-safety scan no longer blocks `private`/`strategy` as ordinary prose outside the content_item annotation model; camelCase markers and JSON-key leaks still caught everywhere.                                                                                                                                                                                                                                | commit `431186d`    |
-| F5  | MEDIUM   | **wontfix-v1 (behavior) + documented.** Publish deliberately keeps the lock (pinned test: "the stamp write must preserve the lock") so concurrent drift is caught under the live lease. The contract now says so and tells callers to `object_checkin`; the surprise, not the behavior, was the defect.                                                                                                                                  | commit `3f5965f`    |
-| F6  | MEDIUM   | **BUILT + verified.** `object_retire` (archive → un-export → 301 redirect, in one commit) plus the export-deletion primitive it needed, `_redirects` emission at build, 404 alternatives, and the Owner-only 30-day `purge_archived` sweep. Wolf's rulings: archive then hard-delete after 30 days; retired means gone after a release; readers are always redirected.                                                                   | commit `f6-*`       |
-| F7  | LOW      | **wontfix-v1.** The get↔patch version drift is the documented eventual-consistency constraint (name-lookup blob path drops strong consistency fleet-wide). Mitigation is read-version-under-lock-and-retry (the T14.5 driver does this). The real remedy — the lock library / a blobs-scoped strong-read token — is already tracked for the genesis-entry decision; not a V1 blocker.                                                   | tracked             |
-| F8  | LOW      | **FIXED + verified.** Two real type holes repaired (string guard; cast the context-validated event); `npm run test:opt-in` now compiles and is gated in the CI `check` job so it can't rot again.                                                                                                                                                                                                                                        | commit `09fb09d`    |
-| F9  | HIGH     | **FIXED + verified.** F1's fail-closed gate locked out the one client that cannot send headers — claude.ai's custom connector. The shared token now also rides the URL (`/mcp?key=<token>`), same constant-time compare, same secret, never logged. Header carriers stay preferred and documented as such.                                                                                                                               | commit `f9-url-key` |
-| F10 | HIGH     | **BUILT + verified.** Wolf's call: implement OAuth, keep the URL key too. Every site is now its own OAuth 2.1 authorization server — RFC 9728/8414 metadata, RFC 7591 registration, PKCE S256, a human consent screen inside `/admin`, rotating refresh tokens, RFC 7009 revocation — and `/mcp` validates those tokens as a resource server, challenge header included. 25 tests.                                                       | commit `f10-oauth`  |
+| #   | Sev      | Disposition                                                                                                                                                                                                                                                                                                                                                                                                                                  | Where               |
+| --- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- |
+| F1  | CRITICAL | **→ T14.8.** The one-line code fix (fail-closed) CLOSES Dr-Lurié's live `/mcp` on deploy, which breaks any connector currently sending no token. That must land in lockstep with setting Dr-Lurié's token AND updating its connector's bearer — exactly T14.8's per-site-key scope. Not deploy-safe alone; flagged to Wolf as top priority.                                                                                                  | T14.8               |
+| F2  | HIGH     | **FIXED + verified.** create-site now picks the export form from each core function's generation; platform artifact-upload shim corrected; regression test.                                                                                                                                                                                                                                                                                  | commit `de89b79`    |
+| F3  | MEDIUM   | **PARTLY FALSE, remainder FIXED + verified.** The "empty footer" was an artifact of the agent's own screenshot tool (hidden tab → zero rAF ticks → IntersectionObserver never fires → the fade-in never runs). A real browser renders it correctly. The real defects the proper render exposed: core's Footer hardcoded Dr-Lurié's descriptor as the fleet default, and a titleless nav group rendered as an empty dropdown. Both fixed.     | commit `f3-chrome`  |
+| F4  | MEDIUM   | **FIXED + verified.** Reader-safety scan no longer blocks `private`/`strategy` as ordinary prose outside the content_item annotation model; camelCase markers and JSON-key leaks still caught everywhere.                                                                                                                                                                                                                                    | commit `431186d`    |
+| F5  | MEDIUM   | **wontfix-v1 (behavior) + documented.** Publish deliberately keeps the lock (pinned test: "the stamp write must preserve the lock") so concurrent drift is caught under the live lease. The contract now says so and tells callers to `object_checkin`; the surprise, not the behavior, was the defect.                                                                                                                                      | commit `3f5965f`    |
+| F6  | MEDIUM   | **BUILT + verified.** `object_retire` (archive → un-export → 301 redirect, in one commit) plus the export-deletion primitive it needed, `_redirects` emission at build, 404 alternatives, and the Owner-only 30-day `purge_archived` sweep. Wolf's rulings: archive then hard-delete after 30 days; retired means gone after a release; readers are always redirected.                                                                       | commit `f6-*`       |
+| F7  | LOW      | **wontfix-v1.** The get↔patch version drift is the documented eventual-consistency constraint (name-lookup blob path drops strong consistency fleet-wide). Mitigation is read-version-under-lock-and-retry (the T14.5 driver does this). The real remedy — the lock library / a blobs-scoped strong-read token — is already tracked for the genesis-entry decision; not a V1 blocker.                                                       | tracked             |
+| F8  | LOW      | **FIXED + verified.** Two real type holes repaired (string guard; cast the context-validated event); `npm run test:opt-in` now compiles and is gated in the CI `check` job so it can't rot again.                                                                                                                                                                                                                                            | commit `09fb09d`    |
+| F9  | HIGH     | **FIXED + verified.** F1's fail-closed gate locked out the one client that cannot send headers — claude.ai's custom connector. The shared token now also rides the URL (`/mcp?key=<token>`), same constant-time compare, same secret, never logged. Header carriers stay preferred and documented as such.                                                                                                                                   | commit `f9-url-key` |
+| F10 | HIGH     | **BUILT + verified.** Wolf's call: implement OAuth, keep the URL key too. Every site is now its own OAuth 2.1 authorization server — RFC 9728/8414 metadata, RFC 7591 registration, PKCE S256, a human consent screen inside `/admin`, rotating refresh tokens, RFC 7009 revocation — and `/mcp` validates those tokens as a resource server, challenge header included. 25 tests.                                                           | commit `f10-oauth`  |
+| F11 | HIGH     | **IMPLEMENTED + focused tests green; render/deploy pending.** `create-site` generated the object-page catch-all but omitted the four blog loaders, so valid published `content_item` objects were deliberately reserved from the catch-all and had no route owner. Platform now carries the loaders, its file-owned blog base matches the `site` object at `/library`, and new scaffolds generate all four loaders with regression coverage. | PR #499             |
+| F12 | MEDIUM   | **FIXED in the Platform README follow-up.** The template JSON schema advertised the broad page-section union, including `shared_ref` and the `card` leaf, while `template_registry` correctly required a concrete registered component. Template slot `allowed` now derives from `REGISTERED_SECTION_TYPES`; downstream instantiation uses the same type guard and obsolete pointer-recipe fixtures are gone.                                | PR #499             |
+| F13 | HIGH     | **FIXED + focused tests green; fleet CI pending.** The shared Astro image optimizer calculated a height for string-backed public/remote images but dropped it when calling `getImage` at each responsive breakpoint. Valid new CMS articles could therefore break any listing page that rendered their hero image. Breakpoint dimensions now come from one pure helper shared by the Astro and CDN paths.                                    | PR #499             |
 
 Net: six fixed-and-verified (F2, F4, F5-doc, F8, F9, F10), one CRITICAL assigned
 to its designated task (F1 → T14.8), two scoped to dedicated follow-ups (F3
@@ -324,6 +327,68 @@ the SAME surface as the shared key. Per-client scope narrowing (a connector
 that may read but not publish) is real work on the tool dispatcher and is
 post-V1. Today the win is identity, expiry, and revocation — not least
 privilege.
+
+---
+
+## F11 — HIGH — generated sites publish unreachable content_item routes
+
+**Found:** 2026-08-02 while turning Platform into the live README tenant.
+
+Platform accepted, published, and released two valid `content_item` objects.
+`fetchPosts()` included them and the object-page catch-all intentionally reserved
+their `/%slug%` permalinks, but the Platform scaffold had no `[...blog]` route
+files. `/library` and both article slugs therefore rendered the CMS 404 after a
+successful production build.
+
+**Root cause:** `create-site` generated only `index.astro`, `404.astro`, and
+`[...objectPage].astro`. The catch-all correctly refuses article permalinks and
+loader-owned listing PageTypes; that safety rule assumes the site also owns the
+four audited blog loaders. Dr-Lurie had them because it predates the generator.
+
+**Fix:** add the post, list, category, and tag loaders to Platform and to every
+future `create-site` plan. Align Platform's file-owned `config.yaml` list path
+with its published `site` object at `/library`. Unit coverage pins the generated
+paths and the two primary static-path functions. The Platform build remains the
+render gate: two local attempts spent 80 and 100 minutes hydrating dependencies
+through macOS File Provider, emitted no Astro diagnostic, and produced no
+`dist`, so that result is infrastructure-inconclusive rather than green.
+
+## F12 — MEDIUM — template discovery advertised two structurally invalid slot types
+
+**Found:** 2026-08-02 during a live recipe-creation probe. A candidate template
+with `allowed: ["shared_ref"]` passed the JSON body shape exposed by the MCP but
+failed `template_registry` with “not a registered component.”
+
+**Root cause:** `templateSlotSchema.allowed` reused `sectionTypeSchema`, the
+broad page-section union. That union deliberately includes the `card` block-tree
+leaf and the `shared_ref` pointer, while a template slot is a concrete section
+recipe and the structural validator accepts registered components only.
+
+**Fix:** derive the template slot enum directly from
+`REGISTERED_SECTION_TYPES`. The JSON schema agents inspect now excludes both
+non-standalone members, while the existing registry criterion remains a drift
+guard. Regression coverage rejects `shared_ref` and `card` and accepts a recent
+registered component (`comparison_table`).
+
+---
+
+## F13 — HIGH — public-path article images could break static generation
+
+**Found:** 2026-08-03 in PR #499 CI after the Platform README route fix caused
+the fleet build to render newly published article cards. Dr-Lurie failed with
+Astro `MissingImageDimension` on a valid `/img/...webp` hero path.
+
+**Root cause:** `getImagesOptimized` correctly derived a height from the
+caller's width/aspect ratio, but `astroAssetsOptimizer` passed only `src` and
+each breakpoint width to `getImage`. Imported image metadata can supply its own
+height; public and remote string paths cannot. The calculation existed but was
+dropped at the final API boundary.
+
+**Fix:** one pure `imageDimensionsAtBreakpoint` helper now scales width and
+height for both the Astro-assets and CDN optimizer paths. Astro receives both
+dimensions for every responsive string-image candidate. Focused coverage pins
+16:9 scaling and the no-source-dimensions fallback without tenant-specific
+content patches.
 
 ---
 

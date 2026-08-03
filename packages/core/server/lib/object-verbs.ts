@@ -58,6 +58,7 @@ import { mintId, MintIdError } from '../../lib/object-ids-mint.js';
 import { applyPatchOps, PatchApplyError } from '../../lib/object-patch-apply.js';
 import { buildVariantBody } from '../../lib/article-object/variant.js';
 import { buildPageBodyFromTemplate } from '../../lib/template-instantiate.js';
+import { isStandalonePlaceableSectionType } from '../../lib/registry/components/registered-types.js';
 import { contentItemBodySchema } from '../../schema/bodies/content-item-v1.js';
 import { pageBodySchema, pageTypeIdSchema } from '../../schema/bodies/page-v1.js';
 import { sectionTemplateBodySchema } from '../../schema/bodies/section-template-v1.js';
@@ -840,7 +841,7 @@ export const handleObjectVerb = async (
       for (const slot of parsedTemplate.data.slots) {
         if (!slot.blueprintRef || slot.allowed.length === 0) continue;
         const refType = resolvedBlueprints[slot.blueprintRef]?.type;
-        if (refType && !slot.allowed.includes(refType)) {
+        if (refType && (!isStandalonePlaceableSectionType(refType) || !slot.allowed.includes(refType))) {
           return err(422, {
             error: `Slot "${slot.slotId}": referenced blueprint type "${refType}" (${slot.blueprintRef}) is no longer in the slot's allowed set — the recipe changed since this template was written.`,
             template_id: request.template_id,
