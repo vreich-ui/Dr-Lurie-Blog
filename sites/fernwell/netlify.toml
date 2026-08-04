@@ -23,6 +23,12 @@
   command = "(npx --no-install astro --version > /dev/null 2>&1 || npm ci --prefix ../.. --no-audit --no-fund) && npx --no-install astro build --config astro.config.ts"
 [build.environment]
   NODE_VERSION = "20"
+  # Same omission the root netlify.toml carries (W15 S3 parity): the secrets
+  # scanner fails the ENTIRE build on any appearance of GITHUB_REPOSITORY's
+  # literal value (this repo's own owner/name string) anywhere in scanned
+  # files -- and repo docs legitimately name the repo. See the root file's
+  # comment for the full story.
+  SECRETS_SCAN_OMIT_KEYS = "GITHUB_REPOSITORY"
 
 [functions]
   directory = "netlify/functions"
