@@ -1,8 +1,8 @@
 {
   "__generated": {
-    "at": "2026-08-04T15:04:49.620Z",
+    "at": "2026-08-04T16:08:01.027Z",
     "from": "objects/content_item/by-id/req_agent_when_content_needs_a_human_20260804_01.json",
-    "record_version": 2
+    "record_version": 6
   },
   "author": "Platform Documentation",
   "deck": "Most objects in this CMS can be created and published by an agent alone. A few can't — and the difference is deliberate, not accidental.",
@@ -70,6 +70,172 @@
       "public": {
         "body": "The point isn't to slow an agent down for its own sake. It's to make sure the handful of changes that matter most — the ones a reader or a business decision actually depends on — always have a person's deliberate decision behind them, while everything else keeps moving at agent speed.",
         "title": "Why the friction is there on purpose"
+      },
+      "visibility": "public"
+    },
+    {
+      "id": "n_13f2bf971ce7",
+      "kind": "content",
+      "private": {
+        "intent": "navigate",
+        "strategy": "context"
+      },
+      "public": {
+        "body": {
+          "content": [
+            {
+              "content": [
+                {
+                  "data": {},
+                  "marks": [],
+                  "nodeType": "text",
+                  "value": "For more on how this platform governs agent-assisted publishing, see:"
+                }
+              ],
+              "data": {},
+              "nodeType": "paragraph"
+            },
+            {
+              "content": [
+                {
+                  "content": [
+                    {
+                      "content": [
+                        {
+                          "content": [
+                            {
+                              "data": {},
+                              "marks": [],
+                              "nodeType": "text",
+                              "value": "Lifecycle Gates for Agent-Assisted Content Workflows"
+                            }
+                          ],
+                          "data": {
+                            "uri": "https://kugel-platform.netlify.app/governed-content-lifecycle-gates-agent-workflows"
+                          },
+                          "nodeType": "hyperlink"
+                        }
+                      ],
+                      "data": {},
+                      "nodeType": "paragraph"
+                    }
+                  ],
+                  "data": {},
+                  "nodeType": "list-item"
+                },
+                {
+                  "content": [
+                    {
+                      "content": [
+                        {
+                          "content": [
+                            {
+                              "data": {},
+                              "marks": [],
+                              "nodeType": "text",
+                              "value": "Why Everything in the CMS Is an Object"
+                            }
+                          ],
+                          "data": {
+                            "uri": "https://kugel-platform.netlify.app/everything-is-an-object"
+                          },
+                          "nodeType": "hyperlink"
+                        }
+                      ],
+                      "data": {},
+                      "nodeType": "paragraph"
+                    }
+                  ],
+                  "data": {},
+                  "nodeType": "list-item"
+                },
+                {
+                  "content": [
+                    {
+                      "content": [
+                        {
+                          "content": [
+                            {
+                              "data": {},
+                              "marks": [],
+                              "nodeType": "text",
+                              "value": "What Happens to an Article Before It's Ready to Publish"
+                            }
+                          ],
+                          "data": {
+                            "uri": "https://kugel-platform.netlify.app/what-happens-before-publish"
+                          },
+                          "nodeType": "hyperlink"
+                        }
+                      ],
+                      "data": {},
+                      "nodeType": "paragraph"
+                    }
+                  ],
+                  "data": {},
+                  "nodeType": "list-item"
+                },
+                {
+                  "content": [
+                    {
+                      "content": [
+                        {
+                          "content": [
+                            {
+                              "data": {},
+                              "marks": [],
+                              "nodeType": "text",
+                              "value": "How the System Grades Its Own Writing"
+                            }
+                          ],
+                          "data": {
+                            "uri": "https://kugel-platform.netlify.app/how-the-system-grades-its-own-writing"
+                          },
+                          "nodeType": "hyperlink"
+                        }
+                      ],
+                      "data": {},
+                      "nodeType": "paragraph"
+                    }
+                  ],
+                  "data": {},
+                  "nodeType": "list-item"
+                },
+                {
+                  "content": [
+                    {
+                      "content": [
+                        {
+                          "content": [
+                            {
+                              "data": {},
+                              "marks": [],
+                              "nodeType": "text",
+                              "value": "What Actually Needs AI in This System (and What Doesn't)"
+                            }
+                          ],
+                          "data": {
+                            "uri": "https://kugel-platform.netlify.app/what-needs-ai-and-what-doesnt"
+                          },
+                          "nodeType": "hyperlink"
+                        }
+                      ],
+                      "data": {},
+                      "nodeType": "paragraph"
+                    }
+                  ],
+                  "data": {},
+                  "nodeType": "list-item"
+                }
+              ],
+              "data": {},
+              "nodeType": "unordered-list"
+            }
+          ],
+          "data": {},
+          "nodeType": "document"
+        },
+        "title": "Related reading"
       },
       "visibility": "public"
     }
