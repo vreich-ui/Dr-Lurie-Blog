@@ -1,8 +1,8 @@
 {
   "__generated": {
-    "at": "2026-08-02T18:17:27.642Z",
+    "at": "2026-08-04T16:02:00.686Z",
     "from": "objects/content_item/by-id/req_agent_simple_skincare_routine_id_choose_20260802_01.json",
-    "record_version": 12
+    "record_version": 16
   },
   "author": "Platform Documentation",
   "deck": "A practical tour of the record, contract, lifecycle, and multisite boundaries that make agent publishing predictable.",
@@ -68,6 +68,172 @@
         "body": "Every tenant has its own site directory, object store, policies, credentials, and deployment, while the renderer and publishing engine live in shared core packages. A core fix can propagate across the fleet through CI; a client content change remains isolated to that tenant. The result is reuse at the software layer and separation at the data and authority layers.",
         "title": "Multisite without content forks"
       }
+    },
+    {
+      "id": "n_6e85a62ab16d",
+      "kind": "content",
+      "private": {
+        "intent": "navigate",
+        "strategy": "context"
+      },
+      "public": {
+        "body": {
+          "content": [
+            {
+              "content": [
+                {
+                  "data": {},
+                  "marks": [],
+                  "nodeType": "text",
+                  "value": "For more on how this platform governs agent-assisted publishing, see:"
+                }
+              ],
+              "data": {},
+              "nodeType": "paragraph"
+            },
+            {
+              "content": [
+                {
+                  "content": [
+                    {
+                      "content": [
+                        {
+                          "content": [
+                            {
+                              "data": {},
+                              "marks": [],
+                              "nodeType": "text",
+                              "value": "Lifecycle Gates for Agent-Assisted Content Workflows"
+                            }
+                          ],
+                          "data": {
+                            "uri": "https://kugel-platform.netlify.app/governed-content-lifecycle-gates-agent-workflows"
+                          },
+                          "nodeType": "hyperlink"
+                        }
+                      ],
+                      "data": {},
+                      "nodeType": "paragraph"
+                    }
+                  ],
+                  "data": {},
+                  "nodeType": "list-item"
+                },
+                {
+                  "content": [
+                    {
+                      "content": [
+                        {
+                          "content": [
+                            {
+                              "data": {},
+                              "marks": [],
+                              "nodeType": "text",
+                              "value": "When Content Needs a Human, and When It Doesn't"
+                            }
+                          ],
+                          "data": {
+                            "uri": "https://kugel-platform.netlify.app/when-content-needs-a-human"
+                          },
+                          "nodeType": "hyperlink"
+                        }
+                      ],
+                      "data": {},
+                      "nodeType": "paragraph"
+                    }
+                  ],
+                  "data": {},
+                  "nodeType": "list-item"
+                },
+                {
+                  "content": [
+                    {
+                      "content": [
+                        {
+                          "content": [
+                            {
+                              "data": {},
+                              "marks": [],
+                              "nodeType": "text",
+                              "value": "What Happens to an Article Before It's Ready to Publish"
+                            }
+                          ],
+                          "data": {
+                            "uri": "https://kugel-platform.netlify.app/what-happens-before-publish"
+                          },
+                          "nodeType": "hyperlink"
+                        }
+                      ],
+                      "data": {},
+                      "nodeType": "paragraph"
+                    }
+                  ],
+                  "data": {},
+                  "nodeType": "list-item"
+                },
+                {
+                  "content": [
+                    {
+                      "content": [
+                        {
+                          "content": [
+                            {
+                              "data": {},
+                              "marks": [],
+                              "nodeType": "text",
+                              "value": "How the System Grades Its Own Writing"
+                            }
+                          ],
+                          "data": {
+                            "uri": "https://kugel-platform.netlify.app/how-the-system-grades-its-own-writing"
+                          },
+                          "nodeType": "hyperlink"
+                        }
+                      ],
+                      "data": {},
+                      "nodeType": "paragraph"
+                    }
+                  ],
+                  "data": {},
+                  "nodeType": "list-item"
+                },
+                {
+                  "content": [
+                    {
+                      "content": [
+                        {
+                          "content": [
+                            {
+                              "data": {},
+                              "marks": [],
+                              "nodeType": "text",
+                              "value": "What Actually Needs AI in This System (and What Doesn't)"
+                            }
+                          ],
+                          "data": {
+                            "uri": "https://kugel-platform.netlify.app/what-needs-ai-and-what-doesnt"
+                          },
+                          "nodeType": "hyperlink"
+                        }
+                      ],
+                      "data": {},
+                      "nodeType": "paragraph"
+                    }
+                  ],
+                  "data": {},
+                  "nodeType": "list-item"
+                }
+              ],
+              "data": {},
+              "nodeType": "unordered-list"
+            }
+          ],
+          "data": {},
+          "nodeType": "document"
+        },
+        "title": "Related reading"
+      },
+      "visibility": "public"
     }
   ],
   "publication_context": {
