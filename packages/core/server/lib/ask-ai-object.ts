@@ -38,6 +38,17 @@
  * Pure/testable like object-verbs.ts: auth, the real blob store, and env come
  * from the thin HTTP wrapper (admin-ask-ai-object.ts); this core takes an
  * injected store and fetch so it can be exercised without network or disk.
+ *
+ * CONTEXT ENRICHMENT (S4x): the object schema already carries a non-reader-
+ * facing context layer — the site's declared `editorial_voice`, a
+ * content_item's `editorial`/`emotional_strategy`/`claims`/`compliance`/
+ * `taxonomy`/`publication_context`, a node's `commercial`/`chat`, a section
+ * instance's own `notes`, and the object's `review` state — that this file
+ * did not read until now. This is a PROMPT-ASSEMBLY change only: every field
+ * below flows one way, into the model's input text, never into the returned
+ * suggestion (the copy-only field-stripping rules a few screens down are
+ * untouched). See `buildVoiceClause`, `buildContentItemContextClause`,
+ * `buildNodeRoleClause`, `buildSectionNotesClause`, and `buildReviewClause`.
  */
 import { objectRecordKey } from './object-store-keys.js';
 import {
@@ -48,7 +59,12 @@ import {
   sectionDataSchemaForType,
   type AskAiTool,
 } from './ask-ai-schema.js';
-import { contentItemNodePublicSchema, type ContentItemNode } from '../../schema/bodies/content-item-v1.js';
+import {
+  contentItemNodePublicSchema,
+  type ContentItemBody,
+  type ContentItemNode,
+} from '../../schema/bodies/content-item-v1.js';
+import { editorialVoiceBodySchema, type EditorialVoiceBody } from '../../schema/bodies/editorial-voice-v1.js';
 import type { ObjectRecord } from '../../schema/object-record-v1.js';
 
 const OPENAI_ENDPOINT = 'https://api.openai.com/v1/chat/completions';
@@ -94,10 +110,175 @@ export type AskAiObjectResult = { status: number; body: Record<string, unknown> 
 
 const err = (status: number, body: Record<string, unknown>): AskAiObjectResult => ({ status, body });
 
-const buildUserMessage = (record: ObjectRecord, request: AskAiObjectRequest): string => {
+// ── context enrichment (S4x) ─────────────────────────────────────────────────
+
+/** `voice_<site>` — the site_/tax_/trk_ singleton convention applied to editorial_voice
+ *  (editorial-voice-v1.ts). `record.site` is the site OBJECT id ('site_drlurie'); strip
+ *  the prefix and re-add the voice one, e.g. sites/platform/seeds/voice-seed-data.mjs
+ *  seeds exactly 'voice_platform' for SEED_SITE 'site_platform'. */
+const editorialVoiceObjectId = (site: string): string => `voice_${site.replace(/^site_/, '')}`;
+
+/**
+ * Fetch the site's declared editorial voice, once per request. Absent-tolerant
+ * by design (mandate item 1) — not every site has authored one yet, so a
+ * missing record, an unparseable body, or a store miss all resolve to
+ * `undefined` rather than failing the ask.
+ */
+const fetchEditorialVoice = async (store: AskAiObjectStore, site: string): Promise<EditorialVoiceBody | undefined> => {
+  const raw = await store.get(objectRecordKey('editorial_voice', editorialVoiceObjectId(site)));
+  if (!raw) return undefined;
+  try {
+    const record = JSON.parse(raw) as ObjectRecord;
+    const parsed = editorialVoiceBodySchema.safeParse(record.body);
+    return parsed.success ? parsed.data : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
+/** House style, folded into every ask (whole-object, section, node) when the site has one. */
+const buildVoiceClause = (voice: EditorialVoiceBody | undefined): string => {
+  if (!voice) return '';
+  const lexiconLines = [
+    voice.lexicon.prefer.length ? `  Prefer this vocabulary: ${voice.lexicon.prefer.join(', ')}` : undefined,
+    voice.lexicon.avoid.length ? `  Avoid this vocabulary: ${voice.lexicon.avoid.join(', ')}` : undefined,
+  ].filter((line): line is string => line !== undefined);
+  const frameworkLines = voice.frameworks.map(
+    (framework) =>
+      `  - ${framework.label}${framework.framework_id === voice.default_framework ? ' (default)' : ''}: ${framework.when_to_use}`
+  );
+  return (
+    `\nHouse style — this site's declared editorial voice ("${voice.name}"), which the suggestion must respect:\n` +
+    [
+      `  Audience: ${voice.audience}`,
+      `  Tone: ${voice.tone.join(', ')}`,
+      `  Cadence: ${voice.cadence}`,
+      ...lexiconLines,
+      `  Claim policy: ${voice.claim_policy}`,
+      `  CTA policy: ${voice.cta_policy}`,
+      `  Reader safety notes: ${voice.reader_safety_notes}`,
+      '  Article frameworks this site publishes with:',
+      ...frameworkLines,
+    ].join('\n') +
+    '\n'
+  );
+};
+
+/** The object's review state, folded into every ask so a suggestion doesn't re-propose a rejected direction. */
+const buildReviewClause = (record: ObjectRecord): string => {
+  const review = record.review;
+  if (!review) return '';
+  const latest = review.decisions.at(-1);
+  const latestClause = latest ? ` Latest decision: ${latest.decision}${latest.note ? ` — "${latest.note}"` : ''}.` : '';
+  return `\nThis object's review state is "${review.state}".${latestClause} Do not re-propose a direction a human already rejected.\n`;
+};
+
+type ContentItemClaim = NonNullable<ContentItemBody['claims']>['claim_list'][number];
+type ContentItemComplianceRequirement = NonNullable<ContentItemBody['compliance']>['requirements'][number];
+
+/** Claims whose `node_ids` touch the scoped node/selection; unscoped (whole-object) asks see every claim. */
+const relevantClaims = (body: ContentItemBody, nodeId: string | undefined): ContentItemClaim[] => {
+  const claims = body.claims?.claim_list ?? [];
+  return nodeId ? claims.filter((claim) => claim.node_ids?.includes(nodeId)) : claims;
+};
+
+/** Compliance requirements whose `node_ids` touch the scoped node/selection; unscoped asks see every requirement. */
+const relevantCompliance = (body: ContentItemBody, nodeId: string | undefined): ContentItemComplianceRequirement[] => {
+  const requirements = body.compliance?.requirements ?? [];
+  return nodeId ? requirements.filter((requirement) => requirement.node_ids?.includes(nodeId)) : requirements;
+};
+
+/**
+ * content_item judge/score substrate (mandate item 2): editorial notes, the
+ * texture-facing emotional_strategy fields, claims/compliance touching the
+ * scope, taxonomy, and publication_context. Used for whole-object asks on a
+ * content_item AND for every node-scoped ask (node scope only exists on this
+ * type) — `nodeId` narrows claims/compliance to the scoped block; `undefined`
+ * (whole-object) surfaces every claim/requirement in the article.
+ */
+const buildContentItemContextClause = (body: ContentItemBody, nodeId: string | undefined): string => {
+  const parts: string[] = [];
+
+  const editorial = body.editorial;
+  if (editorial?.writer_notes || editorial?.framework) {
+    parts.push(
+      `Editorial notes: ${[editorial.framework && `declared framework "${editorial.framework}"`, editorial.writer_notes]
+        .filter(Boolean)
+        .join(' — ')}`
+    );
+  }
+
+  const strategy = body.emotional_strategy;
+  if (strategy?.overall_texture_assessment) {
+    parts.push(`Texture assessment: ${strategy.overall_texture_assessment}`);
+  }
+  if (strategy?.lines_to_preserve?.length) {
+    parts.push(`Lines to preserve verbatim: ${strategy.lines_to_preserve.map((line) => `"${line}"`).join('; ')}`);
+  }
+  if (strategy?.rhythm_adjustments?.length) {
+    parts.push(`Rhythm adjustments wanted: ${strategy.rhythm_adjustments.join('; ')}`);
+  }
+  if (strategy?.opportunities_for_specificity?.length) {
+    parts.push(`Opportunities for specificity: ${strategy.opportunities_for_specificity.join('; ')}`);
+  }
+
+  const claims = relevantClaims(body, nodeId);
+  if (claims.length) {
+    const claimLines = claims
+      .map(
+        (claim) =>
+          `  - "${claim.text}" [status: ${claim.status ?? 'unverified'}${claim.risk ? `, risk: ${claim.risk}` : ''}]`
+      )
+      .join('\n');
+    parts.push(
+      `${nodeId ? 'Claims touching this block' : 'Claims in this article'} — never contradict a verified claim, ` +
+        `and never restate a disputed or retracted claim as fact:\n${claimLines}`
+    );
+  }
+
+  const compliance = relevantCompliance(body, nodeId);
+  if (compliance.length) {
+    const complianceLines = compliance
+      .map(
+        (requirement) =>
+          `  - [${requirement.kind}] ${requirement.text}${requirement.satisfied ? '' : ' (NOT YET SATISFIED)'}`
+      )
+      .join('\n');
+    parts.push(`Compliance requirements${nodeId ? ' touching this block' : ''}:\n${complianceLines}`);
+  }
+
+  const taxonomyLine = [
+    body.taxonomy?.category && `category ${body.taxonomy.category}`,
+    body.taxonomy?.tags?.length && `tags ${body.taxonomy.tags.join(', ')}`,
+  ]
+    .filter(Boolean)
+    .join('; ');
+  if (taxonomyLine) parts.push(`Taxonomy: ${taxonomyLine}`);
+
+  const publicationLine = [
+    body.publication_context?.publication_name,
+    body.publication_context?.domain,
+    body.publication_context?.topic_scope,
+  ]
+    .filter(Boolean)
+    .join(' — ');
+  if (publicationLine) parts.push(`Publication context: ${publicationLine}`);
+
+  return parts.length ? `\n${parts.join('\n')}\n` : '';
+};
+
+const buildUserMessage = (
+  record: ObjectRecord,
+  request: AskAiObjectRequest,
+  voice: EditorialVoiceBody | undefined
+): string => {
   const selectionClause = request.selected_text
     ? `\nThe editor highlighted this specific span: """${request.selected_text}"""\n`
     : '';
+  const contentItemClause =
+    record.object_type === 'content_item'
+      ? buildContentItemContextClause(record.body as ContentItemBody, undefined)
+      : '';
   return [
     `You are editing a "${record.object_type}" CMS object (id ${record.object_id}).`,
     '',
@@ -105,6 +286,9 @@ const buildUserMessage = (record: ObjectRecord, request: AskAiObjectRequest): st
     '```json',
     JSON.stringify(record.body, null, 2),
     '```',
+    buildVoiceClause(voice),
+    contentItemClause,
+    buildReviewClause(record),
     selectionClause,
     `Editor's instruction: ${request.instruction}`,
     '',
@@ -116,16 +300,23 @@ const buildUserMessage = (record: ObjectRecord, request: AskAiObjectRequest): st
 };
 
 /** A section instance as it sits in a page body — the minimal shape the scope path reads. */
-type PageSectionInstance = { id: string; type: string; data: unknown };
+type PageSectionInstance = { id: string; type: string; data: unknown; notes?: string };
 
 /** Plain-text copy: a string, or an array whose every element is a string. */
 const isCopyTextValue = (value: unknown): boolean =>
   typeof value === 'string' || (Array.isArray(value) && value.every((item) => typeof item === 'string'));
 
+/** The section instance's own `notes` — editor/agent context, never rendered (section-v1.ts). */
+const buildSectionNotesClause = (section: PageSectionInstance): string =>
+  section.notes && section.notes.trim() !== ''
+    ? `\nEditor/agent notes on this section (context only, never rendered to readers): ${section.notes}\n`
+    : '';
+
 const buildSectionUserMessage = (
   record: ObjectRecord,
   section: PageSectionInstance,
-  request: AskAiObjectRequest
+  request: AskAiObjectRequest,
+  voice: EditorialVoiceBody | undefined
 ): string => {
   const page = record.body as { title?: unknown; route?: unknown };
   const selectionClause = request.selected_text
@@ -148,6 +339,9 @@ const buildSectionUserMessage = (
     '```json',
     JSON.stringify(section.data, null, 2),
     '```',
+    buildVoiceClause(voice),
+    buildSectionNotesClause(section),
+    buildReviewClause(record),
     selectionClause,
     imageClause,
     `Editor's instruction: ${request.instruction}`,
@@ -161,27 +355,69 @@ const buildSectionUserMessage = (
     .join('\n');
 };
 
-const buildNodeUserMessage = (record: ObjectRecord, node: ContentItemNode, request: AskAiObjectRequest): string => {
+/**
+ * The node's declared ROLE is context the model should write FOR (a hook
+ * reads differently from a resolution) — it flows one way: into the prompt,
+ * never into the suggestion (the tool schema has no annotation fields).
+ * Extended (mandate item 3) to also surface `node.commercial` — so a
+ * suggestion never accidentally strips required disclosure/offer language —
+ * and `node.chat` when present.
+ */
+const buildNodeRoleClause = (node: ContentItemNode): string => {
+  const strategy = node.private?.strategy;
+  const intent = node.private?.intent;
+  const roleLine =
+    strategy || intent
+      ? `This block's editorial role: ${[strategy, intent && `intent: ${intent}`].filter(Boolean).join(', ')}. Write copy that serves that role.`
+      : '';
+
+  const commercial = node.commercial;
+  const commercialLine = commercial
+    ? `This block carries commercial metadata (${[
+        commercial.type,
+        commercial.disclosure?.required
+          ? `disclosure REQUIRED${commercial.disclosure.label ? `: "${commercial.disclosure.label}"` : ''}`
+          : undefined,
+        commercial.offer?.terms && `offer terms: ${commercial.offer.terms}`,
+        commercial.offer?.couponCode && `coupon ${commercial.offer.couponCode}`,
+      ]
+        .filter(Boolean)
+        .join('; ')}). Never strip required disclosure or offer language unless the instruction explicitly asks for it.`
+    : '';
+
+  const chat = node.chat;
+  const chatLine =
+    chat && (chat.invitationText || chat.suggestedQuery)
+      ? `This block also carries a chat invitation${chat.invitationText ? ` ("${chat.invitationText}")` : ''}${
+          chat.suggestedQuery ? ` with suggested query "${chat.suggestedQuery}"` : ''
+        } — keep any copy change consistent with it.`
+      : '';
+
+  const lines = [roleLine, commercialLine, chatLine].filter((line) => line !== '');
+  return lines.length ? `\n${lines.join(' ')}\n` : '';
+};
+
+const buildNodeUserMessage = (
+  record: ObjectRecord,
+  node: ContentItemNode,
+  request: AskAiObjectRequest,
+  voice: EditorialVoiceBody | undefined
+): string => {
   const article = record.body as { title?: unknown };
   const selectionClause = request.selected_text
     ? `\nThe editor highlighted this specific span: """${request.selected_text}"""\n`
     : '';
-  // The node's declared ROLE is context the model should write FOR (a hook
-  // reads differently from a resolution) — it flows one way: into the prompt,
-  // never into the suggestion (the tool schema has no annotation fields).
-  const strategy = node.private?.strategy;
-  const intent = node.private?.intent;
-  const roleClause =
-    strategy || intent
-      ? `\nThis block's editorial role: ${[strategy, intent && `intent: ${intent}`].filter(Boolean).join(', ')}. ` +
-        'Write copy that serves that role.\n'
-      : '';
+  const roleClause = buildNodeRoleClause(node);
+  const contentItemClause = buildContentItemContextClause(record.body as ContentItemBody, node.id);
   return [
     `You are editing ONE BLOCK of the article "${typeof article.title === 'string' ? article.title : record.object_id}".`,
     `The block is a "${node.kind}" node (id ${node.id}). Its current public copy:`,
     '```json',
     JSON.stringify(node.public, null, 2),
     '```',
+    buildVoiceClause(voice),
+    contentItemClause,
+    buildReviewClause(record),
     roleClause,
     selectionClause,
     `Editor's instruction: ${request.instruction}`,
@@ -322,6 +558,11 @@ export const askAiForObject = async (
   if (!raw) return err(404, { error: 'Object record not found', not_found: true });
   const record = JSON.parse(raw) as ObjectRecord;
 
+  // Site house style (mandate item 1) — fetched once, independent of scope,
+  // and folded into every builder below (absent-tolerant: undefined when the
+  // site has no editorial_voice object yet).
+  const voice = await fetchEditorialVoice(store, record.site);
+
   // ── section / node scope (edit-mode canvas) ───────────────────────────────
   let tool: AskAiTool;
   let userMessage: string;
@@ -351,7 +592,7 @@ export const askAiForObject = async (
       // text would destroy its structure — keep it out of the model's reach.
       delete (tool.input_schema.properties as Record<string, unknown> | undefined)?.body;
     }
-    userMessage = buildNodeUserMessage(record, node, request);
+    userMessage = buildNodeUserMessage(record, node, request, voice);
   } else if (request.section_id) {
     const sections = (record.body as { sections?: PageSectionInstance[] }).sections;
     const section = Array.isArray(sections) ? sections.find((entry) => entry.id === request.section_id) : undefined;
@@ -380,7 +621,7 @@ export const askAiForObject = async (
         'Edit text/copy ONLY — never change or invent images, assets, links, or references.',
       protectFields: true,
     });
-    userMessage = buildSectionUserMessage(record, section, request);
+    userMessage = buildSectionUserMessage(record, section, request, voice);
   } else if (request.object_type === 'section') {
     // A shared section object IS one section: auto-scope to the inner
     // instance so the model answers in the section's own data grammar (the
@@ -404,11 +645,11 @@ export const askAiForObject = async (
         'Edit text/copy ONLY — never change or invent images, assets, links, or references.',
       protectFields: true,
     });
-    userMessage = buildSectionUserMessage(record, inner, request);
+    userMessage = buildSectionUserMessage(record, inner, request, voice);
   } else {
     // Tool schema derived from the type's zod body schema at request time.
     tool = deriveAskAiToolSchema(bodySchema);
-    userMessage = buildUserMessage(record, request);
+    userMessage = buildUserMessage(record, request, voice);
   }
 
   const aiResult =
