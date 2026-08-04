@@ -259,3 +259,13 @@ export const getCommerceEventsBlobStore = async (event: unknown, binding?: SiteB
 export const getTrackingEventsBlobStore = async (event: unknown, binding?: SiteBinding): Promise<BlobStore> => {
   return getNetlifyBlobStore('tracking-events', event, binding);
 };
+
+/**
+ * S4x (2/2): the tagged canvas Ask-AI proposal trail a save carries, one
+ * record per save that followed an Ask-AI round. Write-mostly training data
+ * for CMS Agent learning — never read by the object substrate, never part of
+ * `history[].details`. Eventual consistency is fine; nothing reads it back live.
+ */
+export const getAgentLearningBlobStore = async (event: unknown, binding?: SiteBinding): Promise<BlobStore> => {
+  return getNetlifyBlobStore('agent-learning', event, binding);
+};

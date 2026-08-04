@@ -17,11 +17,16 @@
 import type { SiteBinding } from '../lib/site-binding.js';
 import { getAdminStateFromEvent, type LambdaContext } from '../lib/admin-auth.js';
 import type { ArtifactIndexStore } from '../lib/artifact-index.js';
-import { getArtifactIndexBlobStore, getSiteObjectsBlobStore } from '../lib/blob-store.js';
+import { getAgentLearningBlobStore, getArtifactIndexBlobStore, getSiteObjectsBlobStore } from '../lib/blob-store.js';
 import { resolveRolesForPrincipalAsync } from '../lib/roles.js';
 import { getUsersBlobStore, getUserRecord } from '../lib/users-store.js';
 import { getGovernanceBlobStore, resolveActivePolicies } from '../lib/governance-store.js';
-import { handleObjectVerb, objectVerbRequestSchema, type ObjectVerbStore } from '../lib/object-verbs.js';
+import {
+  handleObjectVerb,
+  objectVerbRequestSchema,
+  type AgentLearningWriteStore,
+  type ObjectVerbStore,
+} from '../lib/object-verbs.js';
 import { buildStoreValidationContext } from '../lib/object-validation-context.js';
 import type { ObjectType } from '../../schema/object-record-v1.js';
 import type { Principal } from '../../schema/object-record-v1.js';
@@ -97,12 +102,17 @@ const buildHandlerImpl = (binding: SiteBinding) => async (event: LambdaEvent, co
     // T9.15: runtime governance overrides (else committed policy) feed the
     // publish/create gates.
     const { approval, creation } = await resolveActivePolicies(await getGovernanceBlobStore(event));
+    // S4x (2/2): the ONLY caller that wires this — a canvas save's ops array
+    // may carry a tagged Ask-AI proposal trail marker; handleObjectVerb writes
+    // it here, atomically with the patch, once the patch itself has persisted.
+    const agentLearningStore = (await getAgentLearningBlobStore(event)) as unknown as AgentLearningWriteStore;
     const result = await handleObjectVerb(store, request.data, principal, {
       validationContext,
       roles,
       approvalPolicy: approval,
       creationPolicy: creation,
       publishDeps: { exportRoot: binding.dataRoot },
+      agentLearningStore,
     });
     return jsonResponse(result.status, result.body);
   } catch (error) {
