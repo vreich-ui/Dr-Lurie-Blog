@@ -79,7 +79,8 @@ For everything NOT auto-generated in step 2:
   add one, paste the URL.
 - **Identity / roles** (`ADMIN_EMAILS`, `ROLE_EMAILS_ADMIN/EDITOR/PUBLISHER`,
   `IDENTITY_URL`): enable Netlify Identity on the site, set the allowlists to
-  the real humans who administer this client.
+  the real humans who administer this client — **exact click-by-click steps
+  in §3a below (the admin-workspace human gate)**.
 - **`ARTIFACT_URL_INGEST_ALLOWED_HOSTS`**: the hosts this client's agents may
   pull artifact images from — a policy choice, not a secret.
 - **Tenancy axes** (`PDF_TOOL_PROJECT_ID`, `TRACKING_PROJECT_ID`,
@@ -121,6 +122,62 @@ For everything NOT auto-generated in step 2:
 - **Secret rotation**: `PUBLISH_SECRET`'s rotation runbook is standing debt
   tracked at T11.10 — this scaffold mints an initial value but does not
   automate rotation.
+
+## 3a. Admin workspace & canvas editor bootstrap — §admin (HUMAN GATE)
+
+Every tenant gets the full `/admin` workspace and the edit-mode canvas by
+construction (W15 mandate; requirement inventory + audit:
+`docs/cms-architecture/15-fleet-admin-parity.md` and
+`scripts/audit-site-admin-parity.mjs`). The build ships all of it — but the
+site's admin is a locked door until a human does these three console steps.
+They are `human_gate` in the pipeline's sense: an agent can prepare
+everything else, only you can click these.
+
+1. **Enable Netlify Identity (GoTrue)** on the new site.
+   Netlify console → the site → **Integrations → Identity → Enable** (on
+   older console versions: Site configuration → Identity). This is what
+   stands up `https://<site>/.netlify/identity`; the `/admin` login widget
+   and every function-side token check point at it. Without it, `/admin`
+   shows a login that cannot complete and every admin function returns 401.
+   Registration preference: **Invite only** — this is a workspace, not a
+   signup page.
+2. **Set `ADMIN_EMAILS`** on the site (Site settings → Environment
+   variables) to the operator's real email address(es), comma-separated.
+   These are **bootstrap Owners** (`roles.ts`): implicit Owner forever, the
+   fallback that makes it impossible for an empty or wiped `users` store to
+   lock you out. Until the first invite exists this is the ONLY way in. The
+   scaffold's checklist prints this row with a placeholder — replace it, do
+   not skip it. (Optional: `IDENTITY_URL` only if the default
+   `<site URL>/.netlify/identity` must be overridden; `ROLE_EMAILS_*` for
+   the extra publish-gate vocabulary.)
+3. **Invite the first Owner.** Sign in at `https://<site>/admin` with an
+   `ADMIN_EMAILS` address (Identity → your first login), then
+   `/admin/settings/admins` → **Invite** (email + role Owner). The invite
+   rides the GoTrue admin API with the identity context Netlify injects —
+   no extra secrets. A team of one can stop after step 2; `ADMIN_EMAILS`
+   alone is a complete bootstrap.
+
+What you do NOT need to do (verified by the audit, not remembered): the
+`/admin/*` routes, admin styles, the EditMode canvas, all 34 function shims,
+the S1 `/admin/content/:objectId` rewrite, the OAuth authorization-server
+rewrites, and the blob-store expectations are scaffold/provisioning-owned.
+After the three steps above, verify the wiring any time with:
+
+```
+node scripts/audit-site-admin-parity.mjs --site sites/<client>
+```
+
+and bring an OLDER site (scaffolded before the admin waves) to parity with:
+
+```
+node packages/core/cli/migrate-site.mjs --site sites/<client> --admin-parity --write
+```
+
+Note the store expectation behind the workspace: `users`, `agent-chats`,
+`agent-profiles`, `governance` (plus the object/artifact/tracking stores)
+must round-trip on THIS site — step 2 of this runbook probes all of them
+when run with a token; re-run with `--provision-only` if provisioning ever
+reported a store failure.
 
 ## 4. Wiring an actual second deployment (not this task)
 

@@ -47,6 +47,11 @@ const validPageBody = () => ({
 
 describe('CURRENT_SCHEMAS / CURRENT_SCHEMA_VERSIONS', () => {
   it('pins one schema + one version string per governed object type', () => {
+    // In the compiled test tree the schema machinery MUST load — the
+    // undefined branch exists only for raw-checkout --admin-parity runs
+    // (see migrate-site.mjs's machinery note).
+    assert.ok(CURRENT_SCHEMAS, 'compiled tree must load the schema machinery');
+    assert.ok(CURRENT_SCHEMA_VERSIONS, 'compiled tree must derive the version map');
     const types = Object.keys(CURRENT_SCHEMAS);
     assert.ok(types.length >= 10, 'expected at least the ten governed object types');
     for (const t of types) {

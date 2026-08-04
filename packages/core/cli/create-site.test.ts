@@ -29,6 +29,11 @@ import {
   validateClientSlug,
   writeFiles,
 } from './create-site.mjs';
+import {
+  CANONICAL_INFRA_REDIRECTS,
+  parseNetlifyTomlRedirects,
+  parseSiteConfigRedirects,
+} from './admin-parity.mjs';
 import { navigationBodySchema } from '../schema/bodies/navigation-v1.js';
 import { sectionTemplateBodySchema } from '../schema/bodies/section-template-v1.js';
 import { siteBodySchema } from '../schema/bodies/site-v1.js';
@@ -143,19 +148,25 @@ test('the committed-export tree ships as BOOTSTRAP only — enough to build, not
   }
 });
 
-test('CORE_BLOB_STORES matches the store-name literals in blob-store.ts/governance-store.ts/users-store.ts/chat-store.ts', () => {
-  // Not a live import of those modules (their store names are inline string
-  // literals passed to getNetlifyBlobStore, not exported constants) — this
-  // pins the count/shape so a drift is at least visible in a diff.
+test('CORE_BLOB_STORES matches the store-name literals in blob-store.ts/governance-store.ts/users-store.ts/agent stores', () => {
+  // W15 S2: this pin is no longer the only guard — admin-parity.mjs's
+  // scanCoreBlobStoreNames() reads the literals out of packages/core and
+  // tests/scripts/admin-parity.test.mjs fails when CORE_BLOB_STORES
+  // under-covers them (that check is what surfaced the four appended
+  // stores: agent-profiles, opt-ins, commerce-events, tracking-events).
   assert.deepEqual(
     [...CORE_BLOB_STORES].sort(),
     [
       'agent-chats',
+      'agent-profiles',
       'artifact-index',
       'artifacts',
       'commerce',
+      'commerce-events',
       'governance',
+      'opt-ins',
       'site-objects',
+      'tracking-events',
       'users',
       'workflows',
     ].sort()
@@ -442,6 +453,31 @@ test('function shims use the export form the core function generation requires (
       );
     }
   }
+});
+
+test('the emitted netlify.toml + site.config.ts carry EXACTLY the canonical infra redirects (W15 S2 drift guard)', () => {
+  // The canonical table (admin-parity.mjs) is what the fleet audit checks
+  // every tenant against — so the scaffold must emit exactly it, or a new
+  // client would be born failing its own parity audit. Includes the S1
+  // admin rewrite: single segment, status 200, UNFORCED.
+  const plan = buildPlan({ name: 'acme' });
+  const toml = plan.files.find((f) => f.path === 'sites/acme/netlify.toml');
+  const siteConfig = plan.files.find((f) => f.path === 'sites/acme/site.config.ts');
+  assert.ok(toml && siteConfig);
+
+  const tomlRedirects = parseNetlifyTomlRedirects(toml.content);
+  assert.deepEqual(tomlRedirects, CANONICAL_INFRA_REDIRECTS.map((r) => ({ ...r })));
+
+  const configRedirects = parseSiteConfigRedirects(siteConfig.content);
+  assert.deepEqual(
+    configRedirects,
+    CANONICAL_INFRA_REDIRECTS.map(({ from, to, status }) => ({ from, to, status }))
+  );
+
+  const adminRule = tomlRedirects.find((r) => r.from === '/admin/content/:objectId');
+  assert.ok(adminRule, 'the S1 admin rewrite must be emitted');
+  assert.equal(adminRule.force, false, 'the admin rewrite must be UNFORCED (S1)');
+  assert.ok(!tomlRedirects.some((r) => r.from === '/admin/content/*'), 'the pre-S1 splat form must not be emitted');
 });
 
 test('re-running against an existing sites/<client>/ is a no-op plan-wise (the caller checks existence before writeFiles)', () => {

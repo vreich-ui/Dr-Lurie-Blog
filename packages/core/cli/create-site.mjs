@@ -105,11 +105,25 @@ export const ENV_CHECKLIST = [
         generate: randomSecret(24),
         note: 'Shared MCP auth key (deprecated-fallback once T11.10 per-agent tokens land).',
       },
-      { name: 'ADMIN_EMAILS', cls: 'per-site', note: 'Admin allowlist (Identity bootstrap) — human-owned.' },
+      {
+        name: 'ADMIN_EMAILS',
+        cls: 'per-site',
+        note:
+          'BOOTSTRAP OWNER allowlist — /admin is unusable until this is set (or an invite exists): members are ' +
+          'implicit Owners forever (roles.ts env fallback; a wiped users store can never lock the operator out). ' +
+          'Human-owned; placeholder: the operator’s real email. Runbook: site-provisioning-runbook.md §admin.',
+      },
       { name: 'ROLE_EMAILS_ADMIN', cls: 'per-site', note: 'Role allowlist — human-owned.' },
       { name: 'ROLE_EMAILS_EDITOR', cls: 'per-site', note: 'Role allowlist — human-owned.' },
       { name: 'ROLE_EMAILS_PUBLISHER', cls: 'per-site', note: 'Role allowlist — human-owned.' },
-      { name: 'IDENTITY_URL', cls: 'per-site', note: 'Netlify Identity endpoint for the new site.' },
+      {
+        name: 'IDENTITY_URL',
+        cls: 'per-site, optional',
+        note:
+          'GoTrue endpoint OVERRIDE only — functions fall back to "<site URL>/.netlify/identity", which is correct ' +
+          'once Netlify Identity is ENABLED on the site. Enabling Identity is the real gate (console-only, human — ' +
+          'runbook §admin); without it every /admin login and function auth check fails.',
+      },
       {
         name: 'ARTIFACT_UPLOAD_TOKEN_SECRET',
         cls: 'per-site',
@@ -179,9 +193,17 @@ export const ENV_CHECKLIST = [
   {
     group: 'AI + integrations',
     rows: [
-      { name: 'ANTHROPIC_API_KEY', cls: 'fleet-shared', note: 'AI provider key — reuse the fleet value.' },
-      { name: 'OPENAI_API_KEY', cls: 'fleet-shared', note: 'AI provider key — reuse the fleet value.' },
-      { name: 'OPENAI_CHATKIT_WORKFLOW_ID', cls: 'per-site', note: "ChatKit workflow id for this site's admin chat." },
+      {
+        name: 'ANTHROPIC_API_KEY',
+        cls: 'fleet-shared',
+        note:
+          'AI provider key — reuse the fleet value. Admin-critical: the /admin agents hub and every per-object ' +
+          'chat instantiate a provider adapter (both providers are v1 — Wolf 2026-07-16).',
+      },
+      { name: 'OPENAI_API_KEY', cls: 'fleet-shared', note: 'AI provider key — reuse the fleet value (second v1 adapter).' },
+      // OPENAI_CHATKIT_WORKFLOW_ID was removed W15 S2: ChatKit retired at
+      // T9.24 (OQ-W9-1) — the in-house agents hub replaced it and no core
+      // code reads the variable any more.
       {
         name: 'NETLIFY_AUTH_TOKEN',
         cls: 'fleet-shared',
@@ -216,9 +238,17 @@ export const SITE_IDENTITY_ENV_OVERRIDES = [
 ];
 
 // This site's own blob-store namespace (packages/core/server/lib/{blob-store,
-// governance-store,users-store}.ts + agent/chat-store.ts — keep this list in
-// sync with those store-name literals, the same discipline
+// governance-store,users-store}.ts + agent/{chat-store,profiles}.ts — keep
+// this list in sync with those store-name literals, the same discipline
 // scripts/provision-pdf-tool-stores.mjs uses for the pdf-tool's stores).
+// W15 S2 made the sync CHECKED, not tribal: admin-parity.mjs's
+// scanCoreBlobStoreNames() reads the literals out of packages/core and the
+// audit fails when this list under-covers them. That check is what caught
+// the four stores appended below — `agent-profiles` (the W9 §4a
+// dedicated-agent store the admin chat resolves profiles from) plus
+// `opt-ins`/`commerce-events`/`tracking-events` (blob-store.ts) were used by
+// core but never probed at provisioning time, so a new tenant could look
+// provisioned while its admin chat hub had an unverified store.
 export const CORE_BLOB_STORES = [
   'site-objects',
   'workflows',
@@ -226,8 +256,12 @@ export const CORE_BLOB_STORES = [
   'artifact-index',
   'commerce',
   'agent-chats',
+  'agent-profiles',
   'governance',
   'users',
+  'opt-ins',
+  'commerce-events',
+  'tracking-events',
 ];
 
 const DATA_SITE_SUBDIRS = [
@@ -1235,7 +1269,7 @@ const bootstrap404PageExport = (brandName) =>
  * shim wires the governed trio only. Every article on a new site is a
  * content_item OBJECT; the legacy dialect deliberately does not propagate.
  */
-const mcpShimTemplate = (ids) => `/**
+export const mcpShimTemplate = (ids) => `/**
  * Site shim for '${ids.siteId}'s MCP endpoint. The server is fleet law in
  * packages/core/server/functions/mcp.ts; this file is the per-site wire.
  *
@@ -1272,7 +1306,7 @@ export * from '../../../../packages/core/server/functions/mcp.js';
  * (T14.7 fix, W14 finding F2: the artifact-upload shim shipped as v1 `handler`
  * for a v2 function and 502'd at init on the platform site.)
  */
-const coreFunctionIsV2 = (fnName) => {
+export const coreFunctionIsV2 = (fnName) => {
   const dir = path.join(repoRoot, 'packages', 'core', 'server', 'functions');
   for (const ext of ['ts', 'js', 'mjs']) {
     const file = path.join(dir, `${fnName}.${ext}`);
@@ -1283,7 +1317,7 @@ const coreFunctionIsV2 = (fnName) => {
   return false;
 };
 
-const functionShimTemplate = (ids, fnName) => {
+export const functionShimTemplate = (ids, fnName) => {
   const isV2 = coreFunctionIsV2(fnName);
   const handlerExport = isV2
     ? 'export default createHandler(siteBinding);'
@@ -1413,6 +1447,25 @@ export const renderEnvChecklist = (executed) => {
   return lines.join('\n');
 };
 
+/**
+ * The admin/editor bootstrap checklist (W15 S2). Printed with every plan and
+ * every real run so "the tenant gets the full admin workspace" stops being
+ * tribal knowledge: the three console steps are the HUMAN GATE between a
+ * scaffolded site and a usable /admin; everything else on the list is
+ * verified by scripts/audit-site-admin-parity.mjs.
+ */
+export const renderAdminBootstrapChecklist = () =>
+  [
+    'ADMIN WORKSPACE BOOTSTRAP (human gate — runbook site-provisioning-runbook.md §admin):',
+    '  1. Enable Netlify Identity (GoTrue) on the new site — console-only; without it /admin login',
+    '     has no identity service and every admin function 401s.',
+    '  2. Set ADMIN_EMAILS on the site to the operator’s real email(s) — bootstrap Owners; the',
+    '     users store can be empty/wiped and these addresses still get in.',
+    '  3. Invite the first Owner via /admin/settings/admins (or rely on ADMIN_EMAILS alone).',
+    `  Blob stores backing the workspace (probed automatically when a token is supplied): ${CORE_BLOB_STORES.join(', ')}.`,
+    '  Verify any tenant any time:  node scripts/audit-site-admin-parity.mjs --site sites/<client>',
+  ].join('\n');
+
 export const renderPlan = (plan, { netlifyToken }) => {
   const lines = [];
   lines.push(`create-site plan for '${plan.clientSlug}' (${plan.brandName})`);
@@ -1442,6 +1495,8 @@ export const renderPlan = (plan, { netlifyToken }) => {
   lines.push('');
   lines.push('Env checklist:');
   lines.push(renderEnvChecklist(false));
+  lines.push('');
+  lines.push(renderAdminBootstrapChecklist());
   return lines.join('\n');
 };
 
@@ -1778,6 +1833,8 @@ export const main = async (argv) => {
   console.log('');
   console.log('Env checklist:');
   console.log(renderEnvChecklist(Boolean(netlifyToken)));
+  console.log('');
+  console.log(renderAdminBootstrapChecklist());
   console.log('');
   console.log(
     'See docs/cms-architecture/site-provisioning-runbook.md for the human half (DNS, secrets, Identity bootstrap).'

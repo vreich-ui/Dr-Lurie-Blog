@@ -47,54 +47,117 @@
  * while every committed export actually validates (which the `build`/`check`
  * CI jobs already require).
  *
+ * W15 S2 added a SECOND, independent dimension: ADMIN PARITY
+ * (`--admin-parity`). Schema migration covers a site's DATA; admin parity
+ * covers its WIRING — the function shims, canonical redirects (incl. the S1
+ * `/admin/content/:objectId` rewrite), keepalive schedule, and reader route
+ * loaders an older scaffold may predate. `--admin-parity` alone reports the
+ * full audit (packages/core/cli/admin-parity.mjs, the same checks
+ * scripts/audit-site-admin-parity.mjs prints); `--admin-parity --write`
+ * applies the AUTOMATABLE fixes onto the site tree — additive and
+ * idempotent: missing shims/loaders/redirect rules are added, the one known
+ * stale form (the pre-S1 admin splat) is replaced, existing files are never
+ * overwritten, and a second run finds nothing to do. Human-gated
+ * requirements (Identity enablement, ADMIN_EMAILS, secret values) are
+ * reported, never synthesized.
+ *
  * Usage:
  *   node packages/core/cli/migrate-site.mjs --site sites/acme --dry-run
  *   node packages/core/cli/migrate-site.mjs --site sites/acme --write --local
+ *   node packages/core/cli/migrate-site.mjs --site sites/acme --admin-parity
+ *   node packages/core/cli/migrate-site.mjs --site sites/acme --admin-parity --write
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-import { MIGRATIONS } from '../server/migrations/registry.js';
-import { classifySiteRecords } from '../server/migrations/classify.js';
-import { handleObjectVerb } from '../server/lib/object-verbs.js';
-
-import { navigationBodySchema } from '../schema/bodies/navigation-v1.js';
-import { pageBodySchema } from '../schema/bodies/page-v1.js';
-import { productBodySchema } from '../schema/bodies/product-v1.js';
-import { sectionBodySchema } from '../schema/bodies/section-v1.js';
-import { sectionTemplateBodySchema } from '../schema/bodies/section-template-v1.js';
-import { themeBodySchema } from '../schema/bodies/theme-v1.js';
-import { trackingConfigBodySchema } from '../schema/bodies/tracking-config-v1.js';
-import { siteBodySchema } from '../schema/bodies/site-v1.js';
-import { taxonomyBodySchema } from '../schema/bodies/taxonomy-v1.js';
-import { templateBodySchema } from '../schema/bodies/template-v1.js';
-import { contentItemBodySchema } from '../schema/bodies/content-item-v1.js';
+import {
+  computeAdminParity,
+  planAdminParityFixes,
+  renderParityReport,
+  resolveAuditTarget,
+} from './admin-parity.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
+
+// ─── the schema-migration machinery (COMPILED-tree modules) ─────────────────
+//
+// Everything the schema half needs is TypeScript: on a raw checkout those
+// `.js` specifiers do not exist — they resolve only in the compiled test tree
+// (.tmp/ci-test, where migrate-site.test.ts and scripts/ci/
+// schema-migration-gate.mjs run this module) or a built distribution. The
+// W15 S2 `--admin-parity` half, by contrast, is pure `.mjs` + disk and MUST
+// work on a raw checkout (that is its whole point: repair an older site tree
+// in place). So the TS-bound imports are top-level-awaited but
+// FAILURE-TOLERANT: when they cannot resolve, the schema exports stay
+// undefined, the schema code paths throw a clear error, and `--admin-parity`
+// keeps working.
+const loadSchemaMachinery = async () => {
+  const [registry, classify, verbs, nav, page, product, section, stpl, theme, tracking, site, tax, tpl, contentItem] =
+    await Promise.all([
+      import('../server/migrations/registry.js'),
+      import('../server/migrations/classify.js'),
+      import('../server/lib/object-verbs.js'),
+      import('../schema/bodies/navigation-v1.js'),
+      import('../schema/bodies/page-v1.js'),
+      import('../schema/bodies/product-v1.js'),
+      import('../schema/bodies/section-v1.js'),
+      import('../schema/bodies/section-template-v1.js'),
+      import('../schema/bodies/theme-v1.js'),
+      import('../schema/bodies/tracking-config-v1.js'),
+      import('../schema/bodies/site-v1.js'),
+      import('../schema/bodies/taxonomy-v1.js'),
+      import('../schema/bodies/template-v1.js'),
+      import('../schema/bodies/content-item-v1.js'),
+    ]);
+  return {
+    MIGRATIONS: registry.MIGRATIONS,
+    classifySiteRecords: classify.classifySiteRecords,
+    handleObjectVerb: verbs.handleObjectVerb,
+    schemas: {
+      navigation: nav.navigationBodySchema,
+      page: page.pageBodySchema,
+      section: section.sectionBodySchema,
+      template: tpl.templateBodySchema,
+      section_template: stpl.sectionTemplateBodySchema,
+      theme: theme.themeBodySchema,
+      site: site.siteBodySchema,
+      taxonomy: tax.taxonomyBodySchema,
+      product: product.productBodySchema,
+      content_item: contentItem.contentItemBodySchema,
+      tracking_config: tracking.trackingConfigBodySchema,
+    },
+  };
+};
+
+let machinery;
+try {
+  machinery = await loadSchemaMachinery();
+} catch {
+  machinery = undefined; // raw checkout — only --admin-parity is available
+}
+
+const requireMachinery = () => {
+  if (!machinery) {
+    throw new Error(
+      'the schema-migration half needs the COMPILED core modules (run via npm test / the schema-migration gate, ' +
+        'which compile to .tmp/ci-test first) — on a raw checkout only --admin-parity is available.'
+    );
+  }
+  return machinery;
+};
 
 // ─── head schemas + versions (the ONE place a real schema bump updates) ─────
 // Mirrors object-verbs.ts's `schema_version: \`${objectType}.v1\`` hardcode
 // (object-verbs.ts:643) — today every type is at v1 and BODY_SCHEMAS
 // (object-validate.ts) is unversioned, so this map and that hardcode must
 // move together whenever a real bump ships a v2 for some type.
-export const CURRENT_SCHEMAS = {
-  navigation: navigationBodySchema,
-  page: pageBodySchema,
-  section: sectionBodySchema,
-  template: templateBodySchema,
-  section_template: sectionTemplateBodySchema,
-  theme: themeBodySchema,
-  site: siteBodySchema,
-  taxonomy: taxonomyBodySchema,
-  product: productBodySchema,
-  content_item: contentItemBodySchema,
-  tracking_config: trackingConfigBodySchema,
-};
+// (undefined on a raw checkout — see the machinery note above.)
+export const CURRENT_SCHEMAS = machinery?.schemas;
 
-export const CURRENT_SCHEMA_VERSIONS = Object.fromEntries(
-  Object.keys(CURRENT_SCHEMAS).map((objectType) => [objectType, `${objectType}.v1`])
-);
+export const CURRENT_SCHEMA_VERSIONS = machinery
+  ? Object.fromEntries(Object.keys(CURRENT_SCHEMAS).map((objectType) => [objectType, `${objectType}.v1`]))
+  : undefined;
 
 // ─── directory -> objectType mapping for a site's committed export tree ────
 // (sites/<site>/data/site/** — see SiteBinding.dataRoot / T11.6). Single
@@ -167,13 +230,14 @@ const readExportRecord = (filePath, objectType, fallbackObjectId) => {
     objectId,
     // See the module header: exports carry no real version tag today — the
     // current head version is the only honest default to assume.
-    schemaVersion: CURRENT_SCHEMA_VERSIONS[objectType] ?? `${objectType}.v1`,
+    schemaVersion: CURRENT_SCHEMA_VERSIONS?.[objectType] ?? `${objectType}.v1`,
     body,
   };
 };
 
 /** Classifies every record scanned from `siteDir` against the head schemas + registry. */
-export const buildDryRunReport = (siteDir, { migrations = MIGRATIONS } = {}) => {
+export const buildDryRunReport = (siteDir, { migrations = requireMachinery().MIGRATIONS } = {}) => {
+  const { classifySiteRecords } = requireMachinery();
   const records = scanSiteExports(siteDir);
   const { results, gatePasses } = classifySiteRecords(records, {
     currentSchema: (objectType) => CURRENT_SCHEMAS[objectType],
@@ -237,6 +301,7 @@ export const buildPatchOpsForChain = (oldBody, chain) => {
  * verb callers treat handleObjectVerb's { status, body } results.
  */
 export const applyRecordMigration = async ({ store, principal, objectType, objectId, chain, nowMs = undefined }) => {
+  const { handleObjectVerb } = requireMachinery();
   const call = (request) => handleObjectVerb(store, request, principal, nowMs !== undefined ? { nowMs } : {});
   const outcome = { objectType, objectId, ok: false, stages: {} };
 
@@ -330,7 +395,7 @@ export const runWritePlan = async (report, { store, principal, nowMs = undefined
 // ─── CLI plumbing ────────────────────────────────────────────────────────────
 
 const parseArgs = (argv) => {
-  const opts = { write: false, local: false };
+  const opts = { write: false, local: false, adminParity: false };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === '--site') {
@@ -342,9 +407,34 @@ const parseArgs = (argv) => {
       opts.write = false;
     } else if (arg === '--local') {
       opts.local = true;
+    } else if (arg === '--admin-parity') {
+      opts.adminParity = true;
     }
   }
   return opts;
+};
+
+/**
+ * The `--admin-parity` mode: audit (always) + the automatable fixes
+ * (`--write`). Pure disk — no store, no network — so it is safe to run in CI
+ * and on any checkout. Returns the audit's gap count AFTER any write, so the
+ * exit code reflects the state the tree was left in.
+ */
+export const runAdminParity = (siteDirArg, { write = false, log = console.log } = {}) => {
+  const { target, fixes } = planAdminParityFixes(siteDirArg, { write });
+  if (fixes.length === 0) {
+    log(`[migrate-site] --admin-parity: ${target.label} — nothing automatable to fix.`);
+  } else {
+    log(
+      `[migrate-site] --admin-parity: ${target.label} — ${write ? 'applied' : 'would apply'} ${fixes.length} fix(es):`
+    );
+    for (const fix of fixes) log(`  ${write ? '+' : '~'} [${fix.id}] ${fix.action}  (${fix.path})`);
+    if (!write) log('[migrate-site] re-run with --write to apply.');
+  }
+  const checks = computeAdminParity(resolveAuditTarget(siteDirArg));
+  log('');
+  log(renderParityReport(target.label, checks));
+  return { fixes, checks, gaps: checks.filter((c) => c.status === 'GAP').length };
 };
 
 export const main = async (argv) => {
@@ -355,6 +445,18 @@ export const main = async (argv) => {
     return;
   }
   const siteDir = path.isAbsolute(opts.site) ? opts.site : path.join(repoRoot, opts.site);
+
+  if (opts.adminParity) {
+    // Admin parity is a wiring pass, deliberately independent of the schema
+    // scan: it must work on a site whose data/site tree is empty or absent
+    // (exactly the older-scaffold case it exists for).
+    const { gaps, fixes } = runAdminParity(siteDir, { write: opts.write });
+    // Dry-run exits 1 while automatable fixes are pending, so CI can gate on
+    // it; after --write only non-automatable gaps (if any) keep it red.
+    process.exitCode = gaps === 0 && (opts.write || fixes.length === 0) ? 0 : 1;
+    return;
+  }
+
   const report = buildDryRunReport(siteDir);
   console.log(renderReport(report));
 

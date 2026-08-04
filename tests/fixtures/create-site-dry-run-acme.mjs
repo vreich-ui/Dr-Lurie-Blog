@@ -115,15 +115,15 @@ Env checklist:
     MCP_HTTP_AUTH_TOKEN              [per-site]  ☐ human-supplied — see the provisioning runbook
       Shared MCP auth key (deprecated-fallback once T11.10 per-agent tokens land).
     ADMIN_EMAILS                     [per-site]  ☐ human-supplied — see the provisioning runbook
-      Admin allowlist (Identity bootstrap) — human-owned.
+      BOOTSTRAP OWNER allowlist — /admin is unusable until this is set (or an invite exists): members are implicit Owners forever (roles.ts env fallback; a wiped users store can never lock the operator out). Human-owned; placeholder: the operator’s real email. Runbook: site-provisioning-runbook.md §admin.
     ROLE_EMAILS_ADMIN                [per-site]  ☐ human-supplied — see the provisioning runbook
       Role allowlist — human-owned.
     ROLE_EMAILS_EDITOR               [per-site]  ☐ human-supplied — see the provisioning runbook
       Role allowlist — human-owned.
     ROLE_EMAILS_PUBLISHER            [per-site]  ☐ human-supplied — see the provisioning runbook
       Role allowlist — human-owned.
-    IDENTITY_URL                     [per-site]  ☐ human-supplied — see the provisioning runbook
-      Netlify Identity endpoint for the new site.
+    IDENTITY_URL                     [per-site, optional]  ☐ human-supplied — see the provisioning runbook
+      GoTrue endpoint OVERRIDE only — functions fall back to "<site URL>/.netlify/identity", which is correct once Netlify Identity is ENABLED on the site. Enabling Identity is the real gate (console-only, human — runbook §admin); without it every /admin login and function auth check fails.
     ARTIFACT_UPLOAD_TOKEN_SECRET     [per-site]  ☐ human-supplied — see the provisioning runbook
       Signs artifact-upload intents.
     ARTIFACT_URL_INGEST_ALLOWED_HOSTS [per-site]  ☐ human-supplied — see the provisioning runbook
@@ -149,11 +149,9 @@ Env checklist:
       Bearer for the sink; pairs with TRACKING_SINK_URL.
   AI + integrations:
     ANTHROPIC_API_KEY                [fleet-shared]  reuse the fleet value — do not create a new one
-      AI provider key — reuse the fleet value.
+      AI provider key — reuse the fleet value. Admin-critical: the /admin agents hub and every per-object chat instantiate a provider adapter (both providers are v1 — Wolf 2026-07-16).
     OPENAI_API_KEY                   [fleet-shared]  reuse the fleet value — do not create a new one
-      AI provider key — reuse the fleet value.
-    OPENAI_CHATKIT_WORKFLOW_ID       [per-site]  ☐ human-supplied — see the provisioning runbook
-      ChatKit workflow id for this site's admin chat.
+      AI provider key — reuse the fleet value (second v1 adapter).
     NETLIFY_AUTH_TOKEN               [fleet-shared]  reuse the fleet value — do not create a new one
       Netlify account API token (provisioning/build automation) — reuse the fleet value.
     STRIPE_SECRET_KEY                [per-site, optional]  ☐ human-supplied — see the provisioning runbook
@@ -166,4 +164,13 @@ Env checklist:
       Shop test webhook secret.
   Transitional site-identity env overrides (escape hatch only; prefer the config file):
     SITE_OBJECT_ID, SITE_SLUG, SITE_BRAND_NAME, SITE_TAXONOMY_ID, SITE_TRACKING_PROJECT_ID, MCP_SERVER_NAME, MCP_SERVER_DIAGNOSTIC_NAME, SITE_ASSET_HOST, SITE_ASSET_FOLDER, PDF_TOOL_PROJECT_ID
+
+ADMIN WORKSPACE BOOTSTRAP (human gate — runbook site-provisioning-runbook.md §admin):
+  1. Enable Netlify Identity (GoTrue) on the new site — console-only; without it /admin login
+     has no identity service and every admin function 401s.
+  2. Set ADMIN_EMAILS on the site to the operator’s real email(s) — bootstrap Owners; the
+     users store can be empty/wiped and these addresses still get in.
+  3. Invite the first Owner via /admin/settings/admins (or rely on ADMIN_EMAILS alone).
+  Blob stores backing the workspace (probed automatically when a token is supplied): site-objects, workflows, artifacts, artifact-index, commerce, agent-chats, agent-profiles, governance, users, opt-ins, commerce-events, tracking-events.
+  Verify any tenant any time:  node scripts/audit-site-admin-parity.mjs --site sites/<client>
 `;
