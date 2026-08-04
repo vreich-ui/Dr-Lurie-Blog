@@ -1,0 +1,108 @@
+{
+  "__generated": {
+    "at": "2026-08-04T15:34:05.177Z",
+    "from": "objects/content_item/by-id/req_agent_what_needs_ai_and_what_doesnt_20260804_01.json",
+    "record_version": 2
+  },
+  "author": "Platform Documentation",
+  "deck": "A cost-saving design principle running through the whole platform: if a step's job is to faithfully transform something already known, it shouldn't need a model call. If its job is genuine judgment, it should.",
+  "description": "A practical guide to which parts of the CMS Agent's process are exact, rule-based, and free — and which genuinely require AI, and why that distinction matters for cost and reliability.",
+  "nodes": [
+    {
+      "id": "n_ai01",
+      "kind": "content",
+      "private": {
+        "intent": "educate",
+        "strategy": "hook"
+      },
+      "public": {
+        "body": "It's easy to assume that a system built around AI-assisted writing runs an AI model at every step. It doesn't, and the difference isn't an accident — it's a deliberate design choice that saves real money and makes the whole thing more predictable.",
+        "title": "Not every step in an AI pipeline needs AI"
+      },
+      "visibility": "public"
+    },
+    {
+      "id": "n_ai02",
+      "kind": "content",
+      "private": {
+        "intent": "educate",
+        "strategy": "explanation"
+      },
+      "public": {
+        "body": "If a step's job is to take information that's already known — already fetched, already decided, already on record — and reshape it into a required format, that's a mechanical task. A fixed set of rules can do it exactly, every time, with no guessing. If a step's job is to understand language, weigh evidence, or produce something genuinely new, no fixed rule can cover every case — that's where a model earns its cost.",
+        "title": "The test: transformation versus judgment"
+      },
+      "visibility": "public"
+    },
+    {
+      "id": "n_ai03",
+      "kind": "content",
+      "private": {
+        "intent": "educate",
+        "strategy": "example"
+      },
+      "public": {
+        "body": "One step in the writing pipeline used to work like this: fetch a client's technical publishing rules, then ask an AI model to read them and restate them in the shape the next step needed. That AI call cost real money on every single run, despite doing purely mechanical work — the information was already fully known; nothing needed to be interpreted or invented. It was rebuilt as a direct, rule-based mapping instead. Same output shape, same accuracy — now it costs nothing, on every real run since.",
+        "title": "A real example: reading a client's rules"
+      },
+      "visibility": "public"
+    },
+    {
+      "id": "n_ai04",
+      "kind": "content",
+      "private": {
+        "intent": "educate",
+        "strategy": "explanation"
+      },
+      "public": {
+        "body": "The same pattern shows up elsewhere. Checking a draft against a site's own publishing rules, confirming an uploaded image actually exists, checking a tag against the approved list, confirming a page really went live — none of these are judgment calls. Each one is an exact yes-or-no check against something the system already has on record, and none of them spend a model call to answer.",
+        "title": "Other places where the answer is already known"
+      },
+      "visibility": "public"
+    },
+    {
+      "id": "n_ai05",
+      "kind": "content",
+      "private": {
+        "intent": "educate",
+        "strategy": "explanation"
+      },
+      "public": {
+        "body": "Research that has to judge whether a source is trustworthy, and admit when it can't find enough. Writing original prose that reads naturally. Judging whether a piece's tone lands the way it's meant to. Simulating how an unfamiliar reader would react to a draft. Grading one piece of writing against a quality standard. None of these reduce to a fixed rule, because the input is different every time and the right answer depends on understanding it, not just checking it.",
+        "title": "Where AI is genuinely doing the work"
+      },
+      "visibility": "public"
+    },
+    {
+      "id": "n_ai06",
+      "kind": "content",
+      "private": {
+        "intent": "educate",
+        "strategy": "resolution"
+      },
+      "public": {
+        "body": "A structural or technical request — fixing a title, adjusting a category, re-checking a page against its site's rules, confirming something actually published — moves through the cheap, exact, near-instant path. A request that needs real writing, persuasion, or judgment about the content itself goes through the AI path, and that costs more. That's not a flaw to route around; it's the cost of doing something a fixed rule genuinely can't.",
+        "title": "What this means when you're asking for something"
+      },
+      "visibility": "public"
+    }
+  ],
+  "publication_context": {
+    "domain": "kugel-platform.netlify.app",
+    "publication_name": "Platform",
+    "topic_scope": "CMS cost and AI-usage design"
+  },
+  "seo": {
+    "meta_description": "Which steps in AI-assisted publishing are exact rule-based lookups that cost nothing, which genuinely require AI judgment, and why the distinction matters.",
+    "meta_title": "What Actually Needs AI in This System (and What Doesn't)"
+  },
+  "slug": "what-needs-ai-and-what-doesnt",
+  "taxonomy": {
+    "category": "guide",
+    "tags": [
+      "architecture",
+      "publishing"
+    ]
+  },
+  "title": "What Actually Needs AI in This System (and What Doesn't)"
+}
