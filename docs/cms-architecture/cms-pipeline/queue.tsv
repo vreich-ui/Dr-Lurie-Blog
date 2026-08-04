@@ -125,18 +125,21 @@ T13.12	auto	claude-opus-4-8	medium	docs/cms-architecture/cms-pipeline/T13.12-adm
 T13.13	auto	claude-opus-4-8	medium	docs/cms-architecture/cms-pipeline/T13.13-scores-feedback-design.md
 #
 # W15 — fleet admin parity + follow-ups (mandate: docs/cms-architecture/15-fleet-admin-parity.md).
-# S1 (partial 1/4, PR #500) and S2 (PR #502) are merged and verified in main. S3 (PR #503) and S4x (PR #504)
-# both report "merged" on GitHub but their commits are NOT reachable from main (S6 verification, 2026-08-04) —
-# recovery is a human_gate decision (re-branch from the orphaned SHA, re-open against current main), not a
-# fresh rewrite. S4 (Marginalia editor, full scope) and S5 (client publishing chat / LibreChat) never ran —
-# deferred for cost, on ice until Wolf restarts them; no rows below for those two, nothing to schedule yet.
-# Full detail and evidence: docs/cms-architecture/FLEET-STATUS.md.
-W15.S3	human_gate	claude-sonnet-5	medium	docs/cms-architecture/FLEET-STATUS.md
-W15.S4x	human_gate	claude-sonnet-5	medium	docs/cms-architecture/FLEET-STATUS.md
-W15.LEAK	notify	claude-sonnet-5	low	docs/cms-architecture/FLEET-STATUS.md
-# Housekeeping (auto, mechanical, no diagnosis needed): fold
+# S1 (partial 1/4, PR #500), S2 (PR #502), S3 (PR #505, re-landed clean after #503 hit real conflicts against
+# S1+S2), and S4x items 1-8 (PR #504) are all merged and verified in main as of 2026-08-04. The S6 verification
+# session (below, historical) flagged S3/S4x as orphaned commits not reachable from main — that was true when
+# S6 ran, resolved same day; see docs/cms-architecture/FLEET-STATUS.md for the corrected status. S4x items 9-15
+# (save-gated Ask-AI proposal capture for CMS Agent learning) are drafted but not yet scheduled. S4 (Marginalia
+# editor, full scope) and S5 (client publishing chat / LibreChat) never ran — deferred for cost, on ice until
+# Wolf restarts them; no rows below for those two, nothing to schedule yet. The S6 trigger itself has been
+# disabled (2026-08-04) to stop it re-firing and re-litigating an already-resolved state.
+# W15.S3 / W15.S4x / W15.LEAK rows below are RESOLVED — left commented for audit trail, do not re-run.
+#W15.S3	human_gate	claude-sonnet-5	medium	docs/cms-architecture/FLEET-STATUS.md
+#W15.S4x	human_gate	claude-sonnet-5	medium	docs/cms-architecture/FLEET-STATUS.md
+#W15.LEAK	notify	claude-sonnet-5	low	docs/cms-architecture/FLEET-STATUS.md
+# Housekeeping (auto, mechanical, no diagnosis needed) — still pending, deferred for cost (state-of-play.md is
+# 412 KB, too large to push whole through the contents API cheaply without a dedicated pass): fold
 # state-of-play-2026-08-04-w15-s2.md AND state-of-play-2026-08-04-w15-s6.md
 # into the top of state-of-play.md (this-S6-entry above S2's, both above the
-# 2026-08-03 entry), then delete both standalone files. Neither S2 nor this
-# S6 session could push the 412 KB file whole through the contents API.
+# 2026-08-03 entry), then delete both standalone files.
 W15.FOLD	auto	claude-sonnet-5	low	docs/cms-architecture/cms-pipeline/state-of-play-2026-08-04-w15-s6.md
