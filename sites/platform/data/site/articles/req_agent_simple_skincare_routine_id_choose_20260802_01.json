@@ -1,8 +1,8 @@
 {
   "__generated": {
-    "at": "2026-08-04T16:02:00.686Z",
+    "at": "2026-08-04T16:04:40.061Z",
     "from": "objects/content_item/by-id/req_agent_simple_skincare_routine_id_choose_20260802_01.json",
-    "record_version": 16
+    "record_version": 17
   },
   "author": "Platform Documentation",
   "deck": "A practical tour of the record, contract, lifecycle, and multisite boundaries that make agent publishing predictable.",
