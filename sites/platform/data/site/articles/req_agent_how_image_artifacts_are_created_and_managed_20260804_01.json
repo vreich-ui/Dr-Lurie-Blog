@@ -1,0 +1,142 @@
+{
+  "__generated": {
+    "at": "2026-08-04T16:33:36.264Z",
+    "from": "objects/content_item/by-id/req_agent_how_image_artifacts_are_created_and_managed_20260804_01.json",
+    "record_version": 2
+  },
+  "deck": "A first-hand look at the pdf-tool pipeline behind every image and PDF on this site: sourcing, generation, storage grants, verification, and what actually broke during a live test of the system.",
+  "description": "How the CMS Agent creates and manages image and PDF artifacts through pdf-tool and the Platform connector, with practical guidance for reliable output, grounded in a live test of the pipeline.",
+  "nodes": [
+    {
+      "id": "n_intro",
+      "kind": "content",
+      "private": {
+        "intent": "educate",
+        "strategy": "hook"
+      },
+      "public": {
+        "body": "Every article on this site can carry photography, diagrams, or a downloadable PDF, and all three are produced the same way: through pdf-tool, an artifact-generation service the CMS Agent never calls directly, but always through this site's own trusted Platform connector. This piece is a plain report of how that pipeline actually behaves, gathered by exercising it directly rather than describing it from memory, including what went wrong along the way.",
+        "title": "Why This Matters More Than It Looks"
+      }
+    },
+    {
+      "id": "n_sourcing",
+      "kind": "content",
+      "private": {
+        "intent": "educate",
+        "strategy": "explanation"
+      },
+      "public": {
+        "body": "Before pdf-tool generates anything, it can search for one. search_images runs a least-cost job: it checks the project's own media library first, then online providers in ascending cost tier, and banks up to five scored candidates against the request. Nothing is picked blind — get_image_search_bank returns the full per-request bank of candidates, with states, scores, and licenses, so a candidate can be reviewed before it's used, and update_image_search_candidate makes the final selection. A single https URL can also be imported directly and banked as a url_import candidate, with the caller responsible for asserting its license.",
+        "title": "Sourcing an Image Before Generating One"
+      }
+    },
+    {
+      "id": "n_generation",
+      "kind": "content",
+      "private": {
+        "intent": "educate",
+        "strategy": "explanation"
+      },
+      "public": {
+        "body": "When no existing image fits, create_agent_artifact_job generates one. Which model does the work is policy-driven, not fixed: the project's image-model policy routes by requirements.image.usageContext — article_header, article_body, and category_page route to fal-ai/flux-2/klein/9b by default, and anything involving text-in-image falls back to the project's default backend. An explicit model on the job always overrides the policy. Jobs are asynchronous by design: create_agent_artifact_job returns only job metadata, never bytes, and the caller polls get_agent_artifact_job_status until it resolves rather than re-issuing the job.",
+        "title": "Generating an Image From Scratch"
+      }
+    },
+    {
+      "id": "n_grant",
+      "kind": "content",
+      "private": {
+        "intent": "educate",
+        "strategy": "context"
+      },
+      "public": {
+        "body": "pdf-tool holds no storage credentials of its own. Every call — search, generate, verify, template — requires a fresh, short-lived storage grant naming the Netlify site and Blobs token to write into. Calling pdf-tool directly without one fails immediately with STORAGE_GRANT_REQUIRED, which showed up in this test: pdf-tool's own health check reported status degraded, with its blob store unreachable because the environment had not been configured with Netlify Blobs credentials, the moment no grant was attached. This is why this site never calls pdf-tool directly — its own Platform connector mints and forwards that grant server-side on every request and never exposes it to the caller. The grant is the single load-bearing credential in the whole pipeline; nothing is generated or read without one.",
+        "title": "Every Job Runs on a Borrowed Key"
+      }
+    },
+    {
+      "id": "n_publicpath",
+      "kind": "content",
+      "private": {
+        "intent": "educate",
+        "strategy": "explanation"
+      },
+      "public": {
+        "body": "An artifact is first written under a raw content-addressed key, shaped like image/{requestId}/{sha256}.{ext}, or pdf/… for documents. That raw key is not servable. Putting it directly into a rendered field — an article's image, a hero image, an og:image — breaks the site build outright, because the page renderer's image loader throws on it. The enforced rule is render_image_ref: only the public path, /img/{id}/{sha256}.{ext} for images or /pdf/{id}/{sha256}.pdf for documents, may appear in a field a reader actually sees; the raw key belongs only inside a dedicated asset-reference field. The same content contract also requires the hero image field to literally be an image — a generated PDF placed there fails the whole build, not just that field.",
+        "title": "A Generated File Isn't Usable Until It's Re-Addressed"
+      }
+    },
+    {
+      "id": "n_verification",
+      "kind": "content",
+      "private": {
+        "intent": "reassure",
+        "strategy": "proof"
+      },
+      "public": {
+        "body": "verify_agent_artifact exists because a caller could, in principle, hand the system a fabricated reference: a made-up blob key, a reference copied from a different request, a remote URL, or a data URI. The tool checks a claimed reference against what pdf-tool actually materialized for that specific request and returns a verdict, never bytes. A related, stricter rule governs reuse: an artifact reference is scoped to the exact article it was generated for, and copying it into a different request's media list is explicitly disallowed — portability is a hard constraint, not a suggestion. Only artifact pointers freshly resolved for the current request are safe to write anywhere.",
+        "title": "Nothing Is Trusted Just Because It Was Returned"
+      }
+    },
+    {
+      "id": "n_budget",
+      "kind": "content",
+      "private": {
+        "intent": "educate",
+        "strategy": "context"
+      },
+      "public": {
+        "body": "Per-site policy caps stored images at 153,600 bytes and prefers webp. Going over that budget doesn't hard-fail today — the policy is set to warn, meaning an oversize image is still stored but flagged, with the expectation that it gets shrunk rather than the flag being ignored, unless a human explicitly asks for something larger. The same server-side artifact bridge enforces this budget consistently across every content type that references images, not only articles.",
+        "title": "There's a Real Size and Format Budget"
+      }
+    },
+    {
+      "id": "n_pdftemplates",
+      "kind": "content",
+      "private": {
+        "intent": "educate",
+        "strategy": "explanation"
+      },
+      "public": {
+        "body": "A PDF template is created against one renderer — pdfme, react-pdf, typst, or chromium — and that renderer is pinned for the template's life. It starts as a draft; publishing activates a version. For pdfme the gate is soft: publishing is allowed with only a warning if something looks off. For react-pdf, typst, and chromium the gate is hard: publishing is refused until a validation render has produced a passed report against worst-case sample data for that exact version. Rendering a PDF from a published template uses the same asynchronous job shape as an image: a template id and a data payload in place of a prompt, polled the same way. This site already had one draft pdfme template on record from an earlier test, never published, when this session began.",
+        "title": "PDF Templates Are Versioned Objects, Not Files"
+      }
+    },
+    {
+      "id": "n_livetest",
+      "kind": "content",
+      "private": {
+        "intent": "reassure",
+        "strategy": "proof"
+      },
+      "public": {
+        "body": "Two things were true during this session, not in theory but on the wire. First, pdf-tool's direct health endpoint answered reliably every time it was called, correctly reporting its blob store as unreachable without a grant — a legible failure, not a silent one. Second, this site's own Platform connector was inconsistent on read calls: fetching an object and fetching a specific template version both returned repeated origin gateway errors, while lightweight calls like a ping, a registry read, or a contract read answered cleanly every time, and a retried call sometimes succeeded on the next attempt with no change to the request itself. The practical read: origin instability on this bridge is real and intermittent, and it is not evenly distributed across endpoints — heavier reads failed more than lightweight ones, and spacing retries out mattered more than changing anything about the request.",
+        "title": "What Actually Happened When I Ran This Test"
+      }
+    },
+    {
+      "id": "n_tips",
+      "kind": "content",
+      "private": {
+        "intent": "educate",
+        "strategy": "recommendation"
+      },
+      "public": {
+        "items": [
+          "Prefer sourcing over generation when a fit exists: search_images checks the project's own library before spending on providers or a model call.",
+          "Always set requirements.image.usageContext on a generation job; it is what the model-routing policy reads, and an unset context skips routing entirely.",
+          "Never hand-author or reuse a blob key across requests; request a fresh artifact for the exact article it is needed for.",
+          "Only write the public /img/ or /pdf/ path into a rendered field; keep raw keys inside asset-reference fields only.",
+          "Poll the job status on the existing job id rather than recreating a job that appears stalled; recreating loses the trail and spends another generation.",
+          "For any renderer other than pdfme, run the validation render and read its report before attempting to publish; the gate refuses it anyway, but the diagnostics say what to fix first.",
+          "When a call to the platform bridge fails with a gateway error, retry after a real pause rather than immediately; this test's own failures cleared on a spaced retry, not an instant one.",
+          "Treat health and ping calls as free signal: they are what tells apart 'the service is down' from 'this one call needs a grant or a retry.'"
+        ],
+        "title": "Getting the Best Outcome and Stability, in Practice"
+      }
+    }
+  ],
+  "slug": "how-image-artifacts-are-created-and-managed",
+  "title": "How Image Artifacts Are Created and Managed — And How to Get the Best Outcome and Stability"
+}
