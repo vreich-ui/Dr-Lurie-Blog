@@ -21,9 +21,20 @@ import { loadRoutePageObject } from '~/utils/route-page-object';
 import type { MetaData } from '~/types';
 
 export const prerender = true;
-export const getStaticPaths = (async () => await getStaticPathsBlogPost()) satisfies GetStaticPaths;
+
+// BLOCK BODY + blank-line separation, deliberately (W15 S2 finding, proven
+// on the fernwell zero-article build): the single-expression form
+// "(async () => await ...) satisfies GetStaticPaths" makes the Astro
+// compiler's hoist pass drag the adjacent "const { post } = Astro.props"
+// up to MODULE scope, which throws "Cannot destructure property 'post' of
+// 'Astro.props' as it is undefined" at import time and fails the whole
+// build. sites/platform's committed loaders use this exact proven shape.
+export const getStaticPaths = (async () => {
+  return await getStaticPathsBlogPost();
+}) satisfies GetStaticPaths;
 
 type Props = InferGetStaticPropsType<typeof getStaticPaths>;
+
 const { post } = Astro.props as Props;
 const url = getCanonical(getPermalink(post.permalink, 'post'));
 const image =
@@ -82,9 +93,14 @@ import { blogListRobots, getStaticPathsBlogList } from '~/utils/blog';
 import { loadRoutePageObject, routeHeaderAnnotation } from '~/utils/route-page-object';
 
 export const prerender = true;
-export const getStaticPaths = (async ({ paginate }) => await getStaticPathsBlogList({ paginate })) satisfies GetStaticPaths;
+
+// Block body + blank lines — see the article loader's hoist-bug note.
+export const getStaticPaths = (async ({ paginate }) => {
+  return await getStaticPathsBlogList({ paginate });
+}) satisfies GetStaticPaths;
 
 type Props = InferGetStaticPropsType<typeof getStaticPaths>;
+
 const { page } = Astro.props as Props;
 const currentPage = page.currentPage ?? 1;
 const listing = await loadRoutePageObject('page_library');
@@ -127,9 +143,14 @@ import { ${robotsExport}, ${pathsExport} } from '~/utils/blog';
 import { loadRoutePageObject, routeHeaderAnnotation, type RoutePageHeader } from '~/utils/route-page-object';
 
 export const prerender = true;
-export const getStaticPaths = (async ({ paginate }) => await ${pathsExport}({ paginate })) satisfies GetStaticPaths;
+
+// Block body + blank lines — see the article loader's hoist-bug note.
+export const getStaticPaths = (async ({ paginate }) => {
+  return await ${pathsExport}({ paginate });
+}) satisfies GetStaticPaths;
 
 type Props = InferGetStaticPropsType<typeof getStaticPaths> & { ${kind}: { title: string } };
+
 const { page, ${kind} } = Astro.props as Props;
 const currentPage = page.currentPage ?? 1;
 const listing = await loadRoutePageObject('${objectId}', ${kind}.title);
