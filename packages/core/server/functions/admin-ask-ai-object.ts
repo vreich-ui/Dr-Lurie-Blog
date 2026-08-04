@@ -27,7 +27,8 @@
 import type { SiteBinding } from '../lib/site-binding.js';
 import { z } from 'zod';
 
-import { getAdminStateFromEvent, type LambdaContext } from '../lib/admin-auth.js';
+import type { LambdaContext } from '../lib/admin-auth.js';
+import { resolveAdminAccessFromEvent } from '../lib/request-roles.js';
 import { getSiteObjectsBlobStore } from '../lib/blob-store.js';
 import { askAiForObject, type AskAiObjectStore } from '../lib/ask-ai-object.js';
 import { getAgentProfilesBlobStore, getProfilesDoc, resolveProfile } from '../lib/agent/profiles.js';
@@ -71,7 +72,7 @@ const jsonResponse = (status: number, body: Record<string, unknown>) => ({
 const handlerImpl = async (event: LambdaEvent, context?: LambdaContext) => {
   if (event.httpMethod !== 'POST') return jsonResponse(405, { error: 'Method not allowed' });
 
-  const adminState = await getAdminStateFromEvent(event, context);
+  const adminState = await resolveAdminAccessFromEvent(event, context);
   if (!adminState.authenticated) return jsonResponse(401, { error: adminState.error ?? 'Unauthorized' });
   if (!adminState.isAdmin) return jsonResponse(403, { error: 'Admin access required' });
 

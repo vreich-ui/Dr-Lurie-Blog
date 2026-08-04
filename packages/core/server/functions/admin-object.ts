@@ -15,11 +15,10 @@
  * no code path that touches the shared secret. Enforced by a dedicated test.
  */
 import type { SiteBinding } from '../lib/site-binding.js';
-import { getAdminStateFromEvent, type LambdaContext } from '../lib/admin-auth.js';
+import type { LambdaContext } from '../lib/admin-auth.js';
+import { resolveAdminAccessFromEvent } from '../lib/request-roles.js';
 import type { ArtifactIndexStore } from '../lib/artifact-index.js';
 import { getAgentLearningBlobStore, getArtifactIndexBlobStore, getSiteObjectsBlobStore } from '../lib/blob-store.js';
-import { resolveRolesForPrincipalAsync } from '../lib/roles.js';
-import { getUsersBlobStore, getUserRecord } from '../lib/users-store.js';
 import { getGovernanceBlobStore, resolveActivePolicies } from '../lib/governance-store.js';
 import {
   handleObjectVerb,
@@ -59,7 +58,7 @@ const safeJsonParse = (event: LambdaEvent): { ok: true; value: unknown } | { ok:
 const buildHandlerImpl = (binding: SiteBinding) => async (event: LambdaEvent, context?: LambdaContext) => {
   if (event.httpMethod !== 'POST') return jsonResponse(405, { error: 'Method not allowed' });
 
-  const adminState = await getAdminStateFromEvent(event, context);
+  const adminState = await resolveAdminAccessFromEvent(event, context);
   if (!adminState.authenticated) return jsonResponse(401, { error: adminState.error ?? 'Unauthorized' });
   if (!adminState.isAdmin) return jsonResponse(403, { error: 'Admin access required' });
 
@@ -94,11 +93,11 @@ const buildHandlerImpl = (binding: SiteBinding) => async (event: LambdaEvent, co
       ...(artifactIndexStore ? { artifactIndexStore } : {}),
       artifactRefSources: [parsed.value],
     });
-    // T9.4: resolve the acting human's roles server-side so owner-only verb
-    // options (checkin{force}) are gated by the real tier, not client claims.
-    const roles = await resolveRolesForPrincipalAsync(principal, {
-      getUserRecord: async (email) => getUserRecord(await getUsersBlobStore(event), email),
-    });
+    // T9.4/S1: the acting human's roles server-side, so owner-only verb
+    // options (checkin{force}) are gated by the real tier, not client claims —
+    // reuse what resolveAdminAccessFromEvent already resolved above instead of
+    // re-reading the users store a second time for the same principal.
+    const roles = adminState.roles;
     // T9.15: runtime governance overrides (else committed policy) feed the
     // publish/create gates.
     const { approval, creation } = await resolveActivePolicies(await getGovernanceBlobStore(event));

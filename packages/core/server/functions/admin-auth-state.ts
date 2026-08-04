@@ -1,6 +1,6 @@
 import type { SiteBinding } from '../lib/site-binding.js';
-import { getAdminStateFromEvent, type LambdaContext } from '../lib/admin-auth.js';
-import { resolveRolesFromEvent } from '../lib/request-roles.js';
+import type { LambdaContext } from '../lib/admin-auth.js';
+import { resolveAdminAccessFromEvent } from '../lib/request-roles.js';
 import { isOwner } from '../lib/roles.js';
 
 type LambdaEvent = {
@@ -24,31 +24,23 @@ const handlerImpl = async (event: LambdaEvent, context?: LambdaContext) => {
     return jsonResponse(405, { error: 'Method not allowed' });
   }
 
-  const adminState = await getAdminStateFromEvent(event, context);
-
-  // T9.4: resolve the full workspace tier via the async resolver (users store +
-  // ADMIN_EMAILS bootstrap owners). `isAdmin` now reflects the resolved roles —
-  // a superset of the old ADMIN_EMAILS check (store admins gain access; no one
-  // who had access loses it). Still read-only display info; publish-gate.ts is
+  // T9.4/S1: resolve the full workspace tier via the shared admin-access
+  // resolver (users store + ADMIN_EMAILS bootstrap owners) — the SAME
+  // resolver every admin function now gates on (request-roles.ts), so this
+  // display endpoint can never disagree with what the functions underneath
+  // it actually enforce. Still read-only display info; publish-gate.ts is
   // the sole enforcement point for publishing.
-  const roles =
-    adminState.authenticated && adminState.email
-      ? await resolveRolesFromEvent(event, {
-          kind: 'human',
-          id: adminState.userId ?? '',
-          email: adminState.email,
-        })
-      : [];
-  const tier = isOwner(roles) ? 'owner' : roles.includes('admin') ? 'admin' : null;
+  const adminState = await resolveAdminAccessFromEvent(event, context);
+  const tier = isOwner(adminState.roles) ? 'owner' : adminState.roles.includes('admin') ? 'admin' : null;
 
   return jsonResponse(200, {
     authenticated: adminState.authenticated,
-    isAdmin: roles.includes('admin'),
+    isAdmin: adminState.isAdmin,
     tier,
     email: adminState.email,
     userId: adminState.userId,
     error: adminState.error,
-    roles,
+    roles: adminState.roles,
   });
 };
 

@@ -5,7 +5,7 @@
  * GET /.netlify/functions/admin-taxonomy
  */
 import type { SiteBinding } from '../lib/site-binding.js';
-import { getAdminStateFromEvent } from '../lib/admin-auth.js';
+import { resolveAdminAccessFromEvent } from '../lib/request-roles.js';
 import { collectBlobListItems } from '../lib/blob-list.js';
 import { getWorkflowBlobStore } from '../lib/blob-store.js';
 import type { WorkflowRecord } from '../../schema/schema-v1.js';
@@ -33,7 +33,7 @@ const isRecord = (v: unknown): v is Record<string, unknown> => Boolean(v && type
 const handlerImpl = async (event: LambdaEvent) => {
   if (event.httpMethod !== 'GET') return jsonResponse(405, { error: 'Method not allowed' });
 
-  const adminState = await getAdminStateFromEvent(event);
+  const adminState = await resolveAdminAccessFromEvent(event);
   if (!adminState.authenticated) return jsonResponse(401, { error: adminState.error ?? 'Unauthorized' });
   if (!adminState.isAdmin) return jsonResponse(403, { error: 'Admin access required' });
 

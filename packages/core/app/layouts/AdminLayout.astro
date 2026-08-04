@@ -139,16 +139,49 @@ const metadata = {
         window.__cmsLoginModal?.open();
       });
 
+      // S1 "failure states" fix: a transient problem checking admin access
+      // (network failure, a non-2xx from the function, a cold-start/deploy
+      // blip returning a non-JSON body) must never be presented the same way
+      // as a genuine "you are not an admin" — that literal forbidden message
+      // ("not listed in ADMIN_EMAILS") told a legitimate admin they lacked
+      // access when the real cause was the CHECK failing, not the answer
+      // being no. `checkFailed: true` marks that distinction for the caller.
       const getAdminStateForUser = async () => {
         const token = await getAccessToken();
         if (!token) return { authenticated: false, isAdmin: false };
-        const response = await fetch('/.netlify/functions/admin-auth-state', {
-          method: 'GET',
-          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        let response;
+        try {
+          response = await fetch('/.netlify/functions/admin-auth-state', {
+            method: 'GET',
+            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          });
+        } catch (error) {
+          console.error('Admin access check failed (network).', error);
+          return {
+            authenticated: true,
+            isAdmin: false,
+            checkFailed: true,
+            error: 'Admin access could not be verified.',
+          };
+        }
+        if (!response.ok) {
+          console.error(`Admin access check failed (HTTP ${response.status}).`);
+          return {
+            authenticated: true,
+            isAdmin: false,
+            checkFailed: true,
+            error: `Admin access could not be verified (HTTP ${response.status}).`,
+          };
+        }
+        return response.json().catch((error) => {
+          console.error('Admin access check failed (bad response body).', error);
+          return {
+            authenticated: true,
+            isAdmin: false,
+            checkFailed: true,
+            error: 'Admin access could not be verified.',
+          };
         });
-        return response
-          .json()
-          .catch(() => ({ authenticated: true, isAdmin: false, error: 'Admin access could not be verified.' }));
       };
 
       const renderAuthState = async () => {
@@ -158,6 +191,10 @@ const metadata = {
           return;
         }
         const adminState = await getAdminStateForUser();
+        if (adminState.checkFailed) {
+          setAuthState('error');
+          return;
+        }
         setAuthState(adminState.isAdmin ? 'signed-in' : 'forbidden');
       };
 
@@ -168,10 +205,16 @@ const metadata = {
           if (oauthUser) window.__cmsLoginModal?.close();
           await renderAuthState();
           document.addEventListener('cms:login', () => {
-            renderAuthState().catch((error) => console.error('Auth refresh failed.', error));
+            renderAuthState().catch((error) => {
+              console.error('Auth refresh failed.', error);
+              setAuthState('error');
+            });
           });
           document.addEventListener('cms:logout', () => {
-            renderAuthState().catch((error) => console.error('Auth refresh failed.', error));
+            renderAuthState().catch((error) => {
+              console.error('Auth refresh failed.', error);
+              setAuthState('error');
+            });
           });
         } catch (error) {
           console.error('Identity authentication initialization failed.', error);

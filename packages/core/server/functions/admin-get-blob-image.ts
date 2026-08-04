@@ -1,5 +1,6 @@
 import type { SiteBinding } from '../lib/site-binding.js';
-import { getAdminStateFromEvent, type LambdaContext } from '../lib/admin-auth.js';
+import type { LambdaContext } from '../lib/admin-auth.js';
+import { resolveAdminAccessFromEvent } from '../lib/request-roles.js';
 import {
   getImageArtifactReadDiagnostics,
   reconcileImageArtifactReference,
@@ -259,7 +260,7 @@ const handlerImpl = async (event: LambdaEvent, context?: LambdaContext) => {
     return jsonResponse(405, { error: 'Method not allowed' });
   }
 
-  const adminState = await getAdminStateFromEvent(event, context);
+  const adminState = await resolveAdminAccessFromEvent(event, context);
   if (!adminState.authenticated) {
     return jsonResponse(401, {
       error: adminState.error || 'Authentication is required.',
