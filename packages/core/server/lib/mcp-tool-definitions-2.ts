@@ -1,0 +1,435 @@
+/**
+ * TOOL_DEFINITIONS, part 2 of 2. See mcp-tool-definitions.ts's header for why
+ * this is split from mcp.ts and how the two parts recombine.
+ */
+import { pageTypeIds } from '../../schema/bodies/page-v1.js';
+
+import {
+  anyObjectSchema,
+  arraySchema,
+  intSchema,
+  nullableStringSchema,
+  objectSchema,
+  objectTypeEnumSchema,
+  patchOpsSchema,
+  publishActionInputSchema,
+  stringSchema,
+} from './mcp-tool-definitions.js';
+import type { ToolDefinition } from '../functions/mcp.js';
+
+export const TOOL_DEFINITIONS_PART2: ToolDefinition[] = [
+  {
+    name: 'ping',
+    description: 'Diagnostic tool that confirms the MCP server is reachable.',
+    inputSchema: objectSchema({}),
+  },
+
+  // ── Object verbs (T0.9): the generic CMS object store. Each proxies to
+  //    netlify/functions/object-store.ts with the publish key injected
+  //    server-side (the A§1.8 pattern). Purely additive — the article tools
+  //    above are unchanged. Submit/publish/review arrive in P1. ──
+  {
+    name: 'object_get',
+    description: 'Fetch a CMS object record (current draft state) by type and id from the site-objects store.',
+    inputSchema: objectSchema(
+      { object_type: objectTypeEnumSchema(), object_id: stringSchema('The object id, e.g. page_home.') },
+      ['object_type', 'object_id']
+    ),
+  },
+  {
+    name: 'object_list',
+    description: 'List CMS object summaries for a type, optionally filtered by status (active | archived).',
+    inputSchema: objectSchema(
+      {
+        object_type: objectTypeEnumSchema(),
+        status: { type: 'string', enum: ['active', 'archived'], description: 'Optional status filter.' },
+      },
+      ['object_type']
+    ),
+  },
+  {
+    name: 'object_create',
+    description:
+      'Create a CMS object from object_type, site, and the per-type body. requested_id is optional — omit it to have a valid id minted server-side. For recipe types (template / section_template / theme): REUSE FIRST — object_inventory lists existing recipes with self-describing summaries; create only when none fits, and include description/whenToUse/scope (required to publish). Creation may be restricted per type by the committed creation policy — check object_contract(<type>).creation_policy; a denial is a 403 with code creation_restricted. content_item (articles) is creatable since W7.3: the body is the annotated node list (per-node private.strategy/intent — hook/agitation/resolution etc. — plus commercial/rendering/chat metadata) with plain-text or rich_text.v1 node bodies; read object_contract("content_item") first. Committed legacy posts stay on the old article tools. tracking_config (W13) is the per-site tracker-registry SINGLETON: creation is human/seed-only and a second active registry is refused (409) — read object_contract("tracking_config") and edit the existing trk_* object instead.',
+    inputSchema: objectSchema(
+      {
+        object_type: objectTypeEnumSchema(),
+        site: stringSchema('Owning site object id, e.g. site_acme.'),
+        body: anyObjectSchema('The per-type object body; validated server-side against the T0.2 schema.'),
+        requested_id: stringSchema('Optional explicit object id; a valid id is minted from the body when omitted.'),
+        agent_name: stringSchema('Optional self-declared agent name recorded on history (attribution only).'),
+      },
+      ['object_type', 'site', 'body']
+    ),
+  },
+  {
+    name: 'object_instantiate_template',
+    description:
+      "Create a new page FROM a template recipe (design rule 5: templates are recipes; PageTypes are law). Deep-copies the template's slot blueprints into a fresh page body in slot order (a required slot without a blueprint falls back to the registry defaultData of its first allowed type; an optional slot without one is skipped), stamps page.template provenance ({ref, instantiated_at} — pages never live-inherit from templates), and routes the result through the SAME create validation as object_create (route uniqueness, PageType law, reference integrity). The template must exist (draft is fine); page_type defaults to the template's first appliesTo entry. Pass dry_run: true to preview the built body, the would-be object id, id availability, and full validation without persisting anything.",
+    inputSchema: objectSchema(
+      {
+        template_id: stringSchema('The template object id, e.g. tpl_interior.'),
+        site: stringSchema('Owning site object id, e.g. site_acme.'),
+        route: stringSchema("The new page's route, e.g. /pricing — must be unique across pages."),
+        title: stringSchema("The new page's reader-facing title."),
+        page_type: {
+          type: 'string',
+          enum: [...pageTypeIds],
+          description: "Optional PageType for the new page; defaults to the template's first appliesTo entry.",
+        },
+        seo: anyObjectSchema('Optional seo object ({title?, description?, ogImage?, robots?}); defaults to {}.'),
+        requested_id: stringSchema('Optional explicit page id; a valid id is minted from the route when omitted.'),
+        dry_run: {
+          type: 'boolean',
+          description: 'true → return the built body, would-be id, id availability, and validation; persist nothing.',
+        },
+        agent_name: stringSchema('Optional self-declared agent name recorded on history (attribution only).'),
+      },
+      ['template_id', 'site', 'route', 'title']
+    ),
+  },
+  {
+    name: 'object_instantiate_section_template',
+    description:
+      'Stamp a section-template recipe (W8): deep-copies the recipe\'s blueprint with a freshly minted s_* section id into an existing page — as ONE upsert_section through the standard patch path, so PageType law, the leaf rule, and reference integrity all gate it — or mints a standalone shared sec_* object through the standard create path. Page mode requires YOUR current page checkout (lock_token + expected_record_version; the verb never auto-checkouts). Stamped sections never live-inherit from the recipe (editing the recipe changes future stamps only). Pass dry_run: true to preview the exact op (page mode) or the would-be object (standalone mode) plus full validation without persisting; page-mode dry_run needs neither lock_token nor expected_record_version. The stamped section id is deterministic in (recipe, page, expected_record_version) — after a lost response / 409, dry_run with your ORIGINAL expected_record_version and object_get the page: if that section_id is already present, the first stamp landed. Read object_contract("section_template") first.',
+    inputSchema: objectSchema(
+      {
+        section_template_id: stringSchema('The section-template object id, e.g. stpl_hero_landing.'),
+        target: anyObjectSchema(
+          'Where to stamp: {kind:"page", page_id, position?, lock_token, expected_record_version} (insert into a page you hold the checkout for; position clamped, appended when omitted) OR {kind:"standalone", requested_id?} (mint a new shared sec_* object; a valid id is minted from the recipe name when omitted).'
+        ),
+        dry_run: {
+          type: 'boolean',
+          description: 'true → return the built op/body, ids, and validation; persist nothing (no lock needed).',
+        },
+        agent_name: stringSchema('Optional self-declared agent name recorded on history (attribution only).'),
+      },
+      ['section_template_id', 'target']
+    ),
+  },
+  {
+    name: 'site_apply_theme',
+    description:
+      'Apply a theme preset\'s brandTokens to the site singleton (W8.3): computes ONE exact-replace set_site_brand_tokens op (the privileged palette writer — brandTokens is not patchable via set_site_fields) — every color key the site carries but the theme lacks is explicitly unset, so no stale palette survives. The theme must be TOTAL (every renderer-consumed color key present) or the apply is rejected with the missing keys — an incomplete theme would delete keys from the site. Applies through the standard patch path under YOUR site checkout (lock_token + expected_record_version from object_checkout on the site object; the verb never auto-checkouts). One op = one atomic content_revision; history records applied_theme; the exact inverse makes reverting a standard discard. The site COPIES the tokens (nothing live-binds to the theme), and going live still requires the separate object_publish + release_to_production steps. Pass dry_run: true to preview the computed op + full validation without persisting — dry_run needs neither lock_token nor expected_record_version. Read object_contract("theme") first.',
+    inputSchema: objectSchema(
+      {
+        theme_id: stringSchema('The theme object id, e.g. thm_acme_default.'),
+        site_id: stringSchema('The site singleton object id, e.g. site_acme.'),
+        lock_token: stringSchema('Your held site lock (from object_checkout on the site object); dry_run needs none.'),
+        expected_record_version: intSchema('The record_version your checkout returned; dry_run needs none.'),
+        dry_run: {
+          type: 'boolean',
+          description: 'true → return the computed set_site_brand_tokens op and validation; persist nothing (no lock).',
+        },
+        agent_name: stringSchema('Optional self-declared agent name recorded on history (attribution only).'),
+      },
+      ['theme_id', 'site_id']
+    ),
+  },
+  {
+    name: 'object_create_variant',
+    description:
+      'Clone a content_item (article) object as a DRAFT variant for judge/score/A-B work (W7.3): node ids are re-minted (annotations that reference them — claims/compliance node_ids — are re-pointed), lineage.parent_content_id is set to the source, scores reset, and the clone flows through the standard create validation. Variants need their own slug (defaults to "<source-slug>-variant"; pass slug when creating a second variant). Serving/traffic-splitting is out of scope — publishing a winner is an ordinary object_publish.',
+    inputSchema: objectSchema(
+      {
+        source_object_id: stringSchema('The source article object id (req_*).'),
+        slug: stringSchema('Optional slug for the variant; defaults to "<source-slug>-variant".'),
+        requested_id: stringSchema('Optional explicit object id; a dated req_* id is minted when omitted.'),
+        dry_run: {
+          type: 'boolean',
+          description: 'true → return the built variant body, would-be id, and validation; persist nothing.',
+        },
+        agent_name: stringSchema('Optional self-declared agent name recorded on history (attribution only).'),
+      },
+      ['source_object_id']
+    ),
+  },
+  {
+    name: 'object_checkout',
+    description:
+      'Acquire the record lease before patching. Returns lockToken and record_version (use it as expected_record_version).',
+    inputSchema: objectSchema(
+      {
+        object_type: objectTypeEnumSchema(),
+        object_id: stringSchema(),
+        lease_seconds: intSchema('Optional lease seconds (default 900, max 3600).'),
+      },
+      ['object_type', 'object_id']
+    ),
+  },
+  {
+    name: 'object_refresh_lock',
+    description: 'Extend a held record lease; requires the matching lock_token (wrong/expired → 423).',
+    inputSchema: objectSchema(
+      {
+        object_type: objectTypeEnumSchema(),
+        object_id: stringSchema(),
+        lock_token: stringSchema(),
+        lease_seconds: intSchema('Optional lease seconds (default 900, max 3600).'),
+      },
+      ['object_type', 'object_id', 'lock_token']
+    ),
+  },
+  {
+    name: 'object_checkin',
+    description: 'Release a held record lease; requires the matching lock_token.',
+    inputSchema: objectSchema(
+      { object_type: objectTypeEnumSchema(), object_id: stringSchema(), lock_token: stringSchema() },
+      ['object_type', 'object_id', 'lock_token']
+    ),
+  },
+  {
+    name: 'object_patch',
+    description:
+      'Apply typed patch ops under a held lock. Requires lock_token and expected_record_version (stale version → 409; missing/expired/wrong lock → 423). Omitted ids on add_term/upsert_* ops are minted server-side. A resulting body that fails validation rejects the op (422) without persisting. Palette governance: site.brandTokens is NOT patchable here — a set_site_fields carrying brandTokens is refused; the palette changes only through the site_apply_theme tool (theme-only, Wolf 2026-07-15). set_site_brand_tokens is tool-authored (do not hand-author it).',
+    inputSchema: objectSchema(
+      {
+        object_type: objectTypeEnumSchema(),
+        object_id: stringSchema(),
+        lock_token: stringSchema(),
+        expected_record_version: intSchema('The record version you last read (optimistic concurrency check).'),
+        ops: patchOpsSchema('Array of typed patch ops (the C§2.0 grammar).'),
+      },
+      ['object_type', 'object_id', 'lock_token', 'expected_record_version', 'ops']
+    ),
+  },
+  {
+    name: 'object_validate',
+    description:
+      'Dry-run validation. Read-only: no lock, no write, no record created. Two mutually exclusive modes: ' +
+      '(1) object_id [+ candidate_patch] — validate an EXISTING object, optionally dry-running proposed patch ops ' +
+      'through the real engine before applying them (candidate_patch requires object_id). ' +
+      '(2) object_type + body [+ requested_id], with NO object_id — validate a CANDIDATE body that has no object ' +
+      'yet, running the IDENTICAL checks object_create would run (id pattern/availability, singleton conflict for ' +
+      'singleton types, body schema, id discipline, reference integrity, PageType law and route/slug/taxonomy ' +
+      'uniqueness where applicable) without persisting anything. This is how you learn whether a body is valid ' +
+      'BEFORE creating it — the previous alternative was attempting a real object_create just to learn a body was ' +
+      'invalid. Returns the built object_id (minted or your requested_id), id_available, and the same validation/' +
+      'summary shape as mode (1). Call this before object_create (see object_contract workflow.sequence).',
+    inputSchema: objectSchema(
+      {
+        object_type: objectTypeEnumSchema(),
+        object_id: stringSchema('The object id, for mode (1): validate an existing object. Omit for mode (2).'),
+        candidate_patch: patchOpsSchema(
+          'Mode (1) only: optional ops to dry-run through the engine before validating the result. Requires object_id.'
+        ),
+        body: anyObjectSchema(
+          'Mode (2) only: the candidate object body to validate as if it were about to be created. Omit object_id and candidate_patch when using this.'
+        ),
+        requested_id: stringSchema(
+          'Mode (2) only: optional explicit id for the candidate; a valid id is minted from the body when omitted (same minting object_create uses).'
+        ),
+      },
+      ['object_type']
+    ),
+  },
+
+  // ── Review + publish verbs (P1): the same submit_review / review_decide /
+  //    discard / publish_by_time actions the admin UI (admin-object.ts) drives,
+  //    exposed here so an agent can take an object edit → (review) → published
+  //    through one MCP surface. Every one proxies to object-store.ts with the
+  //    publish key injected server-side; the shared object-verbs.ts core is the
+  //    single authority for locks, the approval-policy publish gate, and the
+  //    review-decision rule (now agentic — see object_review_decide) — this
+  //    layer adds no new logic. ──
+  {
+    name: 'object_submit_review',
+    description:
+      'Open a review on a CMS object (review_state → "open"). Requires a held lock_token. For an approval-gated object type, pass requested_publish_action to pin the exact action the review requests ({ published_time: ISO | null | "immediate" }); an approval only authorizes agent-executed publish of the action it pinned (M-6). Review bookkeeping bumps version, never content_revision. Same path as the admin UI submit-for-review.',
+    inputSchema: objectSchema(
+      {
+        object_type: objectTypeEnumSchema(),
+        object_id: stringSchema(),
+        lock_token: stringSchema('Lock token from object_checkout; required to submit for review.'),
+        note: stringSchema('Optional note recorded on the submit_review history entry.'),
+        requested_publish_action: publishActionInputSchema(
+          'Optional M-6 pin of the publish action being requested, e.g. { published_time: "immediate" }.'
+        ),
+      },
+      ['object_type', 'object_id', 'lock_token']
+    ),
+  },
+  {
+    name: 'object_review_decide',
+    description:
+      "Approve or request changes on an open review. Fully agentic: a detached approval agent may decide over the shared MCP publish key, so an object can go edit → approve → publish with no human; a human decides through the admin UI with a configured role. Same shared logic, one path. On approve, publish_action pins the authorized action (M-6) that an agent-executed publish must then match exactly (publish-gate.ts), so an agentic approval is still explicit and pinned; publish_action is ignored for request_changes. For a live-publish approval you may additionally pass approval_pin to bind agent execution to the exact content-item/request id, artifact set, and release/build behavior reviewed. Bumps version, never content_revision. NOTE (W11 T11.10): a verified-agent-token mechanism now exists (packages/core/server/lib/agent-keys.ts) and could back a future dedicated approval/editor-agent credential, but this verb's own authorization is deliberately UNCHANGED here — it still rides the shared MCP publish key, and M-6 approvals stay human-only (no agent-approves-agent review) per T11.10's own non-goals. Wiring a verified identity into approval authority is a capability change, not an attribution one, and is out of scope until a future task explicitly ratifies it.",
+    inputSchema: objectSchema(
+      {
+        object_type: objectTypeEnumSchema(),
+        object_id: stringSchema(),
+        decision: { type: 'string', enum: ['approve', 'request_changes'], description: 'The review decision.' },
+        note: stringSchema('Optional note recorded on the decision.'),
+        publish_action: publishActionInputSchema(
+          'Optional M-6 pin for an approval, e.g. { published_time: "immediate" }; ignored for request_changes.'
+        ),
+        approval_pin: {
+          type: 'object',
+          additionalProperties: false,
+          description:
+            'Optional extended live-publish pin for an approval: binds an agent-executed publish to the exact content-item/request id, artifact set, and release/build behavior reviewed. Ignored for request_changes.',
+          properties: {
+            request_id: stringSchema('Exact content-item / workflow request id the approval covers.'),
+            artifact_set: {
+              type: 'array',
+              items: stringSchema('Approved artifact identifier (blobKey or sha256).'),
+              description: 'The exact set of artifacts approved; an agent-executed publish must use exactly this set.',
+            },
+            release_build: {
+              type: 'string',
+              enum: ['defer', 'release'],
+              description: 'Whether the approval authorizes a deferred (default) or an immediate release/build.',
+            },
+          },
+        },
+      },
+      ['object_type', 'object_id', 'decision']
+    ),
+  },
+  {
+    name: 'object_discard',
+    description:
+      'Discard rejected draft ops via compensating inverse writes (C§2.4). Requires a held lock_token and the rejected ops exactly as their history entries stored them ({ op, capture }); inverses are applied newest-first as one atomic batch attributed to the caller. This IS a body write: it bumps content_revision and invalidates any approval pinned to the prior revision. A blind revert over intervening accepted ops is refused (409).',
+    inputSchema: objectSchema(
+      {
+        object_type: objectTypeEnumSchema(),
+        object_id: stringSchema(),
+        lock_token: stringSchema('Lock token from object_checkout; required to write the inverse ops.'),
+        entries: arraySchema(
+          objectSchema(
+            {
+              op: { description: 'The rejected patch op, exactly as stored in the record history entry.' },
+              capture: { description: "The op's history capture, exactly as stored alongside it." },
+            },
+            ['op', 'capture']
+          ),
+          'Rejected ops to invert, exactly as their history entries store them (details.op / details.capture).'
+        ),
+      },
+      ['object_type', 'object_id', 'lock_token', 'entries']
+    ),
+  },
+  {
+    name: 'object_retire',
+    description:
+      'RETIRE an object: the governed way to remove one (W14 F6). Archives the record (reversible — history is preserved, and a separate purge hard-deletes only after a 30-day grace period), REMOVES its committed export in the same commit, and — for a page — writes a 301 redirect from the retired route so no reader is dropped on a 404. Requires a held lock_token, exactly like patch and publish. REFUSED (409) when anything still references the object (the referrers are named — repoint or retire those first), when a review is open, or for the site singleton. The retirement commits to main with [skip netlify]: the live site keeps serving the old build until an explicit release_to_production, which is when the page actually disappears. Idempotent — retiring an already-archived object reports success.',
+    inputSchema: objectSchema(
+      {
+        object_type: objectTypeEnumSchema(),
+        object_id: stringSchema(),
+        lock_token: stringSchema('Lock token from object_checkout; required to retire.'),
+        redirect_to: stringSchema(
+          'Where readers of the retired route should land. Defaults to "/" — a retired page never 404s.'
+        ),
+        reason: stringSchema('Optional note recorded in the retirement history entry.'),
+      },
+      ['object_type', 'object_id', 'lock_token']
+    ),
+  },
+  {
+    name: 'object_publish',
+    description:
+      'Publish a CMS object (any of the nine governed types) through the generic publish operation: run the approval-policy publish gate, then validate → materialize → commit the export to git → stamp the record, in that order (the record is never stamped before the export commits). Requires a held lock_token. Omit published_time to publish now; null (unpublish) and future timestamps are rejected in this phase. The gate is identical to the admin UI: autonomous object types publish directly with no human; approval-gated types require a current human approval pinned (M-6) to the exact action being attempted. content_item (article objects) publishes here too since W7.3 — Tier 1 stays autonomous under the committed policy. The export commit carries [skip netlify], so a successful publish does NOT deploy — the change commits to main and goes live only on an explicit release (release_to_production); the response "production" block spells this out. Publish deliberately KEEPS your lock (it re-stamps under the live lease so concurrent body drift is caught, not silently overwritten) — it is NOT terminal for the lock. Call object_checkin when you are done, or the object stays locked to everyone else for the rest of the 15-minute lease.',
+    inputSchema: objectSchema(
+      {
+        object_type: objectTypeEnumSchema(),
+        object_id: stringSchema(),
+        lock_token: stringSchema('Lock token from object_checkout; required to publish.'),
+        published_time: nullableStringSchema(
+          'Optional ISO instant. Omit to publish now. null (unpublish) and future timestamps are rejected in this phase.'
+        ),
+        artifact_set: {
+          type: 'array',
+          items: stringSchema('Artifact identifier (blobKey or sha256) this publish uses.'),
+          description:
+            'Optional. Declare the artifact set this publish uses so an approval that pins an artifact_set can be satisfied — the gate confirms they match exactly. Only needed for approval-gated types whose current approval pins one.',
+        },
+        release_build: {
+          type: 'string',
+          enum: ['defer', 'release'],
+          description:
+            'Optional. The release/build behavior this publish uses, so an approval that pins release_build can be satisfied. Object publishes always defer the deploy (release is the separate release_to_production step); this declares the approved intent for the gate.',
+        },
+      },
+      ['object_type', 'object_id', 'lock_token']
+    ),
+  },
+  {
+    name: 'object_inventory',
+    description:
+      'Read-only inventory of CMS objects: per object — id, type, status, requires_approval (whether the configured approval policy gates publishing this type behind a human approval), lock state (held/free, holder, expiry), review state, version, content_revision, last-published time, and an unpublished_changes flag (current content_revision vs the publish receipt). Recipe rows (template / section_template / theme) additionally carry a `recipe` summary — name, scope ("evergreen" = standing recipe, "one_off" = single-project), description, when_to_use, plus blueprint_type (section_template) or applies_to + slot_count (template) — so ONE cheap call answers "what recipes exist and which fits" without fetching bodies. REUSE FIRST: consult this before creating any new recipe. Omit object_type to sweep every type; pass object_type + object_id for a single-object detail view (adds site, timestamps, full review decisions, publish receipt, history length). Filters: status, requires_approval, review_state (none | open | changes_requested | approved), pending_changes.',
+    inputSchema: objectSchema({
+      object_type: objectTypeEnumSchema(),
+      object_id: stringSchema('With object_type: return the single-object detail view instead of a list.'),
+      status: { type: 'string', enum: ['active', 'archived'], description: 'Optional status filter.' },
+      requires_approval: {
+        type: 'boolean',
+        description: 'Optional filter: true → only approval-gated types; false → only autonomous ones.',
+      },
+      review_state: {
+        type: 'string',
+        enum: ['none', 'open', 'changes_requested', 'approved'],
+        description: 'Optional review-state filter (none = no review has ever been opened).',
+      },
+      pending_changes: {
+        type: 'boolean',
+        description: 'Optional: true → only objects the live site has not seen; false → only fully published ones.',
+      },
+    }),
+  },
+  {
+    name: 'object_contract',
+    description:
+      'The complete, machine-readable contract for creating and editing one CMS object type — READ THIS FIRST, before object_create/object_patch, so you never guess. Returns, all derived from the enforcing code (so it cannot drift): body_schema (the exact JSON-schema of a valid body); section_types (for page/section: every placeable section variant, its data JSON-schema, whether it has a bound component, and editor hints); patch_ops (exactly the ops allowed for this type, each with an argument JSON-schema and which id field is server-minted so you may omit it); constraints (the structural boundaries with severity and whether each is enforced live); publish_policy (whether publishing needs approval — computed from the live policy — plus the M-6 pin rules and denial codes); creation_policy (who may CREATE this type: humans always; agents open or allowlisted per the committed creation policy — a denial is a 403 creation_restricted); workflow (the checkout→validate→patch→publish→release sequence — for recipe types it STARTS with a REUSE-FIRST step, the 423/409 lock/version discipline, and the patch error-code catalog); and auxiliary_inputs (side-data a move needs, e.g. artifact uploads for image fields). Live per-object state (version/lock/review) is in object_inventory; a dry run of a specific patch is object_validate.',
+    inputSchema: objectSchema({ object_type: objectTypeEnumSchema('The CMS object type to describe.') }, [
+      'object_type',
+    ]),
+  },
+  {
+    name: 'product_set_price',
+    description:
+      'THE only price-edit path for a product (§3 canonicality): creates a NEW Stripe Price (prices are immutable) for the running STRIPE_MODE, archives the old one, and writes price_id + the display cache into the product record in ONE governed set_product_price patch (checkout → patch → checkin; audited; inverse = re-point to the archived price). A product with no Stripe linkage yet gets a Stripe Product created from its title. The change is an UNPUBLISHED revision — publishing stays review-required (§0.4): submit_review → a human approves → object_publish. Never edit commerce.price/stripe via set_product_fields; that op refuses those keys.',
+    inputSchema: objectSchema(
+      {
+        product_id: stringSchema('The product object id (prod_…).'),
+        amount_cents: { type: 'number', description: 'The new price in integer cents (positive).' },
+        currency: stringSchema("Lowercase ISO currency code; default 'usd'."),
+        agent_name: stringSchema('Optional self-declared agent name recorded on history (attribution only).'),
+      },
+      ['product_id', 'amount_cents']
+    ),
+  },
+  {
+    name: 'order_reissue',
+    description:
+      'Regenerate a purchase download link from the stored ORDER record (§5 — fulfillment is a pure function of the order; no Stripe round trip). The support case this exists for: "customer lost the email / the link expired" (§8.4 — launch-critical, there are no customer accounts). Appends an audited reissue entry {at, token_hash, by} to the order plus a fulfillment_reissued event; old tokens are not revoked (they expire on their own). order_key is the Checkout session id (cs_…) for paid orders, or the ord_free_… id for free claims.',
+    inputSchema: objectSchema(
+      {
+        order_key: stringSchema('The order idempotency key: Checkout session id, or ord_… for free claims.'),
+        ttl_hours: { type: 'number', description: 'Link lifetime in hours (1–336); default 72.' },
+        agent_name: stringSchema('Optional self-declared agent name recorded on the reissue entry.'),
+      },
+      ['order_key']
+    ),
+  },
+  {
+    name: 'commerce_orders',
+    description:
+      'Read-only order administration over the commerce store (support lookups — the front half of order_reissue). Without order_key: a bounded list, newest first (limit default 20, cap 100), filterable by buyer email (exact, case-insensitive) and/or product_id — "customer X lost their email" starts here. With order_key: the full order record (raw buyer email lives in orders by design, §6; the event log carries only hashes). NOT a reporting surface: Blobs is not a queryable database (§8.6) — aggregation waits for the external consumer.',
+    inputSchema: objectSchema({
+      order_key: stringSchema(
+        'Return ONE full order by its idempotency key (cs_… session id, or ord_… for free claims).'
+      ),
+      email: stringSchema('List filter: exact buyer email (case-insensitive).'),
+      product_id: stringSchema('List filter: only orders for this product object id (prod_…).'),
+      limit: { type: 'number', description: 'List cap, newest first (default 20, max 100).' },
+    }),
+  },
+  {
+    name: 'registry_get',
+    description:
+      "Read a code registry. registry: 'page_type' returns the PageType definitions (route pattern, allowed/required sections, review policy) plus a JSON-schema rendering of the definition shape; 'component' returns every section type with its data JSON-schema, editor hints, and whether a component is bound. For the full per-object-type contract (body schema + patch ops + constraints + publish policy), use object_contract instead.",
+    inputSchema: objectSchema({
+      registry: { type: 'string', enum: ['component', 'page_type'], description: 'Optional registry name.' },
+    }),
+  },
+];

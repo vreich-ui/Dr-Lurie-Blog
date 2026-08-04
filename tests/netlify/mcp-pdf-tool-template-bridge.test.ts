@@ -94,6 +94,7 @@ test('tools/list exposes the pdf template bridge tools', async () => {
   assert.ok(names.has('list_pdf_templates'));
   assert.ok(names.has('get_pdf_template'));
   assert.ok(names.has('publish_pdf_template'));
+  assert.ok(names.has('delete_pdf_template'));
 });
 
 test('Platform creates then publishes a pdfme template end-to-end and never exposes the grant', async () => {
@@ -184,6 +185,71 @@ test('publish_pdf_template surfaces the upstream 409 TEMPLATE_VALIDATION_REQUIRE
   }
 });
 
+test('Platform deactivates a pdf template and never exposes the grant', async () => {
+  const originalFetch = globalThis.fetch;
+  const { calls, fetchImpl } = stubFetch({
+    '/delete-pdf-template': (body) =>
+      Response.json({
+        projectId: body.projectId,
+        templateId: body.templateId,
+        version: body.version ?? 1,
+        status: 'disabled',
+      }),
+  });
+  globalThis.fetch = fetchImpl;
+  try {
+    const logs: Array<Record<string, unknown>> = [];
+    const deleted = await rpc(
+      'delete_pdf_template',
+      { site_id: 'site_drlurie', template_id: 'tpl_report_card', reason: 'superseded by v2 layout' },
+      logs
+    );
+    assert.ok(!deleted.result.isError, JSON.stringify(deleted.result.structuredContent));
+    assert.equal(deleted.result.structuredContent?.status, 'disabled');
+    assert.equal(deleted.result.structuredContent?.templateId, 'tpl_report_card');
+    assert.equal(deleted.result.structuredContent?.siteId, 'site_drlurie');
+
+    assert.equal(calls.length, 1);
+    const call = calls[0];
+    assert.equal(call.authorization, `Bearer ${RUN_SECRET}`);
+    assert.equal(call.body.projectId, 'dr-lurie');
+    assert.equal(call.body.templateId, 'tpl_report_card');
+    assert.equal(call.body.reason, 'superseded by v2 layout');
+    assert.equal((call.body.storage as { projectId: string }).projectId, 'dr-lurie');
+    assert.equal((call.body.storage as { token: string }).token, STORAGE_SECRET);
+
+    const visible = JSON.stringify({ logs, deleted: deleted.response.body });
+    assert.ok(!visible.includes(STORAGE_SECRET));
+    assert.ok(!visible.includes(RUN_SECRET));
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('delete_pdf_template surfaces an upstream 409 TEMPLATE_ARCHIVED-style error unchanged', async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async () =>
+    Response.json(
+      {
+        error: 'Template tpl_report_card version 3 conflicts with the currently disabled version.',
+        errorCode: 'TEMPLATE_ARCHIVED',
+      },
+      { status: 409 }
+    )) as typeof fetch;
+  try {
+    const deleted = await rpc('delete_pdf_template', {
+      site_id: 'site_drlurie',
+      template_id: 'tpl_report_card',
+      version: 3,
+    });
+    assert.equal(deleted.result.isError, true);
+    assert.equal(deleted.result.structuredContent?.statusCode, 409);
+    assert.equal(deleted.result.structuredContent?.errorCode, 'TEMPLATE_ARCHIVED');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test('foreign site_id fails template bridge tools with template_site_mismatch and makes zero outbound fetches', async () => {
   const originalFetch = globalThis.fetch;
   let fetchCalls = 0;
@@ -210,6 +276,10 @@ test('foreign site_id fails template bridge tools with template_site_mismatch an
     const publish = await rpc('publish_pdf_template', { site_id: 'site_other', template_id: 'tpl_x' });
     assert.equal(publish.result.isError, true);
     assert.equal(publish.result.structuredContent?.error_code, 'template_site_mismatch');
+
+    const del = await rpc('delete_pdf_template', { site_id: 'site_other', template_id: 'tpl_x' });
+    assert.equal(del.result.isError, true);
+    assert.equal(del.result.structuredContent?.error_code, 'template_site_mismatch');
 
     assert.equal(fetchCalls, 0);
   } finally {

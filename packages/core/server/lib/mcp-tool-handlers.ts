@@ -1,0 +1,856 @@
+/**
+ * Tool-call handlers for the "operational" and pdf-tool/artifact-bridge MCP
+ * tools (deploy_status, verify_article_images, trigger_netlify_build,
+ * release_to_production, artifact upload/URL-ingest, the pdf-tool artifact
+ * and template bridges, and the object_* verb dispatch). callTool in
+ * mcp.ts's dispatch switch routes straight to these.
+ *
+ * Split out of mcp.ts (W14 T14.3 delete_pdf_template bridge follow-up) purely
+ * to keep each source file within the GitHub content-push size this repo's
+ * tooling can deliver in one shot -- NOT a behavioral seam. A few names
+ * (toolError, toolResult, toNonEmptyString, getHeader, response,
+ * parseJsonResponseBody, invokeSaveArtifact, objectStoreHandler,
+ * deployStatusHandler, verifyArticleImagesHandler, and the LambdaEvent type)
+ * are imported back from mcp.ts, and mcp.ts imports every export here in
+ * turn -- a real circular import, but a safe one: every one of those mcp.ts
+ * bindings is only read inside an async function body here, never at this
+ * module's own top level, so it is always fully initialized by the time any
+ * of these handlers actually runs.
+ */
+import {
+  isNetlifyBuildHookConfigured,
+  NetlifyBuildHookTriggerError,
+  triggerNetlifyBuild,
+} from './netlify-deploys.js';
+import { releaseToProduction } from './production-release.js';
+import { buildPdfToolStorageGrant } from './pdf-tool-storage-grant.js';
+import {
+  canonicalPlatformArtifact,
+  createPlatformArtifactJob,
+  createPlatformPdfTemplate,
+  deletePlatformPdfTemplate,
+  getPlatformArtifactBySlot,
+  getPlatformArtifactJobStatus,
+  getPlatformPdfTemplate,
+  listPlatformPdfTemplates,
+  publishPlatformPdfTemplate,
+  verifyPlatformArtifact,
+  type PlatformArtifactJobInput,
+  type PlatformCreateTemplateInput,
+} from './pdf-tool-client.js';
+import {
+  createArtifactUploadToken,
+  defaultArtifactUploadTokenTtlMs,
+  getDirectArtifactUploadMaxBytes,
+} from './artifact-upload.js';
+import {
+  artifactKindValues,
+  artifactReferenceLimits,
+  isSafeArtifactFilename,
+  isSafeArtifactText,
+} from './artifacts.js';
+import { validateFilename, validateRequestId } from '../../lib/agents-naming.js';
+import { getSiteIdentity } from '../../lib/site-identity.js';
+import { normalizeArtifactKindInput } from './mcp-artifact-admin.js';
+import {
+  getHeader,
+  invokeSaveArtifact,
+  objectStoreHandler,
+  deployStatusHandler,
+  verifyArticleImagesHandler,
+  parseJsonResponseBody,
+  toNonEmptyString,
+  toolError,
+  toolResult,
+  type LambdaEvent,
+} from '../functions/mcp.js';
+
+export const callDeployStatus = async (event: LambdaEvent, payload: Record<string, unknown>) => {
+  const publishSecret = process.env.PUBLISH_SECRET || process.env.NETLIFY_PUBLISH_SECRET;
+
+  if (!publishSecret) {
+    return toolError('Deploy status lookup is not configured on the server.', {
+      error_code: 'deploy_status_not_configured',
+    });
+  }
+
+  const deployStatusResponse = await deployStatusHandler({
+    httpMethod: 'POST',
+    headers: {
+      ...(event.headers ?? {}),
+      'x-publish-key': publishSecret,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+  const body = parseJsonResponseBody(deployStatusResponse.body);
+
+  if (deployStatusResponse.statusCode < 200 || deployStatusResponse.statusCode >= 300) {
+    return toolError(
+      typeof body.error === 'string'
+        ? body.error
+        : `HTTP ${deployStatusResponse.statusCode}: deploy status lookup failed`,
+      { statusCode: deployStatusResponse.statusCode, ...body }
+    );
+  }
+
+  return toolResult(body);
+};
+
+export const callVerifyArticleImages = async (event: LambdaEvent, input: Record<string, unknown>) => {
+  const publishSecret = process.env.PUBLISH_SECRET || process.env.NETLIFY_PUBLISH_SECRET;
+
+  if (!publishSecret) {
+    return toolError('Article image verification is not configured on the server.', {
+      error_code: 'verify_article_images_not_configured',
+    });
+  }
+
+  const verifyResponse = await verifyArticleImagesHandler({
+    httpMethod: 'POST',
+    headers: {
+      ...(event.headers ?? {}),
+      'x-publish-key': publishSecret,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({
+      url: input.url,
+      expectedImages: input.expectedImages,
+      ...(input.commit !== undefined ? { commit: input.commit } : {}),
+      ...(input.deployTimeoutSeconds !== undefined ? { deployTimeoutSeconds: input.deployTimeoutSeconds } : {}),
+      ...(input.deployPollIntervalSeconds !== undefined
+        ? { deployPollIntervalSeconds: input.deployPollIntervalSeconds }
+        : {}),
+    }),
+  });
+  const body = parseJsonResponseBody(verifyResponse.body);
+
+  if (verifyResponse.statusCode < 200 || verifyResponse.statusCode >= 300) {
+    return toolError(
+      typeof body.error === 'string'
+        ? body.error
+        : `HTTP ${verifyResponse.statusCode}: article image verification failed`,
+      { statusCode: verifyResponse.statusCode, ...body }
+    );
+  }
+
+  return toolResult(body);
+};
+
+export const callTriggerNetlifyBuild = async (event: LambdaEvent, input: Record<string, unknown>) => {
+  const reason = toNonEmptyString(input.reason) ?? null;
+
+  if (!isNetlifyBuildHookConfigured()) {
+    event.log?.({ event: 'netlify_build_trigger_not_configured', reason });
+    return toolError('Netlify build hook is not configured on the server.', {
+      error_code: 'netlify_build_hook_not_configured',
+    });
+  }
+
+  event.log?.({ event: 'netlify_build_trigger_requested', reason });
+
+  try {
+    const { triggeredAt } = await triggerNetlifyBuild();
+    event.log?.({ event: 'netlify_build_triggered', reason, triggeredAt });
+
+    return toolResult({ triggered: true, triggeredAt });
+  } catch (error) {
+    const statusCode = error instanceof NetlifyBuildHookTriggerError ? error.statusCode : undefined;
+    const message = error instanceof Error ? error.message : 'Netlify build hook trigger failed.';
+    event.log?.({ event: 'netlify_build_trigger_failed', reason, error: message });
+
+    return toolError(message, {
+      error_code: 'netlify_build_hook_trigger_failed',
+      ...(statusCode ? { statusCode } : {}),
+    });
+  }
+};
+
+// A synchronous Netlify function is killed at its platform timeout (10s
+// default, 26s max) — a deploy poll that outlives the invocation dies as a
+// dropped connection, not a JSON-RPC response, and the agent's MCP client
+// reads that as the whole server failing. Cap the wait so the agent always
+// gets the structured build_not_confirmed_live receipt and follows up with
+// deploy_status. The margin also covers the pre-poll work inside
+// releaseToProduction (branch-HEAD resolution + build-hook POST) and response
+// serialization.
+const RELEASE_WAIT_SAFETY_MARGIN_MS = 3_500;
+const RELEASE_WAIT_FALLBACK_SECONDS = 6;
+
+export const resolveReleaseWaitBudgetSeconds = (
+  requestedSeconds: number | undefined,
+  invocationDeadlineMs: number | undefined,
+  nowMs: number = Date.now()
+) => {
+  const platformBudgetSeconds =
+    invocationDeadlineMs === undefined
+      ? RELEASE_WAIT_FALLBACK_SECONDS
+      : Math.floor((invocationDeadlineMs - nowMs - RELEASE_WAIT_SAFETY_MARGIN_MS) / 1000);
+  const cappedSeconds = Math.max(1, platformBudgetSeconds);
+
+  return requestedSeconds === undefined ? cappedSeconds : Math.max(1, Math.min(requestedSeconds, cappedSeconds));
+};
+
+export const callReleaseToProduction = async (event: LambdaEvent, input: Record<string, unknown>) => {
+  const commit = toNonEmptyString(input.commit);
+  const forceBuild = typeof input.force_build === 'boolean' ? input.force_build : undefined;
+  const requestedTimeoutSeconds = typeof input.timeout_seconds === 'number' ? input.timeout_seconds : undefined;
+  const timeoutSeconds = resolveReleaseWaitBudgetSeconds(requestedTimeoutSeconds, event.invocationDeadlineMs);
+
+  event.log?.({
+    event: 'production_release_requested',
+    commit: commit ?? null,
+    forceBuild: forceBuild ?? null,
+    requestedTimeoutSeconds: requestedTimeoutSeconds ?? null,
+    effectiveTimeoutSeconds: timeoutSeconds,
+  });
+
+  try {
+    const result = await releaseToProduction({
+      ...(commit ? { commit } : {}),
+      ...(forceBuild !== undefined ? { forceBuild } : {}),
+      ...(timeoutSeconds !== undefined ? { timeoutSeconds } : {}),
+    });
+    event.log?.({
+      event: 'production_release_result',
+      status: result.status,
+      released: result.released,
+      commit: result.targetCommit || null,
+    });
+
+    // A configuration gap is a tool error the agent should surface, not a
+    // "released: false" success it might misread as "build still running".
+    if (result.status === 'build_hook_not_configured' || result.status === 'deploy_lookup_not_configured') {
+      return toolError(result.reason, { error_code: result.status, ...result });
+    }
+    return toolResult({ ...result });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Production release failed.';
+    event.log?.({ event: 'production_release_failed', error: message });
+    return toolError(message, { error_code: 'production_release_failed' });
+  }
+};
+
+const normalizeArtifactUploadIntentInput = (input: Record<string, unknown>) => {
+  const requestId = toNonEmptyString(input.requestId);
+  if (!requestId) return { ok: false as const, error: 'requestId is required.' };
+  const requestIdValidation = validateRequestId(requestId);
+  if (!requestIdValidation.ok) return { ok: false as const, error: requestIdValidation.error };
+
+  const artifactKind = normalizeArtifactKindInput(input.artifactKind, true);
+  if (!artifactKind.ok) return artifactKind;
+  const normalizedArtifactKind = artifactKind.artifactKind as (typeof artifactKindValues)[number];
+
+  const contentType = toNonEmptyString(input.contentType);
+  if (!contentType) return { ok: false as const, error: 'contentType is required.' };
+
+  const expectedSizeBytes = Number(input.expectedSizeBytes);
+  const maxBytes = getDirectArtifactUploadMaxBytes();
+  if (!Number.isInteger(expectedSizeBytes) || expectedSizeBytes < 0) {
+    return { ok: false as const, error: 'expectedSizeBytes must be a non-negative integer.' };
+  }
+  if (expectedSizeBytes > maxBytes) {
+    return { ok: false as const, error: `expectedSizeBytes must be less than or equal to ${maxBytes}.`, maxBytes };
+  }
+
+  const expectedSha256 = toNonEmptyString(input.expectedSha256)?.toLowerCase();
+  if (!expectedSha256 || !/^[a-f0-9]{64}$/.test(expectedSha256)) {
+    return { ok: false as const, error: 'expectedSha256 must be a 64-character hex digest.' };
+  }
+
+  const filename = toNonEmptyString(input.filename);
+  const filenameValidation = filename ? validateFilename(filename) : undefined;
+  if (filename && (!isSafeArtifactFilename(filename) || !filenameValidation?.ok)) {
+    return {
+      ok: false as const,
+      error:
+        'filename must be readable lowercase kebab-case and must not contain control characters, angle brackets, or path separators.',
+    };
+  }
+
+  const label = toNonEmptyString(input.label);
+  if (label && !isSafeArtifactText(label, artifactReferenceLimits.label)) {
+    return { ok: false as const, error: 'label must not contain control characters or angle brackets.' };
+  }
+
+  let tags: string[] | undefined;
+  if (input.tags !== undefined) {
+    if (!Array.isArray(input.tags)) return { ok: false as const, error: 'tags must be an array.' };
+    if (input.tags.length > artifactReferenceLimits.tags) {
+      return { ok: false as const, error: `tags must contain at most ${artifactReferenceLimits.tags} values.` };
+    }
+    tags = [];
+    for (const tag of input.tags) {
+      const normalizedTag = toNonEmptyString(tag);
+      if (!normalizedTag || !isSafeArtifactText(normalizedTag, artifactReferenceLimits.tag)) {
+        return { ok: false as const, error: 'tags must not contain control characters or angle brackets.' };
+      }
+      tags.push(normalizedTag);
+    }
+  }
+
+  return {
+    ok: true as const,
+    value: {
+      requestId: requestIdValidation.value,
+      artifactKind: normalizedArtifactKind,
+      contentType,
+      expectedSizeBytes,
+      expectedSha256,
+      ...(filenameValidation?.ok ? { filename: filenameValidation.value } : {}),
+      ...(label ? { label } : {}),
+      ...(tags?.length ? { tags } : {}),
+    },
+    maxBytes,
+  };
+};
+
+const getArtifactUploadBaseUrl = (event: LambdaEvent) => {
+  const forwardedProto = toNonEmptyString(getHeader(event.headers, 'x-forwarded-proto'))?.split(',')[0]?.trim();
+  const proto = forwardedProto || 'https';
+  const forwardedHost = toNonEmptyString(getHeader(event.headers, 'x-forwarded-host'))?.split(',')[0]?.trim();
+  const host = forwardedHost || toNonEmptyString(getHeader(event.headers, 'host'));
+
+  if (!host || /[\s/]/.test(host)) return '/api/artifacts/upload';
+  return `${proto}://${host}/api/artifacts/upload`;
+};
+
+const createRequiredArtifactUploadHeaders = (input: {
+  requestId: string;
+  artifactKind: string;
+  contentType: string;
+  expectedSizeBytes: number;
+  expectedSha256: string;
+  uploadToken: string;
+  filename?: string;
+  tags?: string[];
+}) => ({
+  Authorization: `Bearer ${input.uploadToken}`,
+  'Content-Type': 'application/octet-stream',
+  'X-Artifact-Request-Id': input.requestId,
+  'X-Artifact-Kind': input.artifactKind,
+  'X-Artifact-Content-Type': input.contentType,
+  'X-Artifact-Size': String(input.expectedSizeBytes),
+  'X-Artifact-Sha256': input.expectedSha256,
+  ...(input.filename ? { 'X-Artifact-Filename': input.filename } : {}),
+  ...(input.tags?.length ? { 'X-Artifact-Tags': input.tags.join(',') } : {}),
+});
+
+export const callCreateArtifactUploadIntent = async (event: LambdaEvent, input: Record<string, unknown>) => {
+  const normalized = normalizeArtifactUploadIntentInput(input);
+  if (!normalized.ok)
+    return toolError(normalized.error, 'maxBytes' in normalized ? { maxBytes: normalized.maxBytes } : {});
+
+  const expiresAt = Date.now() + defaultArtifactUploadTokenTtlMs;
+
+  try {
+    const uploadToken = createArtifactUploadToken({
+      requestId: normalized.value.requestId,
+      artifactKind: normalized.value.artifactKind,
+      contentType: normalized.value.contentType,
+      filename: normalized.value.filename,
+      label: normalized.value.label,
+      tags: normalized.value.tags,
+      expectedSizeBytes: normalized.value.expectedSizeBytes,
+      expectedSha256: normalized.value.expectedSha256,
+      expiresAt,
+    });
+
+    return toolResult({
+      ok: true,
+      uploadUrl: getArtifactUploadBaseUrl(event),
+      uploadToken,
+      expiresAtISO: new Date(expiresAt).toISOString(),
+      maxBytes: normalized.maxBytes,
+      requiredHeaders: createRequiredArtifactUploadHeaders({ ...normalized.value, uploadToken }),
+    });
+  } catch (error) {
+    return toolError(error instanceof Error ? error.message : String(error), { maxBytes: normalized.maxBytes });
+  }
+};
+
+export const callArtifactUpload = async (event: LambdaEvent, payload: Record<string, unknown>) => {
+  const result = await invokeSaveArtifact(event, payload);
+
+  if ('isError' in result) return result;
+
+  return toolResult(result);
+};
+
+// ── Object-verb proxy (T0.9) for the generic object store. Injects the
+//    publish key server-side and forwards to object-store.ts, exactly the
+//    A§1.8 proxy pattern. ──
+const createObjectStoreHeaders = (event: LambdaEvent, publishSecret: string) => ({
+  ...(event.headers ?? {}),
+  ...(getHeader(event.headers, 'x-nf-site-id') ? { 'x-nf-site-id': getHeader(event.headers, 'x-nf-site-id') } : {}),
+  'x-publish-key': publishSecret,
+  'content-type': 'application/json',
+});
+
+const stripObjectEnvelope = (payload: Record<string, unknown>): Record<string, unknown> => {
+  const rest = { ...payload };
+  delete rest.ok;
+  delete rest.status;
+  return rest;
+};
+
+const invokeObjectStore = async (event: LambdaEvent, payload: Record<string, unknown>) => {
+  const publishSecret = process.env.PUBLISH_SECRET || process.env.NETLIFY_PUBLISH_SECRET;
+
+  if (!publishSecret) {
+    return toolError('Server-side object storage credentials are not configured.');
+  }
+
+  const objectResponse = await objectStoreHandler({
+    httpMethod: 'POST',
+    headers: createObjectStoreHeaders(event, publishSecret),
+    body: JSON.stringify(payload),
+  });
+
+  const bodyText = objectResponse.body ?? '';
+  let parsedBody: Record<string, unknown> = {};
+
+  if (bodyText) {
+    try {
+      parsedBody = JSON.parse(bodyText) as Record<string, unknown>;
+    } catch {
+      return toolError(`HTTP ${objectResponse.statusCode}: ${bodyText}`);
+    }
+  }
+
+  if (objectResponse.statusCode < 200 || objectResponse.statusCode >= 300) {
+    // Conflicts (404 / 409 / 422 / 423) surface as tool errors carrying the
+    // status code and the endpoint's own payload (lock holder, expected/actual
+    // version, PatchApplyError code, blockers) so the agent can react.
+    return toolError(typeof parsedBody.error === 'string' ? parsedBody.error : `HTTP ${objectResponse.statusCode}`, {
+      statusCode: objectResponse.statusCode,
+      ...stripObjectEnvelope(parsedBody),
+    });
+  }
+
+  return stripObjectEnvelope(parsedBody);
+};
+
+type ArtifactBridgeScope = { siteId: string; requestId: string };
+
+const resolveArtifactBridgeScope = async (
+  event: LambdaEvent,
+  input: Record<string, unknown>
+): Promise<{ ok: true; scope: ArtifactBridgeScope } | { ok: false; result: ReturnType<typeof toolError> }> => {
+  const siteId = toNonEmptyString(input.site_id);
+  const requestId = toNonEmptyString(input.request_id);
+  const identity = getSiteIdentity();
+
+  if (!siteId || !requestId) {
+    return {
+      ok: false,
+      result: toolError('site_id and request_id are required.', { error_code: 'artifact_scope_required' }),
+    };
+  }
+  if (siteId !== identity.siteId) {
+    return {
+      ok: false,
+      result: toolError(
+        `Artifact scope mismatch: this deployment owns ${identity.siteId}, not ${siteId}. Use the owning site's Platform connector.`,
+        { error_code: 'artifact_site_mismatch' }
+      ),
+    };
+  }
+
+  const lookup = await invokeObjectStore(event, {
+    action: 'get',
+    object_type: 'content_item',
+    object_id: requestId,
+  });
+  if ('isError' in lookup) {
+    return {
+      ok: false,
+      result: toolError(
+        `Artifact request mapping is absent: content_item ${requestId} does not exist on ${siteId}. Create or select the owning content object before requesting artifacts.`,
+        { error_code: 'artifact_request_not_found' }
+      ),
+    };
+  }
+
+  const record =
+    lookup.record && typeof lookup.record === 'object' && !Array.isArray(lookup.record)
+      ? (lookup.record as Record<string, unknown>)
+      : undefined;
+  if (!record || record.object_id !== requestId || record.site !== siteId) {
+    return {
+      ok: false,
+      result: toolError(`Artifact scope mismatch: ${requestId} is not owned by ${siteId}.`, {
+        error_code: 'artifact_request_scope_mismatch',
+      }),
+    };
+  }
+
+  return { ok: true, scope: { siteId, requestId } };
+};
+
+const buildArtifactBridgeGrant = () => {
+  const built = buildPdfToolStorageGrant();
+  return built.ok
+    ? { ok: true as const, grant: built.grant }
+    : {
+        ok: false as const,
+        result: toolError(built.error, { error_code: built.errorCode, statusCode: 503 }),
+      };
+};
+
+const pdfToolBridgeError = (result: { statusCode: number; error: string; body?: Record<string, unknown> }) =>
+  toolError(result.error, {
+    error_code: 'pdf_tool_bridge_request_failed',
+    statusCode: result.statusCode,
+    ...(result.body ?? {}),
+  });
+
+const platformPolling = (scope: ArtifactBridgeScope, jobId: string) => ({
+  tool: 'get_agent_artifact_job_status',
+  input: { site_id: scope.siteId, request_id: scope.requestId, job_id: jobId },
+  recommended_interval_ms: 2000,
+  terminal_statuses: ['complete', 'failed'],
+});
+
+export const callCreateAgentArtifactJob = async (event: LambdaEvent, input: Record<string, unknown>) => {
+  const scoped = await resolveArtifactBridgeScope(event, input);
+  if (!scoped.ok) return scoped.result;
+  const artifactKind = toNonEmptyString(input.artifact_kind);
+  const filename = toNonEmptyString(input.filename);
+  if ((artifactKind !== 'image' && artifactKind !== 'pdf') || !filename) {
+    return toolError('artifact_kind must be image or pdf, and filename is required.');
+  }
+
+  const built = buildArtifactBridgeGrant();
+  if (!built.ok) return built.result;
+  const jobInput: PlatformArtifactJobInput = {
+    requestId: scoped.scope.requestId,
+    artifactKind,
+    filename,
+    ...(toNonEmptyString(input.operation)
+      ? { operation: toNonEmptyString(input.operation) as 'generate' | 'edit' }
+      : {}),
+    ...(toNonEmptyString(input.prompt) ? { prompt: toNonEmptyString(input.prompt) } : {}),
+    ...(toNonEmptyString(input.slot) ? { slot: toNonEmptyString(input.slot) } : {}),
+    ...(toNonEmptyString(input.model) ? { model: toNonEmptyString(input.model) } : {}),
+    ...(input.requirements && typeof input.requirements === 'object' && !Array.isArray(input.requirements)
+      ? { requirements: input.requirements as Record<string, unknown> }
+      : {}),
+    ...(toNonEmptyString(input.template_id) ? { templateId: toNonEmptyString(input.template_id) } : {}),
+    ...(input.data !== undefined ? { data: input.data } : {}),
+    ...(input.assets && typeof input.assets === 'object' && !Array.isArray(input.assets)
+      ? { assets: input.assets as { images?: unknown[] } }
+      : {}),
+  };
+  const created = await createPlatformArtifactJob(built.grant, jobInput);
+  if (!created.ok) return pdfToolBridgeError(created);
+
+  const jobId = toNonEmptyString(created.body.jobId);
+  if (!jobId) return toolError('pdf-tool returned no jobId.', { error_code: 'pdf_tool_invalid_response' });
+  event.log?.({
+    event: 'artifact_bridge_job_created',
+    siteId: scoped.scope.siteId,
+    requestId: scoped.scope.requestId,
+    projectId: built.grant.projectId,
+    jobId,
+  });
+  const { polling: _pdfToolPolling, ...safeBody } = created.body;
+  return toolResult({
+    ...safeBody,
+    siteId: scoped.scope.siteId,
+    projectId: built.grant.projectId,
+    requestId: scoped.scope.requestId,
+    polling: platformPolling(scoped.scope, jobId),
+  });
+};
+
+const verifyBridgeArtifact = async (
+  grant: Extract<ReturnType<typeof buildArtifactBridgeGrant>, { ok: true }>['grant'],
+  requestId: string,
+  artifactReference: Record<string, unknown>,
+  materializationProof: string | undefined
+) => {
+  const verified = await verifyPlatformArtifact(grant, requestId, artifactReference, materializationProof);
+  if (!verified.ok) return { ok: false as const, result: pdfToolBridgeError(verified) };
+  if (verified.body.verified !== true) {
+    return {
+      ok: false as const,
+      result: toolError(
+        typeof verified.body.reason === 'string'
+          ? verified.body.reason
+          : 'pdf-tool could not verify artifact materialization for this request.',
+        { error_code: 'artifact_materialization_unverified' }
+      ),
+    };
+  }
+  const canonical = canonicalPlatformArtifact(verified.body);
+  return canonical
+    ? { ok: true as const, canonical }
+    : {
+        ok: false as const,
+        result: toolError('pdf-tool verification returned no canonical ArtifactReference.', {
+          error_code: 'pdf_tool_invalid_response',
+        }),
+      };
+};
+
+export const callGetAgentArtifactJobStatus = async (event: LambdaEvent, input: Record<string, unknown>) => {
+  const scoped = await resolveArtifactBridgeScope(event, input);
+  if (!scoped.ok) return scoped.result;
+  const jobId = toNonEmptyString(input.job_id);
+  if (!jobId) return toolError('job_id is required.');
+  const built = buildArtifactBridgeGrant();
+  if (!built.ok) return built.result;
+
+  const status = await getPlatformArtifactJobStatus(built.grant, jobId);
+  if (!status.ok) return pdfToolBridgeError(status);
+  if (status.body.projectId !== built.grant.projectId || status.body.requestId !== scoped.scope.requestId) {
+    return toolError('pdf-tool job scope does not match the requested site/content object.', {
+      error_code: 'artifact_job_scope_mismatch',
+    });
+  }
+
+  const { polling: _pdfToolPolling, artifact: _duplicateArtifact, artifactReference, ...safeStatus } = status.body;
+  if (status.body.status !== 'complete') {
+    return toolResult({ ...safeStatus, siteId: scoped.scope.siteId, polling: platformPolling(scoped.scope, jobId) });
+  }
+  const claimed =
+    artifactReference && typeof artifactReference === 'object' && !Array.isArray(artifactReference)
+      ? (artifactReference as Record<string, unknown>)
+      : undefined;
+  if (!claimed) return toolError('Completed pdf-tool job returned no ArtifactReference.');
+  const verified = await verifyBridgeArtifact(
+    built.grant,
+    scoped.scope.requestId,
+    claimed,
+    status.internalMaterializationProof
+  );
+  if (!verified.ok) return verified.result;
+
+  event.log?.({
+    event: 'artifact_bridge_job_verified',
+    siteId: scoped.scope.siteId,
+    requestId: scoped.scope.requestId,
+    projectId: built.grant.projectId,
+    jobId,
+    blobKey: verified.canonical.artifactReference.blobKey,
+  });
+  return toolResult({
+    ...safeStatus,
+    siteId: scoped.scope.siteId,
+    projectId: built.grant.projectId,
+    requestId: scoped.scope.requestId,
+    artifactReference: verified.canonical.artifactReference,
+    public_path: verified.canonical.publicPath,
+    verified: true,
+  });
+};
+
+export const callGetAgentArtifactBySlot = async (event: LambdaEvent, input: Record<string, unknown>) => {
+  const scoped = await resolveArtifactBridgeScope(event, input);
+  if (!scoped.ok) return scoped.result;
+  const slot = toNonEmptyString(input.slot);
+  if (!slot) return toolError('slot is required.');
+  const built = buildArtifactBridgeGrant();
+  if (!built.ok) return built.result;
+
+  const found = await getPlatformArtifactBySlot(built.grant, scoped.scope.requestId, slot);
+  if (!found.ok) return pdfToolBridgeError(found);
+  const claimed = canonicalPlatformArtifact(found.body)?.artifactReference;
+  if (!claimed) return toolError('pdf-tool slot lookup returned no ArtifactReference.');
+  const verified = await verifyBridgeArtifact(
+    built.grant,
+    scoped.scope.requestId,
+    claimed,
+    found.internalMaterializationProof
+  );
+  if (!verified.ok) return verified.result;
+
+  return toolResult({
+    siteId: scoped.scope.siteId,
+    projectId: built.grant.projectId,
+    requestId: scoped.scope.requestId,
+    slot,
+    artifactReference: verified.canonical.artifactReference,
+    public_path: verified.canonical.publicPath,
+    verified: true,
+  });
+};
+
+// Templates are site/project-level assets, not content-item-scoped — this is
+// deliberately lighter than resolveArtifactBridgeScope (no request_id, no
+// content_item lookup; templates have no equivalent owning object).
+const resolveTemplateBridgeScope = (
+  input: Record<string, unknown>
+): { ok: true; siteId: string } | { ok: false; result: ReturnType<typeof toolError> } => {
+  const siteId = toNonEmptyString(input.site_id);
+  const identity = getSiteIdentity();
+  if (!siteId) {
+    return { ok: false, result: toolError('site_id is required.', { error_code: 'template_scope_required' }) };
+  }
+  if (siteId !== identity.siteId) {
+    return {
+      ok: false,
+      result: toolError(
+        `Template scope mismatch: this deployment owns ${identity.siteId}, not ${siteId}. Use the owning site's Platform connector.`,
+        { error_code: 'template_site_mismatch' }
+      ),
+    };
+  }
+  return { ok: true, siteId };
+};
+
+export const callCreatePdfTemplate = async (event: LambdaEvent, input: Record<string, unknown>) => {
+  const scoped = resolveTemplateBridgeScope(input);
+  if (!scoped.ok) return scoped.result;
+  const templateJson = input.template_json;
+  if (!templateJson || typeof templateJson !== 'object' || Array.isArray(templateJson)) {
+    return toolError('template_json is required and must be an object.');
+  }
+  const renderer = toNonEmptyString(input.renderer);
+  if (renderer && !['pdfme', 'react-pdf', 'typst', 'chromium'].includes(renderer)) {
+    return toolError('renderer must be one of: pdfme, react-pdf, typst, chromium.');
+  }
+
+  const built = buildArtifactBridgeGrant();
+  if (!built.ok) return built.result;
+  const created = await createPlatformPdfTemplate(built.grant, {
+    templateJson,
+    ...(renderer ? { renderer: renderer as PlatformCreateTemplateInput['renderer'] } : {}),
+    ...(toNonEmptyString(input.template_id) ? { templateId: toNonEmptyString(input.template_id) } : {}),
+    ...(toNonEmptyString(input.label) ? { label: toNonEmptyString(input.label) } : {}),
+    ...(Array.isArray(input.tags) ? { tags: input.tags as string[] } : {}),
+  });
+  if (!created.ok) return pdfToolBridgeError(created);
+
+  event.log?.({
+    event: 'template_bridge_created',
+    siteId: scoped.siteId,
+    projectId: built.grant.projectId,
+    templateId: created.body.templateId,
+    version: created.body.version,
+  });
+  return toolResult({ ...created.body, siteId: scoped.siteId });
+};
+
+export const callListPdfTemplates = async (event: LambdaEvent, input: Record<string, unknown>) => {
+  const scoped = resolveTemplateBridgeScope(input);
+  if (!scoped.ok) return scoped.result;
+  const built = buildArtifactBridgeGrant();
+  if (!built.ok) return built.result;
+
+  const limit = typeof input.limit === 'number' && Number.isFinite(input.limit) ? input.limit : undefined;
+  const listed = await listPlatformPdfTemplates(built.grant, {
+    ...(limit ? { limit } : {}),
+    ...(toNonEmptyString(input.cursor) ? { cursor: toNonEmptyString(input.cursor) } : {}),
+  });
+  if (!listed.ok) return pdfToolBridgeError(listed);
+  return toolResult({ ...listed.body, siteId: scoped.siteId });
+};
+
+export const callGetPdfTemplate = async (event: LambdaEvent, input: Record<string, unknown>) => {
+  const scoped = resolveTemplateBridgeScope(input);
+  if (!scoped.ok) return scoped.result;
+  const templateId = toNonEmptyString(input.template_id);
+  if (!templateId) return toolError('template_id is required.');
+  const built = buildArtifactBridgeGrant();
+  if (!built.ok) return built.result;
+
+  const version = typeof input.version === 'number' && Number.isFinite(input.version) ? input.version : undefined;
+  const found = await getPlatformPdfTemplate(built.grant, { templateId, ...(version ? { version } : {}) });
+  if (!found.ok) return pdfToolBridgeError(found);
+  return toolResult({ ...found.body, siteId: scoped.siteId });
+};
+
+export const callPublishPdfTemplate = async (event: LambdaEvent, input: Record<string, unknown>) => {
+  const scoped = resolveTemplateBridgeScope(input);
+  if (!scoped.ok) return scoped.result;
+  const templateId = toNonEmptyString(input.template_id);
+  if (!templateId) return toolError('template_id is required.');
+  const built = buildArtifactBridgeGrant();
+  if (!built.ok) return built.result;
+
+  const version = typeof input.version === 'number' && Number.isFinite(input.version) ? input.version : undefined;
+  const published = await publishPlatformPdfTemplate(built.grant, { templateId, ...(version ? { version } : {}) });
+  if (!published.ok) return pdfToolBridgeError(published);
+  return toolResult({ ...published.body, siteId: scoped.siteId });
+};
+
+export const callDeletePdfTemplate = async (event: LambdaEvent, input: Record<string, unknown>) => {
+  const scoped = resolveTemplateBridgeScope(input);
+  if (!scoped.ok) return scoped.result;
+  const templateId = toNonEmptyString(input.template_id);
+  if (!templateId) return toolError('template_id is required.');
+  const built = buildArtifactBridgeGrant();
+  if (!built.ok) return built.result;
+
+  const version = typeof input.version === 'number' && Number.isFinite(input.version) ? input.version : undefined;
+  const reason = toNonEmptyString(input.reason);
+  const deleted = await deletePlatformPdfTemplate(built.grant, {
+    templateId,
+    ...(version ? { version } : {}),
+    ...(reason ? { reason } : {}),
+  });
+  if (!deleted.ok) return pdfToolBridgeError(deleted);
+
+  event.log?.({
+    event: 'template_bridge_deleted',
+    siteId: scoped.siteId,
+    projectId: built.grant.projectId,
+    templateId: deleted.body.templateId,
+    version: deleted.body.version,
+  });
+  return toolResult({ ...deleted.body, siteId: scoped.siteId });
+};
+
+export const callObjectAction = async (event: LambdaEvent, payload: Record<string, unknown>) => {
+  const result = await invokeObjectStore(event, payload);
+
+  if ('isError' in result) return result;
+
+  return toolResult(result);
+};
+
+// A successful object publish COMMITS the export to main with the Netlify skip
+// marker ([skip netlify]), so the push does NOT build or deploy — object
+// exports deliberately accumulate on main and go live only on an explicit
+// release. Attach an explicit production status to every successful publish so
+// an agent never mistakes "committed" for "live" and knows the deploy is a
+// separate, deliberate step (release_to_production / the admin button).
+const OBJECT_PUBLISH_LIVE_NOTE =
+  'Committed to main with the Netlify skip marker ([skip netlify]): this commit does NOT build or deploy, so the change is NOT live and will not go live on its own. Object exports accumulate on main until an explicit release. Call release_to_production (or use the admin "Release to Production" button) to POST the production build hook once and deploy all accumulated exports as a single deploy, then confirm the live site.';
+
+export const callObjectPublish = async (event: LambdaEvent, payload: Record<string, unknown>) => {
+  const result = await invokeObjectStore(event, payload);
+
+  if ('isError' in result) return result;
+
+  // For articles the publish result carries the live permalink — surface it
+  // with the exact follow-up so the agent verifies the real URL after release
+  // instead of guessing routes (the post-publish-404 failure class).
+  const articlePath = typeof result.article_path === 'string' ? result.article_path : undefined;
+  const receiptCommit =
+    result.receipt && typeof result.receipt === 'object' && !Array.isArray(result.receipt)
+      ? (result.receipt as { commit_sha?: unknown }).commit_sha
+      : undefined;
+
+  return toolResult({
+    ...result,
+    production: {
+      committed: true,
+      live: false,
+      deploy_deferred: true,
+      requires_explicit_release: true,
+      note: OBJECT_PUBLISH_LIVE_NOTE,
+      ...(articlePath
+        ? {
+            article_path: articlePath,
+            verify_after_release:
+              `After release_to_production, poll deploy_status {commit: "${typeof receiptCommit === 'string' ? receiptCommit : '<receipt.commit_sha>'}"} ` +
+              `until deployStatus is "ready" AND productionConfirmed is true, then call verify_article_images ` +
+              `{ url: "<site-origin>${articlePath}", expectedImages: [each node media /img/... path], commit: the same sha } for the definitive live check.`,
+          }
+        : {}),
+    },
+  });
+};
