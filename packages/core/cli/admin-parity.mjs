@@ -223,7 +223,7 @@ export const scanCoreBlobStoreNames = (coreDir = path.join(repoRoot, 'packages',
   return [...names].sort();
 };
 
-// ─── parsers (shared with the drift-test approach) ───────────────────────
+// ─── parsers (shared with the drift-test approach) ───────────────────────────
 
 /** Parses every `[[redirects]]` block of a netlify.toml into {from,to,status,force}. */
 export const parseNetlifyTomlRedirects = (tomlText) =>

@@ -392,7 +392,7 @@ export const runWritePlan = async (report, { store, principal, nowMs = undefined
   return { attempted, skipped };
 };
 
-// ─── CLI plumbing ──────────────────────────────────────────────────────────────
+// ─── CLI plumbing ────────────────────────────────────────────────────────────
 
 const parseArgs = (argv) => {
   const opts = { write: false, local: false, adminParity: false };
