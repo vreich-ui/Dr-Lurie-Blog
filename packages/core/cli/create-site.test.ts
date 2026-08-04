@@ -158,6 +158,7 @@ test('CORE_BLOB_STORES matches the store-name literals in blob-store.ts/governan
     [...CORE_BLOB_STORES].sort(),
     [
       'agent-chats',
+      'agent-learning', // S4x (2/2): the tagged canvas Ask-AI proposal trail a save carries
       'agent-profiles',
       'artifact-index',
       'artifacts',

@@ -93,11 +93,17 @@ import {
   type CreationPolicy,
 } from '../../lib/creation-policy.js';
 import { approvalPinSchema, decideReview, discardProposal, publishActionSchema, submitReview } from './review-state.js';
+import { isAgentLearningTrailOp, type AgentLearningRecord } from '../../lib/admin/agent-learning-trail.js';
 
 // ─── store shape ──────────────────────────────────────────────────────────────
 
 export type ObjectVerbStore = ObjectLockStore & {
   list(options: { prefix: string; directories?: boolean; paginate?: boolean }): Promise<BlobListResponse>;
+};
+
+/** S4x (2/2): the minimal shape the agent-learning write needs — plain setJSON, no new abstraction. */
+export type AgentLearningWriteStore = {
+  setJSON(key: string, value: unknown): Promise<void | { modified: boolean; etag?: string }>;
 };
 
 // ─── request grammar (per-action) ────────────────────────────────────────────
@@ -349,6 +355,16 @@ export type HandleObjectVerbOptions = {
    * Absent ⇒ treated as no roles.
    */
   roles?: readonly Role[];
+  /**
+   * S4x (2/2): the per-site agent-learning blob store. A 'patch' whose `ops`
+   * carries the AGENT_LEARNING_TRAIL_OP marker (edit-mode/ui.ts appends it
+   * alongside the real ops for a save that followed a canvas Ask-AI round)
+   * writes the tagged trail here — ONLY after the rest of the patch persists.
+   * Absent (the publish-key agent path never sends the marker; admin-object.ts
+   * is the only caller that supplies this): any marker present is stripped
+   * from the ops array and silently dropped, never applied as a content op.
+   */
+  agentLearningStore?: AgentLearningWriteStore;
 };
 
 // ─── small helpers ────────────────────────────────────────────────────────────
@@ -442,6 +458,13 @@ const mintOpsIds = (rawOps: readonly unknown[]): { ops: unknown[]; minted: Minte
     return op;
   });
   return { ops, minted };
+};
+
+/** `learning/<yyyy-mm-dd>/<compact-ts>-<object_type>-<object_id>.json` — the commerce-events date-directory idiom. */
+const agentLearningRecordKey = (objectType: ObjectType, objectId: string, at: string): string => {
+  const date = at.slice(0, 10);
+  const compactTs = at.replace(/\D/g, '');
+  return `learning/${date}/${compactTs}-${objectType}-${objectId}.json`;
 };
 
 // A patch the engine refuses maps to an HTTP code by kind: a malformed op is a
@@ -1278,10 +1301,18 @@ export const handleObjectVerb = async (
         });
       }
 
+      // S4x (2/2): the canvas Ask-AI proposal trail rides as one marker entry
+      // in the SAME ops array the save already sends — pull it out before
+      // minting/applying so it is never itself a patch op and never reaches
+      // the engine (it does not touch the object body or history[].details).
+      // It ships to agent-learning only after the REST of the ops persist.
+      const learningOps = request.ops.filter(isAgentLearningTrailOp);
+      const contentOps = request.ops.filter((op) => !isAgentLearningTrailOp(op));
+
       let minted: MintedId[];
       let normalizedOps: unknown[];
       try {
-        const result = mintOpsIds(request.ops);
+        const result = mintOpsIds(contentOps);
         normalizedOps = result.ops;
         minted = result.minted;
       } catch (error) {
@@ -1323,7 +1354,9 @@ export const handleObjectVerb = async (
       );
       const summary = summarizeValidation(groups);
       if (!summary.eligible) {
-        // Hard-fail rejects the op and does NOT persist (C§2.0).
+        // Hard-fail rejects the op and does NOT persist (C§2.0) — a pending
+        // learning trail is discarded right along with it: no orphaned
+        // record for a change that never landed.
         return err(422, {
           error: 'Validation failed',
           validation: groups,
@@ -1334,6 +1367,27 @@ export const handleObjectVerb = async (
       }
 
       await store.setJSON(key, appliedRecord);
+
+      // Ship the trail ONLY now that the save it describes has actually
+      // persisted — atomic with the save (one call from the caller, not a
+      // separate request ahead of it). Absent agentLearningStore (the
+      // publish-key agent path never wires one): the trail is dropped, not
+      // queued — it was never anything but ops-array cargo for this one call.
+      if (learningOps.length > 0 && options.agentLearningStore) {
+        const learningRecord: AgentLearningRecord = {
+          object_id: request.object_id,
+          object_type: request.object_type,
+          site: record.site,
+          saved_at: timestamp,
+          editor: principal,
+          proposals: learningOps.flatMap((op) => op.proposals),
+        };
+        await options.agentLearningStore.setJSON(
+          agentLearningRecordKey(request.object_type, request.object_id, timestamp),
+          learningRecord
+        );
+      }
+
       return ok({
         version: appliedRecord.version,
         content_revision: appliedRecord.content_revision,

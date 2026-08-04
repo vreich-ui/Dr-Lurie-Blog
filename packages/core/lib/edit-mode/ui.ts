@@ -24,6 +24,7 @@
  * unit-tested modules (targets.ts, preview.ts, verbs-client.ts).
  */
 import { captureObjectSelection } from '../admin/ask-ai-object-selection.js';
+import { buildLearningTrailOpIfAny, scopeKeyFor, type AccumulatedProposal } from '../admin/agent-learning-trail.js';
 import { SECTION_PALETTE, insertPositionFor } from './sections-palette.js';
 import { NODE_PALETTE } from './nodes-palette.js';
 import {
@@ -125,6 +126,42 @@ const imageEntriesFor = (data: Record<string, unknown>): Array<{ field: string; 
 // Locks survive view-transition remounts: sessions are module state, not mount state.
 const sessions = new Map<string, EditSession>();
 let activeController: AbortController | undefined;
+
+// S4x (2/2): every Ask-AI round the editor asks for, per object/section/node,
+// held ONLY in memory — never sent anywhere on its own. A save for the same
+// scope ships the tagged trail alongside the patch it already sends
+// (attachLearningTrail/clearLearningTrail below); nothing here survives a
+// navigate-away without a save, same lifetime discipline as `sessions`.
+const proposalTrails = new Map<string, AccumulatedProposal[]>();
+
+/**
+ * Append the tagged learning trail (if this scope has accumulated any
+ * pending Ask-AI proposals) as one extra entry in the ops array a save is
+ * about to send — the SAME object_patch call, never a separate request.
+ * `savedFields` is whatever fields this particular save actually persists,
+ * used to determine which (if any) accumulated proposal it used.
+ */
+const attachLearningTrail = (
+  target: EditTarget,
+  ops: Array<Record<string, unknown>>,
+  savedFields: Record<string, unknown> | undefined
+): void => {
+  const trailOp = buildLearningTrailOpIfAny(proposalTrails.get(scopeKeyFor(target)), savedFields);
+  if (trailOp) ops.push(trailOp);
+};
+
+/** Call once a save for this scope has actually landed: its trail has shipped: the next editing session starts fresh. */
+const clearLearningTrail = (target: EditTarget): void => {
+  proposalTrails.delete(scopeKeyFor(target));
+};
+
+/** Record one Ask-AI round (mandate #9) — appends, never replaces; re-asking keeps every prior round in the trail. */
+const accumulateProposal = (target: EditTarget, instruction: string, suggestion: Record<string, unknown>): void => {
+  const key = scopeKeyFor(target);
+  const list = proposalTrails.get(key) ?? [];
+  list.push({ instruction, suggestion, at: new Date().toISOString() });
+  proposalTrails.set(key, list);
+};
 
 // The canvas chrome themes itself from the PROJECT it is editing: every color
 // and font is the site's own --aw-* design token (rendered by CustomStyles from
@@ -2310,9 +2347,11 @@ export const mountEditMode = (options: MountOptions): void => {
       log('sys', `Locked by ${escapeHtml(checkout.heldBy ?? 'another editor')} — try again when the lock frees.`);
       return;
     }
-    const outcome = await objectSession.patch([
+    const ops: Array<Record<string, unknown>> = [
       { op: 'update_node', node_id: state.target.nodeId, fields: { private: fields } },
-    ]);
+    ];
+    attachLearningTrail(state.target, ops, fields);
+    const outcome = await objectSession.patch(ops);
     working.remove();
     saveButton.done(outcome.ok);
     if (!outcome.ok) {
@@ -2320,6 +2359,7 @@ export const mountEditMode = (options: MountOptions): void => {
       log('sys', `Not saved: ${escapeHtml(outcome.error)}${blockers}`);
       return;
     }
+    clearLearningTrail(state.target);
     state.nodePrivate = {
       ...before,
       ...Object.fromEntries(Object.entries(fields).map(([key, value]) => [key, value ?? undefined])),
@@ -2513,7 +2553,9 @@ export const mountEditMode = (options: MountOptions): void => {
       log('sys', `Locked by ${escapeHtml(checkout.heldBy ?? 'another editor')} — try again when the lock frees.`);
       return;
     }
-    const outcome = await objectSession.patch([{ op: 'set_article_meta', fields }]);
+    const ops: Array<Record<string, unknown>> = [{ op: 'set_article_meta', fields }];
+    attachLearningTrail(state.target, ops, fields);
+    const outcome = await objectSession.patch(ops);
     working.remove();
     saveButton.done(outcome.ok);
     if (!outcome.ok) {
@@ -2521,6 +2563,7 @@ export const mountEditMode = (options: MountOptions): void => {
       log('sys', `Not saved: ${escapeHtml(outcome.error)}${blockers}`);
       return;
     }
+    clearLearningTrail(state.target);
     state.articleMeta = {
       ...before,
       ...(fields.slug !== undefined ? { slug: fields.slug } : {}),
@@ -2602,6 +2645,7 @@ export const mountEditMode = (options: MountOptions): void => {
       log('sys', `Locked by ${escapeHtml(checkout.heldBy ?? 'another editor')} — try again when the lock frees.`);
       return;
     }
+    attachLearningTrail(state.target, ops, changes);
     const outcome = await objectSession.patch(ops);
     working.remove();
     saveButton.done(outcome.ok);
@@ -2610,6 +2654,7 @@ export const mountEditMode = (options: MountOptions): void => {
       log('sys', `Not saved: ${escapeHtml(outcome.error)}${blockers}`);
       return;
     }
+    clearLearningTrail(state.target);
     for (const preview of previews) previewFieldChange(state.region, 'string', preview.before, preview.after);
     // Keep the panel body in step with the draft record, then re-snapshot the
     // form (a later upsert_group resends whole groups — staleness reverts edits).
@@ -2747,7 +2792,9 @@ export const mountEditMode = (options: MountOptions): void => {
       log('sys', `Locked by ${escapeHtml(checkout.heldBy ?? 'another editor')} — try again when the lock frees.`);
       return;
     }
-    const outcome = await objectSession.patch(suggestionToOps(state.target, changed, state.patchSectionId));
+    const ops = suggestionToOps(state.target, changed, state.patchSectionId);
+    attachLearningTrail(state.target, ops, changed);
+    const outcome = await objectSession.patch(ops);
     working.remove();
     saveButton.done(outcome.ok);
     if (!outcome.ok) {
@@ -2755,6 +2802,7 @@ export const mountEditMode = (options: MountOptions): void => {
       log('sys', `Not saved: ${escapeHtml(outcome.error)}${blockers}`);
       return;
     }
+    clearLearningTrail(state.target);
     // Show the saved draft in place where we can do so unambiguously.
     for (const preview of previews) {
       if (preview.kind === 'image') {
@@ -2867,10 +2915,12 @@ export const mountEditMode = (options: MountOptions): void => {
     }
     const changes = summarizeFieldChanges(state.currentData, response.suggestion);
     if (changes.length === 0) {
+      accumulateProposal(state.target, instruction, {});
       log('ai', 'No changes — the content already satisfies that.');
       return;
     }
     state.suggestion = changedFieldsOnly(changes);
+    accumulateProposal(state.target, instruction, state.suggestion);
     state.changes = changes;
     state.snapshot = snapshotRegion(state.region);
     const previewed = new Map<string, boolean>();
@@ -2902,6 +2952,7 @@ export const mountEditMode = (options: MountOptions): void => {
       return;
     }
     const ops = suggestionToOps(state.target, state.suggestion, state.patchSectionId);
+    attachLearningTrail(state.target, ops, state.suggestion);
     const outcome = await objectSession.patch(ops);
     working.remove();
     if (!outcome.ok) {
@@ -2910,6 +2961,7 @@ export const mountEditMode = (options: MountOptions): void => {
       suggestionActions.hidden = false;
       return;
     }
+    clearLearningTrail(state.target);
     Object.assign(state.currentData, state.suggestion);
     invalidateRecord(state.target.objectType, state.target.objectId);
     state.suggestion = undefined;

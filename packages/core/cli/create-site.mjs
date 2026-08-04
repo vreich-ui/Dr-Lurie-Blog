@@ -262,6 +262,9 @@ export const CORE_BLOB_STORES = [
   'opt-ins',
   'commerce-events',
   'tracking-events',
+  // S4x (2/2): the tagged canvas Ask-AI proposal trail a save carries —
+  // write-mostly training data, admin-object.ts's only consumer.
+  'agent-learning',
 ];
 
 const DATA_SITE_SUBDIRS = [

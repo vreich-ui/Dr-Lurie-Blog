@@ -172,6 +172,6 @@ ADMIN WORKSPACE BOOTSTRAP (human gate — runbook site-provisioning-runbook.md �
   2. Set ADMIN_EMAILS on the site to the operator’s real email(s) — bootstrap Owners; the
      users store can be empty/wiped and these addresses still get in.
   3. Invite the first Owner via /admin/settings/admins (or rely on ADMIN_EMAILS alone).
-  Blob stores backing the workspace (probed automatically when a token is supplied): site-objects, workflows, artifacts, artifact-index, commerce, agent-chats, agent-profiles, governance, users, opt-ins, commerce-events, tracking-events.
+  Blob stores backing the workspace (probed automatically when a token is supplied): site-objects, workflows, artifacts, artifact-index, commerce, agent-chats, agent-profiles, governance, users, opt-ins, commerce-events, tracking-events, agent-learning.
   Verify any tenant any time:  node scripts/audit-site-admin-parity.mjs --site sites/<client>
 `;
