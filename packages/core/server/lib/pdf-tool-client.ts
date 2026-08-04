@@ -229,6 +229,21 @@ export const publishPlatformPdfTemplate = (
     options
   );
 
+export const deletePlatformPdfTemplate = (
+  grant: PdfToolStorageGrant,
+  input: { templateId: string; version?: number; reason?: string },
+  options: PdfToolClientOptions = {}
+) =>
+  postPdfTool(
+    'delete-pdf-template',
+    projectPayload(grant, {
+      templateId: input.templateId,
+      ...(input.version ? { version: input.version } : {}),
+      ...(input.reason ? { reason: input.reason } : {}),
+    }),
+    options
+  );
+
 export const canonicalPlatformArtifact = (body: Record<string, unknown>) => {
   const reference = isRecord(body.artifactReference)
     ? body.artifactReference
