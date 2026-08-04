@@ -304,7 +304,7 @@ export const idsFor = (clientSlug) => {
   };
 };
 
-// ─── file content templates ─────────────────────────────────────────────────
+// ─── file content templates ───────────────────────────────────────────────
 
 const titleCase = (slug) =>
   slug
@@ -447,6 +447,12 @@ const netlifyTomlTemplate = (ids) => `# Per-site Netlify config. The redirects h
   command = "(npx --no-install astro --version > /dev/null 2>&1 || npm ci --prefix ../.. --no-audit --no-fund) && npx --no-install astro build --config astro.config.ts"
 [build.environment]
   NODE_VERSION = "20"
+  # Same omission the root netlify.toml carries (W15 S3 parity): the secrets
+  # scanner fails the ENTIRE build on any appearance of GITHUB_REPOSITORY's
+  # literal value (the monorepo's own owner/name string) anywhere in scanned
+  # files -- and repo docs legitimately name the repo. See the root file's
+  # comment for the full story.
+  SECRETS_SCAN_OMIT_KEYS = "GITHUB_REPOSITORY"
 
 [functions]
   directory = "netlify/functions"
@@ -978,10 +984,19 @@ const contentConfigTemplate = (ids) => `/**
  * and live in the shell; this file supplies only this deployment's export root.
  * Astro requires the file at \`<srcDir>/content/config.ts\`, which is why every
  * site carries its own three-line copy.
+ *
+ * \`postDir\` is pinned to THIS site's own (empty) legacy shelf — W15 S3: the
+ * shared default is \`src/data/post\`, which is Dr-Lurie's preserved legacy
+ * content, and inheriting it published Dr-Lurie's committed test post on
+ * every tenant with blog routes. Every real article here is a \`content_item\`
+ * object; this shelf stays empty by design.
  */
 import { buildSiteCollections } from '@core/app/content/collections';
 
-export const collections = buildSiteCollections({ dataRoot: 'sites/${ids.clientSlug}/data/site' });
+export const collections = buildSiteCollections({
+  dataRoot: 'sites/${ids.clientSlug}/data/site',
+  postDir: 'sites/${ids.clientSlug}/data/post',
+});
 `;
 
 const configYamlTemplate = (ids, brandName, canonicalHost) => `site:
@@ -1359,7 +1374,7 @@ export const coreFunctionNames = () => {
   return [...stems].sort();
 };
 
-// ─── plan builder ────────────────────────────────────────────────────────────
+// ─── plan builder ──────────────────────────────────────────────────────────────
 
 export const buildPlan = (opts) => {
   const clientSlug = validateClientSlug(opts.name);
@@ -1384,6 +1399,9 @@ export const buildPlan = (opts) => {
     { path: `${dir}/seeds/themes-seed-data.mjs`, content: themeSeedTemplate(ids) },
     { path: `${dir}/seeds/section-templates-seed-data.mjs`, content: sectionTemplatesSeedTemplate(ids) },
     ...DATA_SITE_SUBDIRS.map((sub) => ({ path: `${dir}/data/site/${sub}/.gitkeep`, content: '' })),
+    // The site's OWN legacy post shelf (empty by design) — the target of the
+    // content config's `postDir` pin above, so the glob has a real directory.
+    { path: `${dir}/data/post/.gitkeep`, content: '' },
 
     // W14 T14.1/T14.2 — the build entry and the routes it can serve.
     { path: `${dir}/astro.config.ts`, content: astroConfigTemplate(ids) },
@@ -1500,7 +1518,7 @@ export const renderPlan = (plan, { netlifyToken }) => {
   return lines.join('\n');
 };
 
-// ─── execution ───────────────────────────────────────────────────────────────
+// ─── execution ─────────────────────────────────────────────────────────────────
 
 export const writeFiles = (plan) => {
   for (const file of plan.files) {
@@ -1733,7 +1751,7 @@ export const executeNetlifyProvisioning = async (
   return { site, siteId, accountId, storeFailures, secretsSet, secretsFailed };
 };
 
-// ─── CLI entry ───────────────────────────────────────────────────────────────
+// ─── CLI entry ─────────────────────────────────────────────────────────────────
 
 const parseArgs = (argv) => {
   const opts = { dryRun: false };
