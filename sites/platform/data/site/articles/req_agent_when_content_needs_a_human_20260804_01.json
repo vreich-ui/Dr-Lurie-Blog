@@ -1,0 +1,94 @@
+{
+  "__generated": {
+    "at": "2026-08-04T15:04:49.620Z",
+    "from": "objects/content_item/by-id/req_agent_when_content_needs_a_human_20260804_01.json",
+    "record_version": 2
+  },
+  "author": "Platform Documentation",
+  "deck": "Most objects in this CMS can be created and published by an agent alone. A few can't — and the difference is deliberate, not accidental.",
+  "description": "How the platform decides which objects an agent can publish unassisted and which ones require a human decision first.",
+  "nodes": [
+    {
+      "id": "n_appr01",
+      "kind": "content",
+      "private": {
+        "intent": "educate",
+        "strategy": "hook"
+      },
+      "public": {
+        "body": "An agent can create a page, adjust a navigation menu, or publish an article without asking anyone first. Try the same thing on a handful of other object types, and the system will refuse — not because something broke, but because that type is built to wait for a person. Knowing which is which, and why, saves a lot of confused troubleshooting.",
+        "title": "Two agents, two very different outcomes"
+      },
+      "visibility": "public"
+    },
+    {
+      "id": "n_appr02",
+      "kind": "content",
+      "private": {
+        "intent": "educate",
+        "strategy": "explanation"
+      },
+      "public": {
+        "body": "Every object type in the CMS carries its own publish policy, decided in advance, not guessed at run time. Most types — the structural, low-risk ones — are autonomous: an agent that creates a valid, checked object can publish it directly, the same way a person with the right role could. A smaller set of higher-stakes types requires a human's explicit approval before anything ships, regardless of who wrote the content.",
+        "title": "Most types are autonomous; a few aren't"
+      },
+      "visibility": "public"
+    },
+    {
+      "id": "n_appr03",
+      "kind": "content",
+      "private": {
+        "intent": "educate",
+        "strategy": "explanation"
+      },
+      "public": {
+        "body": "An approval isn't a blanket \"yes\" that covers whatever comes next. It's tied to the exact thing being approved: the specific object, at a specific version of its content, doing a specific action — publishing it now, scheduling it, or taking it down. If the content changes after approval, or someone tries a different action than the one that was approved, the approval no longer applies. It has to be given again, against the new reality.",
+        "title": "An approval is pinned to one exact action"
+      },
+      "visibility": "public"
+    },
+    {
+      "id": "n_appr04",
+      "kind": "content",
+      "private": {
+        "intent": "educate",
+        "strategy": "step"
+      },
+      "public": {
+        "body": "Practically, this means an agent working on an approval-gated object can still do almost everything up to the final step: draft it, validate it, check it against the site's own rules, get it into a reviewable state. What it can't do is make that last move alone. And even when a human executes that final publish, the platform still checks they're carrying the right role for it — authorship and authorization are checked separately.",
+        "title": "What an agent can and can't do alone"
+      },
+      "visibility": "public"
+    },
+    {
+      "id": "n_appr05",
+      "kind": "content",
+      "private": {
+        "intent": "reassure",
+        "strategy": "resolution"
+      },
+      "public": {
+        "body": "The point isn't to slow an agent down for its own sake. It's to make sure the handful of changes that matter most — the ones a reader or a business decision actually depends on — always have a person's deliberate decision behind them, while everything else keeps moving at agent speed.",
+        "title": "Why the friction is there on purpose"
+      },
+      "visibility": "public"
+    }
+  ],
+  "publication_context": {
+    "domain": "kugel-platform.netlify.app",
+    "publication_name": "Platform",
+    "topic_scope": "CMS publishing governance"
+  },
+  "seo": {
+    "meta_description": "A plain-language guide to approval-gated publishing: which CMS objects need a human sign-off, what an approval actually locks in, and why.",
+    "meta_title": "When Content Needs a Human, and When It Doesn't"
+  },
+  "slug": "when-content-needs-a-human",
+  "taxonomy": {
+    "category": "guide",
+    "tags": [
+      "publishing"
+    ]
+  },
+  "title": "When Content Needs a Human, and When It Doesn't"
+}
