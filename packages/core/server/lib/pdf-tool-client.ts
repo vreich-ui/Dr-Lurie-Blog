@@ -100,6 +100,10 @@ export type PlatformArtifactJobInput = {
   slot?: string;
   model?: string;
   requirements?: Record<string, unknown>;
+  templateId?: string;
+  templateRef?: { storeName?: string; blobKey: string; version?: number };
+  data?: unknown;
+  assets?: { images?: unknown[] };
 };
 
 const projectPayload = (grant: PdfToolStorageGrant, payload: Record<string, unknown>) => ({
@@ -124,6 +128,10 @@ export const createPlatformArtifactJob = (
       slot: input.slot,
       model: input.model,
       requirements: input.requirements,
+      templateId: input.templateId,
+      templateRef: input.templateRef,
+      data: input.data,
+      assets: input.assets,
     }),
     options
   );
@@ -151,6 +159,73 @@ export const verifyPlatformArtifact = (
   postPdfTool(
     'verify-agent-artifact',
     projectPayload(grant, { requestId, artifactReference, materializationProof }),
+    options
+  );
+
+export type PlatformCreateTemplateInput = {
+  templateJson: unknown;
+  renderer?: 'pdfme' | 'react-pdf' | 'typst' | 'chromium';
+  templateId?: string;
+  label?: string;
+  tags?: string[];
+};
+
+export const createPlatformPdfTemplate = (
+  grant: PdfToolStorageGrant,
+  input: PlatformCreateTemplateInput,
+  options: PdfToolClientOptions = {}
+) =>
+  postPdfTool(
+    'create-pdf-template',
+    projectPayload(grant, {
+      templateJson: input.templateJson,
+      ...(input.renderer ? { renderer: input.renderer } : {}),
+      ...(input.templateId ? { templateId: input.templateId } : {}),
+      ...(input.label ? { label: input.label } : {}),
+      ...(input.tags ? { tags: input.tags } : {}),
+    }),
+    options
+  );
+
+export const listPlatformPdfTemplates = (
+  grant: PdfToolStorageGrant,
+  input: { limit?: number; cursor?: string } = {},
+  options: PdfToolClientOptions = {}
+) =>
+  postPdfTool(
+    'list-pdf-templates',
+    projectPayload(grant, {
+      ...(input.limit ? { limit: input.limit } : {}),
+      ...(input.cursor ? { cursor: input.cursor } : {}),
+    }),
+    options
+  );
+
+export const getPlatformPdfTemplate = (
+  grant: PdfToolStorageGrant,
+  input: { templateId: string; version?: number },
+  options: PdfToolClientOptions = {}
+) =>
+  postPdfTool(
+    'get-pdf-template',
+    projectPayload(grant, {
+      templateId: input.templateId,
+      ...(input.version ? { version: input.version } : {}),
+    }),
+    options
+  );
+
+export const publishPlatformPdfTemplate = (
+  grant: PdfToolStorageGrant,
+  input: { templateId: string; version?: number },
+  options: PdfToolClientOptions = {}
+) =>
+  postPdfTool(
+    'publish-pdf-template',
+    projectPayload(grant, {
+      templateId: input.templateId,
+      ...(input.version ? { version: input.version } : {}),
+    }),
     options
   );
 

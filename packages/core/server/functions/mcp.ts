@@ -123,10 +123,15 @@ import { buildPdfToolStorageGrant } from '../lib/pdf-tool-storage-grant.js';
 import {
   canonicalPlatformArtifact,
   createPlatformArtifactJob,
+  createPlatformPdfTemplate,
   getPlatformArtifactBySlot,
   getPlatformArtifactJobStatus,
+  getPlatformPdfTemplate,
+  listPlatformPdfTemplates,
+  publishPlatformPdfTemplate,
   verifyPlatformArtifact,
   type PlatformArtifactJobInput,
+  type PlatformCreateTemplateInput,
 } from '../lib/pdf-tool-client.js';
 import { collectBlobListItems } from '../lib/blob-list.js';
 import {
@@ -611,7 +616,7 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: 'create_agent_artifact_job',
     description:
-      "Create a pdf-tool artifact job through THIS site's trusted Platform bridge. Pass the owning site_id and content-item request_id; Platform resolves the canonical pdf-tool project, verifies request ownership, mints and forwards a fresh short-lived storage grant server-side, and never returns the grant. Do not call pdf-tool directly or guess projectId. The job is asynchronous: poll get_agent_artifact_job_status with the returned jobId; do not recreate it.",
+      "Create a pdf-tool artifact job through THIS site's trusted Platform bridge. Pass the owning site_id and content-item request_id; Platform resolves the canonical pdf-tool project, verifies request ownership, mints and forwards a fresh short-lived storage grant server-side, and never returns the grant. Do not call pdf-tool directly or guess projectId. The job is asynchronous: poll get_agent_artifact_job_status with the returned jobId; do not recreate it. For template-driven PDFs pass template_id + data (+ optional assets) instead of a prompt.",
     inputSchema: objectSchema(
       {
         site_id: stringSchema('Owning site object id, e.g. site_acme. Must match this deployment.'),
@@ -625,6 +630,9 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
         requirements: anyObjectSchema(
           'pdf-tool requirements, e.g. {maxBytes, image:{outputFormat:"webp", size:"1536x1024", usageContext:"article_body"}}.'
         ),
+        template_id: stringSchema('A published pdf_template id to render from, in place of prompt.'),
+        data: anyObjectSchema('Template data payload for a template_id-driven PDF render.'),
+        assets: anyObjectSchema('Optional supporting assets (e.g. {images: [...]}) for a template_id-driven PDF render.'),
       },
       ['site_id', 'request_id', 'artifact_kind', 'filename']
     ),
@@ -653,6 +661,65 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
         slot: stringSchema('The exact slot used when the job was created.'),
       },
       ['site_id', 'request_id', 'slot']
+    ),
+  },
+  {
+    name: 'create_pdf_template',
+    description:
+      "Create or version a pdf-tool PDF template for THIS site through the trusted Platform bridge. Platform resolves the canonical project and mints/forwards a short-lived storage grant server-side; never call pdf-tool directly or pass a grant. Draft only — call publish_pdf_template to activate. renderer is pinned for the template's life; pdfme publishes immediately, react-pdf/typst/chromium require a passed validation render first.",
+    inputSchema: objectSchema(
+      {
+        site_id: stringSchema('Owning site object id, e.g. site_acme. Must match this deployment.'),
+        template_json: anyObjectSchema('The pdf-tool template definition for the chosen renderer.'),
+        renderer: {
+          type: 'string',
+          enum: ['pdfme', 'react-pdf', 'typst', 'chromium'],
+          description: "Rendering engine, pinned for the template's life. Omit to default to pdfme.",
+        },
+        template_id: stringSchema('Optional existing template id to version instead of creating a new template.'),
+        label: stringSchema('Optional human-readable label.'),
+        tags: arraySchema({ type: 'string', minLength: 1 }, 'Optional list of tags.'),
+      },
+      ['site_id', 'template_json']
+    ),
+  },
+  {
+    name: 'list_pdf_templates',
+    description:
+      "List pdf-tool PDF templates for THIS site through the trusted Platform bridge. Site ownership, canonical project, and storage grant are resolved server-side.",
+    inputSchema: objectSchema(
+      {
+        site_id: stringSchema('Owning site object id; must match this deployment.'),
+        limit: intSchema('Optional page size.'),
+        cursor: stringSchema('Optional pagination cursor from a previous list_pdf_templates call.'),
+      },
+      ['site_id']
+    ),
+  },
+  {
+    name: 'get_pdf_template',
+    description:
+      "Fetch a pdf-tool PDF template record for THIS site through the trusted Platform bridge.",
+    inputSchema: objectSchema(
+      {
+        site_id: stringSchema('Owning site object id; must match this deployment.'),
+        template_id: stringSchema('The template object id.'),
+        version: intSchema('Optional specific version; omit for the active version.'),
+      },
+      ['site_id', 'template_id']
+    ),
+  },
+  {
+    name: 'publish_pdf_template',
+    description:
+      'Publish (activate) a pdf-tool PDF template version for THIS site through the trusted Platform bridge. react-pdf/typst/chromium templates require a passed validation report first (surfaced verbatim as HTTP 409 TEMPLATE_VALIDATION_REQUIRED otherwise); pdfme publishes immediately.',
+    inputSchema: objectSchema(
+      {
+        site_id: stringSchema('Owning site object id; must match this deployment.'),
+        template_id: stringSchema('The template object id to publish.'),
+        version: intSchema('Optional specific version to publish; omit for the latest draft version.'),
+      },
+      ['site_id', 'template_id']
     ),
   },
   {
@@ -1974,6 +2041,11 @@ const callCreateAgentArtifactJob = async (event: LambdaEvent, input: Record<stri
     ...(input.requirements && typeof input.requirements === 'object' && !Array.isArray(input.requirements)
       ? { requirements: input.requirements as Record<string, unknown> }
       : {}),
+    ...(toNonEmptyString(input.template_id) ? { templateId: toNonEmptyString(input.template_id) } : {}),
+    ...(input.data !== undefined ? { data: input.data } : {}),
+    ...(input.assets && typeof input.assets === 'object' && !Array.isArray(input.assets)
+      ? { assets: input.assets as { images?: unknown[] } }
+      : {}),
   };
   const created = await createPlatformArtifactJob(built.grant, jobInput);
   if (!created.ok) return pdfToolBridgeError(created);
@@ -2108,6 +2180,105 @@ const callGetAgentArtifactBySlot = async (event: LambdaEvent, input: Record<stri
     public_path: verified.canonical.publicPath,
     verified: true,
   });
+};
+
+// Templates are site/project-level assets, not content-item-scoped — this is
+// deliberately lighter than resolveArtifactBridgeScope (no request_id, no
+// content_item lookup; templates have no equivalent owning object).
+const resolveTemplateBridgeScope = (
+  input: Record<string, unknown>
+): { ok: true; siteId: string } | { ok: false; result: ReturnType<typeof toolError> } => {
+  const siteId = toNonEmptyString(input.site_id);
+  const identity = getSiteIdentity();
+  if (!siteId) {
+    return { ok: false, result: toolError('site_id is required.', { error_code: 'template_scope_required' }) };
+  }
+  if (siteId !== identity.siteId) {
+    return {
+      ok: false,
+      result: toolError(
+        `Template scope mismatch: this deployment owns ${identity.siteId}, not ${siteId}. Use the owning site's Platform connector.`,
+        { error_code: 'template_site_mismatch' }
+      ),
+    };
+  }
+  return { ok: true, siteId };
+};
+
+const callCreatePdfTemplate = async (event: LambdaEvent, input: Record<string, unknown>) => {
+  const scoped = resolveTemplateBridgeScope(input);
+  if (!scoped.ok) return scoped.result;
+  const templateJson = input.template_json;
+  if (!templateJson || typeof templateJson !== 'object' || Array.isArray(templateJson)) {
+    return toolError('template_json is required and must be an object.');
+  }
+  const renderer = toNonEmptyString(input.renderer);
+  if (renderer && !['pdfme', 'react-pdf', 'typst', 'chromium'].includes(renderer)) {
+    return toolError('renderer must be one of: pdfme, react-pdf, typst, chromium.');
+  }
+
+  const built = buildArtifactBridgeGrant();
+  if (!built.ok) return built.result;
+  const created = await createPlatformPdfTemplate(built.grant, {
+    templateJson,
+    ...(renderer ? { renderer: renderer as PlatformCreateTemplateInput['renderer'] } : {}),
+    ...(toNonEmptyString(input.template_id) ? { templateId: toNonEmptyString(input.template_id) } : {}),
+    ...(toNonEmptyString(input.label) ? { label: toNonEmptyString(input.label) } : {}),
+    ...(Array.isArray(input.tags) ? { tags: input.tags as string[] } : {}),
+  });
+  if (!created.ok) return pdfToolBridgeError(created);
+
+  event.log?.({
+    event: 'template_bridge_created',
+    siteId: scoped.siteId,
+    projectId: built.grant.projectId,
+    templateId: created.body.templateId,
+    version: created.body.version,
+  });
+  return toolResult({ ...created.body, siteId: scoped.siteId });
+};
+
+const callListPdfTemplates = async (event: LambdaEvent, input: Record<string, unknown>) => {
+  const scoped = resolveTemplateBridgeScope(input);
+  if (!scoped.ok) return scoped.result;
+  const built = buildArtifactBridgeGrant();
+  if (!built.ok) return built.result;
+
+  const limit = typeof input.limit === 'number' && Number.isFinite(input.limit) ? input.limit : undefined;
+  const listed = await listPlatformPdfTemplates(built.grant, {
+    ...(limit ? { limit } : {}),
+    ...(toNonEmptyString(input.cursor) ? { cursor: toNonEmptyString(input.cursor) } : {}),
+  });
+  if (!listed.ok) return pdfToolBridgeError(listed);
+  return toolResult({ ...listed.body, siteId: scoped.siteId });
+};
+
+const callGetPdfTemplate = async (event: LambdaEvent, input: Record<string, unknown>) => {
+  const scoped = resolveTemplateBridgeScope(input);
+  if (!scoped.ok) return scoped.result;
+  const templateId = toNonEmptyString(input.template_id);
+  if (!templateId) return toolError('template_id is required.');
+  const built = buildArtifactBridgeGrant();
+  if (!built.ok) return built.result;
+
+  const version = typeof input.version === 'number' && Number.isFinite(input.version) ? input.version : undefined;
+  const found = await getPlatformPdfTemplate(built.grant, { templateId, ...(version ? { version } : {}) });
+  if (!found.ok) return pdfToolBridgeError(found);
+  return toolResult({ ...found.body, siteId: scoped.siteId });
+};
+
+const callPublishPdfTemplate = async (event: LambdaEvent, input: Record<string, unknown>) => {
+  const scoped = resolveTemplateBridgeScope(input);
+  if (!scoped.ok) return scoped.result;
+  const templateId = toNonEmptyString(input.template_id);
+  if (!templateId) return toolError('template_id is required.');
+  const built = buildArtifactBridgeGrant();
+  if (!built.ok) return built.result;
+
+  const version = typeof input.version === 'number' && Number.isFinite(input.version) ? input.version : undefined;
+  const published = await publishPlatformPdfTemplate(built.grant, { templateId, ...(version ? { version } : {}) });
+  if (!published.ok) return pdfToolBridgeError(published);
+  return toolResult({ ...published.body, siteId: scoped.siteId });
 };
 
 const callObjectAction = async (event: LambdaEvent, payload: Record<string, unknown>) => {
@@ -3028,6 +3199,14 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
       return callGetAgentArtifactJobStatus(event, input);
     case 'get_agent_artifact_by_slot':
       return callGetAgentArtifactBySlot(event, input);
+    case 'create_pdf_template':
+      return callCreatePdfTemplate(event, input);
+    case 'list_pdf_templates':
+      return callListPdfTemplates(event, input);
+    case 'get_pdf_template':
+      return callGetPdfTemplate(event, input);
+    case 'publish_pdf_template':
+      return callPublishPdfTemplate(event, input);
     case 'create_artifact_upload_intent':
       return callCreateArtifactUploadIntent(event, input);
     case 'create_artifact_from_url': {
