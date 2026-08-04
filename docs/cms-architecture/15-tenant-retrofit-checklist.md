@@ -15,6 +15,10 @@ repeatable version of this same audit (see `15-fleet-admin-parity.md` for
 the full requirement inventory it checks against). This document remains
 the point-in-time hand-audit record; run the script directly for current
 state. The drift that IS now guarded in CI is called out per tenant below.
+The two audits were cross-checked after the merge and agree everywhere they
+overlap: `node scripts/audit-site-admin-parity.mjs --all` reports **12/12
+automatable checks PASS on all three tenants at current main**, and
+`migrate-site --admin-parity` reports nothing automatable to fix.
 
 **The parity definition used** (from the create-site reference shape):
 
@@ -64,14 +68,16 @@ fernwell 12 records, zero blocked) ✓.
   `config.yaml` hosts (it covered only Dr-Lurie before — which is exactly why
   S1 had to fix six files by hand).
 
-**What `migrate-site` should learn** (recorded, not built here):
-`migrate-site` is a schema-migration harness only — it classifies committed
-export RECORDS and covered none of the gaps above. The gaps were all
-file-level scaffold drift (missing route files, stale content-config, toml
-divergence). The natural home is a `create-site --retrofit <site>` (or the S2
-audit script): diff an existing tenant's tree against the current emission
-set, report, and optionally write the missing files. Until one exists,
-retrofit = this document's manual procedure.
+**What the parity machinery should learn** (updated post-merge): S2's
+`migrate-site --admin-parity [--write]` now IS the retrofit tool for shims,
+canonical redirects, the keepalive schedule, and the reader loaders. Two S3
+finds are not yet in its requirement inventory
+(`packages/core/cli/admin-parity.mjs`): the `postDir` pin in
+`app/content/config.ts` (without it a tenant serves Dr-Lurie's legacy post
+shelf) and the per-site `SECRETS_SCAN_OMIT_KEYS` omission. Both are fixed on
+every current tenant and emitted by `create-site` for future ones, but a
+site scaffolded from an old checkout would drift silently — add them as
+audit checks + `--write` fixes in a follow-up.
 
 **Client sites outside this repo: none.** `13-separation-plan.md` confirms
 all clients share this one monorepo today ("the only thing NOT yet separated
@@ -100,10 +106,21 @@ Human steps:
 - ✅ **First Owner** — done (Wolf signs in via Google today).
 - ✅ **ADMIN_EMAILS + env checklist** — done (every admin surface, publish,
   release, and `/mcp` proven live repeatedly; latest release 2026-08-02).
-- ✅ **Blob stores** — done (production store is the live source of truth;
-  65 committed export records match it through the migration gate).
-- ☐ **Nothing pending.** Next deploy picks up this PR's changes (none affect
-  this tenant's output).
+- ✅ **Blob stores** — done for the 8 long-probed stores (production store is
+  the live source of truth; 65 committed export records match it through the
+  migration gate).
+- ⏳ **One store-probe run for the 4 stores S2 found were never probed**
+  (`agent-profiles`, `opt-ins`, `commerce-events`, `tracking-events` — used
+  by core, absent from the pre-S2 probe list). One command verifies all 12:
+  `node packages/core/cli/create-site.mjs --name drlurie --provision-only
+  --netlify-site-name drluriescience --netlify-token <token>`.
+  (`--netlify-site-name` matters: without it the CLI would look up — and on
+  a miss CREATE — a Netlify project named `drlurie`.) Netlify Blobs
+  auto-creates on first write, so this is verification, not repair — but
+  /admin/agents' profile store being unproven is worth the two minutes.
+- ⏳ **Verify the post-merge production deploy went green** — the W15 stack
+  merged to main 2026-08-04 ~15:30 (+03) and all three projects build from
+  main automatically. Console: Netlify → **drluriescience** → Deploys.
 
 ## Platform (`sites/platform` → Netlify project `kugel-platform`)
 
@@ -126,12 +143,17 @@ Human steps:
   If anything acts up, the reference list is `ENV_CHECKLIST` in
   `packages/core/cli/create-site.mjs`; console: Netlify → **kugel-platform** →
   Site configuration → Environment variables.
-- ✅ **Blob stores** — done (probed at provisioning; 42 committed records
-  match the store through the gate).
-- ⏳ **Redeploy after this PR merges** so `/test-article-dry-run` (Dr-Lurie's
-  leaked test post) drops off the live site. Merging to main triggers all
-  three builds automatically — no console action unless you want it sooner
-  (Netlify → **kugel-platform** → Deploys → Trigger deploy).
+- ✅ **Blob stores** — done for the 8 long-probed stores (42 committed
+  records match the store through the gate).
+- ⏳ **One store-probe run for the 4 never-probed stores** (same as Dr-Lurie
+  above): `node packages/core/cli/create-site.mjs --name platform
+  --provision-only --netlify-site-name kugel-platform --netlify-token
+  <token>` verifies all 12.
+- ⏳ **Verify the post-merge deploy went green and the leak is gone** — the
+  merge (2026-08-04 ~15:30 +03) auto-triggered the build; once it's live,
+  `/test-article-dry-run` (Dr-Lurie's leaked test post) should 404 and the
+  `/library` listing should no longer show it. Console: Netlify →
+  **kugel-platform** → Deploys.
 
 ## Fernwell (`sites/fernwell` → Netlify project `kugel-fernwell`)
 
@@ -159,13 +181,17 @@ Human steps:
   Identity → Invite users.)
 - ✅ **Env checklist** — done (all 17 vars set via API in the T14.9 run;
   live round-trip + release proven the same day).
-- ✅ **Blob stores** — done (all 8 probed write→read→delete at provisioning;
-  12 records live).
-- ⏳ **Redeploy after this PR merges** to pick up the new reader routes —
-  after it, `/learn/library` serves (empty until fernwell has articles) and a
-  published `content_item` becomes reachable at its permalink. Automatic on
-  merge to main; manual path: Netlify → **kugel-fernwell** → Deploys →
-  Trigger deploy.
+- ✅ **Blob stores** — done for the 8 stores in the T14.9 probe list
+  (write→read→delete verified; 12 records live).
+- ⏳ **One store-probe run for the 4 never-probed stores** (same as the other
+  tenants): `node packages/core/cli/create-site.mjs --name fernwell
+  --provision-only --netlify-site-name kugel-fernwell --netlify-token
+  <token>` verifies all 12.
+- ⏳ **Verify the post-merge deploy picked up the new reader routes** — the
+  merge (2026-08-04 ~15:30 +03) auto-triggered the build; once it's live,
+  `/learn/library` serves (empty until fernwell has articles) and a
+  published `content_item` becomes reachable at its permalink. Console:
+  Netlify → **kugel-fernwell** → Deploys.
 
 ---
 
