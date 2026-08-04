@@ -1,0 +1,260 @@
+import '../../sites/drlurie/config/policy-bindings.js';
+import assert from 'node:assert/strict';
+import { rm } from 'node:fs/promises';
+import { join } from 'node:path';
+import test from 'node:test';
+
+import { handler } from '../../netlify/functions/mcp.js';
+import { setLocalBlobsRootForTesting } from '../../packages/core/server/lib/local-blobs.js';
+
+const REQUEST_ID = 'req_agent_pdf_template_bridge_pdf_report_20260804_01';
+const STORAGE_SECRET = 'storage-secret-never-expose';
+const RUN_SECRET = 'run-secret-never-expose';
+const LOCAL_BLOBS_ROOT = join(process.cwd(), '.netlify', 'local-blobs-test', 'mcp-pdf-tool-template-bridge');
+setLocalBlobsRootForTesting(LOCAL_BLOBS_ROOT);
+
+for (const key of [
+  'NETLIFY',
+  'NETLIFY_SITE_ID',
+  'NETLIFY_BLOBS_TOKEN',
+  'NETLIFY_AUTH_TOKEN',
+  'SITE_ID',
+  'MCP_HTTP_AUTH_TOKEN',
+]) {
+  delete process.env[key];
+}
+process.env.PUBLISH_SECRET = 'test-publish-secret';
+process.env.PDF_TOOL_STORAGE_TOKEN = STORAGE_SECRET;
+process.env.PDF_TOOL_STORAGE_SITE_ID = 'site-api-id';
+process.env.PDF_TOOL_BASE_URL = 'https://pdf-tool.test';
+process.env.PDF_TOOL_AGENT_RUN_TOKEN = RUN_SECRET;
+
+type ToolResult = { isError?: boolean; structuredContent?: Record<string, unknown> };
+
+const rpc = async (name: string, args: Record<string, unknown>, logs: Array<Record<string, unknown>> = []) => {
+  const response = await handler({
+    httpMethod: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } }),
+    log: (payload) => logs.push(payload),
+  });
+  assert.equal(response.statusCode, 200);
+  return { response, result: (JSON.parse(response.body) as { result: ToolResult }).result };
+};
+
+const resetAndSeedRequest = async () => {
+  await rm(join(LOCAL_BLOBS_ROOT, 'site-objects'), { recursive: true, force: true });
+  const created = await rpc('object_create', {
+    object_type: 'content_item',
+    site: 'site_drlurie',
+    requested_id: REQUEST_ID,
+    body: {
+      slug: 'pdf-template-bridge-pdf-report',
+      title: 'A PDF Report Built From a Template',
+      nodes: [
+        {
+          id: 'n_start',
+          kind: 'content',
+          public: { title: 'Report', body: 'A report generated from a pdf-tool template.' },
+          visibility: 'public',
+        },
+      ],
+    },
+  });
+  assert.ok(!created.result.isError, JSON.stringify(created.result.structuredContent));
+};
+
+const stubFetch = (routes: Record<string, (body: Record<string, unknown>) => Response>) => {
+  const calls: Array<{ path: string; authorization?: string; body: Record<string, unknown> }> = [];
+  const fetchImpl = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = new URL(String(input));
+    const body = JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>;
+    calls.push({
+      path: url.pathname,
+      authorization: new Headers(init?.headers).get('authorization') ?? undefined,
+      body,
+    });
+    for (const [suffix, respond] of Object.entries(routes)) {
+      if (url.pathname.endsWith(suffix)) return respond(body);
+    }
+    return Response.json({ error: 'unexpected path' }, { status: 404 });
+  }) as typeof fetch;
+  return { calls, fetchImpl };
+};
+
+test('tools/list exposes the pdf template bridge tools', async () => {
+  const response = await handler({
+    httpMethod: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }),
+  });
+  const tools = (JSON.parse(response.body) as { result: { tools: Array<{ name: string }> } }).result.tools;
+  const names = new Set(tools.map((tool) => tool.name));
+  assert.ok(names.has('create_pdf_template'));
+  assert.ok(names.has('list_pdf_templates'));
+  assert.ok(names.has('get_pdf_template'));
+  assert.ok(names.has('publish_pdf_template'));
+});
+
+test('Platform creates then publishes a pdfme template end-to-end and never exposes the grant', async () => {
+  const originalFetch = globalThis.fetch;
+  const { calls, fetchImpl } = stubFetch({
+    '/create-pdf-template': (body) =>
+      Response.json(
+        {
+          projectId: body.projectId,
+          templateId: 'tpl_report_card',
+          version: 1,
+          status: 'draft',
+          renderer: body.renderer ?? 'pdfme',
+        },
+        { status: 201 }
+      ),
+    '/publish-pdf-template': (body) =>
+      Response.json({
+        projectId: body.projectId,
+        templateId: body.templateId,
+        version: body.version ?? 1,
+        status: 'published',
+        renderer: 'pdfme',
+      }),
+  });
+  globalThis.fetch = fetchImpl;
+  try {
+    const logs: Array<Record<string, unknown>> = [];
+    const created = await rpc(
+      'create_pdf_template',
+      {
+        site_id: 'site_drlurie',
+        template_json: { schemas: [[{ name: 'title', type: 'text', position: { x: 0, y: 0 } }]] },
+        label: 'Report card',
+      },
+      logs
+    );
+    assert.ok(!created.result.isError, JSON.stringify(created.result.structuredContent));
+    assert.equal(created.result.structuredContent?.templateId, 'tpl_report_card');
+    assert.equal(created.result.structuredContent?.renderer, 'pdfme');
+    assert.equal(created.result.structuredContent?.siteId, 'site_drlurie');
+
+    const published = await rpc(
+      'publish_pdf_template',
+      { site_id: 'site_drlurie', template_id: 'tpl_report_card' },
+      logs
+    );
+    assert.ok(!published.result.isError, JSON.stringify(published.result.structuredContent));
+    assert.equal(published.result.structuredContent?.status, 'published');
+    assert.equal(published.result.structuredContent?.siteId, 'site_drlurie');
+
+    assert.equal(calls.length, 2);
+    for (const call of calls) {
+      assert.equal(call.authorization, `Bearer ${RUN_SECRET}`);
+      assert.equal(call.body.projectId, 'dr-lurie');
+      assert.equal((call.body.storage as { projectId: string }).projectId, 'dr-lurie');
+      assert.equal((call.body.storage as { token: string }).token, STORAGE_SECRET);
+    }
+
+    const visible = JSON.stringify({ logs, created: created.response.body, published: published.response.body });
+    assert.ok(!visible.includes(STORAGE_SECRET));
+    assert.ok(!visible.includes(RUN_SECRET));
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('publish_pdf_template surfaces the upstream 409 TEMPLATE_VALIDATION_REQUIRED unchanged', async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async () =>
+    Response.json(
+      {
+        error: 'Template tpl_react_report has no passed validation report for renderer react-pdf.',
+        errorCode: 'TEMPLATE_VALIDATION_REQUIRED',
+      },
+      { status: 409 }
+    )) as typeof fetch;
+  try {
+    const published = await rpc('publish_pdf_template', {
+      site_id: 'site_drlurie',
+      template_id: 'tpl_react_report',
+    });
+    assert.equal(published.result.isError, true);
+    assert.equal(published.result.structuredContent?.statusCode, 409);
+    assert.equal(published.result.structuredContent?.errorCode, 'TEMPLATE_VALIDATION_REQUIRED');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('foreign site_id fails template bridge tools with template_site_mismatch and makes zero outbound fetches', async () => {
+  const originalFetch = globalThis.fetch;
+  let fetchCalls = 0;
+  globalThis.fetch = (async () => {
+    fetchCalls += 1;
+    return Response.json({ error: 'must not be reached' }, { status: 500 });
+  }) as typeof fetch;
+  try {
+    const create = await rpc('create_pdf_template', {
+      site_id: 'site_other',
+      template_json: { schemas: [[]] },
+    });
+    assert.equal(create.result.isError, true);
+    assert.equal(create.result.structuredContent?.error_code, 'template_site_mismatch');
+
+    const list = await rpc('list_pdf_templates', { site_id: 'site_other' });
+    assert.equal(list.result.isError, true);
+    assert.equal(list.result.structuredContent?.error_code, 'template_site_mismatch');
+
+    const get = await rpc('get_pdf_template', { site_id: 'site_other', template_id: 'tpl_x' });
+    assert.equal(get.result.isError, true);
+    assert.equal(get.result.structuredContent?.error_code, 'template_site_mismatch');
+
+    const publish = await rpc('publish_pdf_template', { site_id: 'site_other', template_id: 'tpl_x' });
+    assert.equal(publish.result.isError, true);
+    assert.equal(publish.result.structuredContent?.error_code, 'template_site_mismatch');
+
+    assert.equal(fetchCalls, 0);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('create_agent_artifact_job forwards template_id, data, and assets to pdf-tool', async () => {
+  await resetAndSeedRequest();
+  const originalFetch = globalThis.fetch;
+  const { calls, fetchImpl } = stubFetch({
+    '/create-agent-artifact-job': (body) =>
+      Response.json(
+        {
+          jobId: 'job-template-render',
+          status: 'pending',
+          projectId: body.projectId,
+          requestId: body.requestId,
+          artifactKind: body.artifactKind,
+          polling: { tool: 'get_agent_artifact_job_status', input: { projectId: body.projectId } },
+        },
+        { status: 202 }
+      ),
+  });
+  globalThis.fetch = fetchImpl;
+  try {
+    const data = { title: 'Q3 Report', total: '$4,200' };
+    const assets = { images: [{ name: 'logo', src: 'image/req/logo.webp' }] };
+    const created = await rpc('create_agent_artifact_job', {
+      site_id: 'site_drlurie',
+      request_id: REQUEST_ID,
+      artifact_kind: 'pdf',
+      filename: 'q3-report.pdf',
+      template_id: 'tpl_report_card',
+      data,
+      assets,
+    });
+    assert.ok(!created.result.isError, JSON.stringify(created.result.structuredContent));
+
+    const jobCall = calls.find((call) => call.path.endsWith('/create-agent-artifact-job'));
+    assert.ok(jobCall);
+    assert.equal(jobCall?.body.templateId, 'tpl_report_card');
+    assert.deepEqual(jobCall?.body.data, data);
+    assert.deepEqual(jobCall?.body.assets, assets);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
