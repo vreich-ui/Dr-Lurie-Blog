@@ -158,6 +158,7 @@ const { variant = 'desktop' } = Astro.props;
     handleRecoveryCallback,
     getAccessToken,
   } from '@core/lib/admin/goTrueClient';
+  import { fetchAdminAccessState } from '@core/lib/admin/admin-access-client';
 
   (() => {
     if (!window.__cmsHeaderAuth) {
@@ -206,14 +207,16 @@ const { variant = 'desktop' } = Astro.props;
       authMenuCloseTimer = window.setTimeout(() => setMenuOpen(root, false), 180);
     };
 
-    const getAdminState = async (token) => {
-      if (!token) return { authenticated: false, isAdmin: false };
-      const response = await fetch('/.netlify/functions/admin-auth-state', {
-        method: 'GET',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      });
-      return response.json().catch(() => ({ authenticated: false, isAdmin: false }));
-    };
+    // S1 auth-dedupe/failure-states follow-up: this used to be its own inline
+    // copy of "call admin-auth-state, decide isAdmin" that swallowed every
+    // failure (network error, non-2xx, bad body) into a bare `isAdmin: false`
+    // — indistinguishable, here, from a genuine non-admin. Since this check
+    // gates the site-wide admin-only nav reveal below, that meant a real
+    // admin whose check failed transiently would silently never see the
+    // admin nav appear, with nothing logged to explain why. Now shares
+    // admin-access-client.ts with AdminLayout.astro's gate, which surfaces
+    // `checkFailed` distinctly and always logs the underlying cause.
+    const getAdminState = fetchAdminAccessState;
 
     // M-9 (2026-07-14): the admin menu moved OUT of this account dropdown and
     // into the MAIN header nav as an admin-only group (nav_header, `adminOnly`),
@@ -232,6 +235,14 @@ const { variant = 'desktop' } = Astro.props;
       const signedIn = Boolean(user);
       const token = signedIn ? await getAccessToken() : undefined;
       const adminState = signedIn ? await getAdminState(token) : { authenticated: false, isAdmin: false };
+
+      if (adminState.checkFailed) {
+        document.dispatchEvent(
+          new CustomEvent('cms:auth-error', {
+            detail: { message: adminState.error || 'Admin access could not be verified.' },
+          })
+        );
+      }
 
       // M-9: reveal the main-nav admin group (and any other [data-admin-only]
       // element) once, site-wide — independent of the per-root account UI below.

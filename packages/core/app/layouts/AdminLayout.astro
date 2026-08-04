@@ -104,6 +104,7 @@ const metadata = {
   // for a validly signed-in admin on every cold load.
   import '@site/config/policy-bindings';
   import { currentUser, getAccessToken, handleOAuthCallback } from '@core/lib/admin/goTrueClient';
+  import { fetchAdminAccessState } from '@core/lib/admin/admin-access-client';
 
   (() => {
     const initializeAdminLayoutGate = () => {
@@ -139,50 +140,15 @@ const metadata = {
         window.__cmsLoginModal?.open();
       });
 
-      // S1 "failure states" fix: a transient problem checking admin access
+      // S1 "failure states" fix, now shared with HeaderAuthButton.astro via
+      // admin-access-client.ts: a transient problem checking admin access
       // (network failure, a non-2xx from the function, a cold-start/deploy
       // blip returning a non-JSON body) must never be presented the same way
       // as a genuine "you are not an admin" — that literal forbidden message
       // ("not listed in ADMIN_EMAILS") told a legitimate admin they lacked
       // access when the real cause was the CHECK failing, not the answer
       // being no. `checkFailed: true` marks that distinction for the caller.
-      const getAdminStateForUser = async () => {
-        const token = await getAccessToken();
-        if (!token) return { authenticated: false, isAdmin: false };
-        let response;
-        try {
-          response = await fetch('/.netlify/functions/admin-auth-state', {
-            method: 'GET',
-            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-          });
-        } catch (error) {
-          console.error('Admin access check failed (network).', error);
-          return {
-            authenticated: true,
-            isAdmin: false,
-            checkFailed: true,
-            error: 'Admin access could not be verified.',
-          };
-        }
-        if (!response.ok) {
-          console.error(`Admin access check failed (HTTP ${response.status}).`);
-          return {
-            authenticated: true,
-            isAdmin: false,
-            checkFailed: true,
-            error: `Admin access could not be verified (HTTP ${response.status}).`,
-          };
-        }
-        return response.json().catch((error) => {
-          console.error('Admin access check failed (bad response body).', error);
-          return {
-            authenticated: true,
-            isAdmin: false,
-            checkFailed: true,
-            error: 'Admin access could not be verified.',
-          };
-        });
-      };
+      const getAdminStateForUser = async () => fetchAdminAccessState(await getAccessToken());
 
       const renderAuthState = async () => {
         const user = currentUser();
