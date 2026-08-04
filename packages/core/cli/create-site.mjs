@@ -241,7 +241,7 @@ const DATA_SITE_SUBDIRS = [
   'articles',
 ];
 
-// ─── validation ────────────────────────────────────────────────────────────────────────
+// ─── validation ─────────────────────────────────────────────────────────────
 
 const SLUG_RE = /^[a-z][a-z0-9-]{1,30}$/;
 
@@ -257,7 +257,7 @@ export const validateClientSlug = (name) => {
   return name;
 };
 
-// ─── plan ids ──────────────────────────────────────────────────────────────────────────
+// ─── plan ids ────────────────────────────────────────────────────────────────
 
 export const idsFor = (clientSlug) => {
   const clientId = clientSlug.replace(/-/g, '_');
@@ -270,7 +270,7 @@ export const idsFor = (clientSlug) => {
   };
 };
 
-// ─── file content templates ─────────────────────────────────────────────────────────
+// ─── file content templates ───────────────────────────────────────────────
 
 const titleCase = (slug) =>
   slug
@@ -917,7 +917,7 @@ setActiveMediaPolicyProvider((): MediaPolicy => (mediaPolicy ??= resolveMediaPol
 setSiteIdentityConfigProvider((): unknown => siteIdentityConfig);
 `;
 
-// ─── W14 T14.1/T14.2: the BUILD ENTRY ────────────────────────────────────────────
+// ─── W14 T14.1/T14.2: the BUILD ENTRY ────────────────────────────────────────
 //
 // T14.1 moved the application shell into `packages/core/app` and made each
 // site a thin entry over it. A scaffolded site therefore needs four small
@@ -1096,7 +1096,7 @@ const { objectId } = Astro.props as Props;
 <PageObjectRenderer objectId={objectId} />
 `;
 
-// ─── bootstrap committed exports ───────────────────────────────────────────────────
+// ─── bootstrap committed exports ─────────────────────────────────────────────
 //
 // A site cannot render one page until its navigation objects are published:
 // PageLayout throws on a missing nav export BY DESIGN ("never leaves a surface
@@ -1340,7 +1340,7 @@ export const coreFunctionNames = () => {
   return [...stems].sort();
 };
 
-// ─── plan builder ────────────────────────────────────────────────────────────────────
+// ─── plan builder ──────────────────────────────────────────────────────────────
 
 export const buildPlan = (opts) => {
   const clientSlug = validateClientSlug(opts.name);
@@ -1409,7 +1409,7 @@ export const buildPlan = (opts) => {
   return { clientSlug, ids, brandName, canonicalHost, dir, files };
 };
 
-// ─── rendering (dry-run / execution report) ─────────────────────────────────────────
+// ─── rendering (dry-run / execution report) ─────────────────────────────────
 
 export const renderEnvChecklist = (executed) => {
   const lines = [];
@@ -1463,7 +1463,7 @@ export const renderPlan = (plan, { netlifyToken }) => {
   return lines.join('\n');
 };
 
-// ─── execution ────────────────────────────────────────────────────────────────────────
+// ─── execution ─────────────────────────────────────────────────────────────────
 
 export const writeFiles = (plan) => {
   for (const file of plan.files) {
@@ -1696,7 +1696,7 @@ export const executeNetlifyProvisioning = async (
   return { site, siteId, accountId, storeFailures, secretsSet, secretsFailed };
 };
 
-// ─── CLI entry ──────────────────────────────────────────────────────────────────────
+// ─── CLI entry ─────────────────────────────────────────────────────────────────
 
 const parseArgs = (argv) => {
   const opts = { dryRun: false };
