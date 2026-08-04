@@ -119,7 +119,7 @@ Env checklist:
       BOOTSTRAP OWNER allowlist — /admin is unusable until this is set (or an invite exists): members are implicit Owners forever (roles.ts env fallback; a wiped users store can never lock the operator out). Human-owned; placeholder: the operator’s real email. Runbook: site-provisioning-runbook.md §admin.
     ROLE_EMAILS_ADMIN                [per-site]  ☐ human-supplied — see the provisioning runbook
       Role allowlist — human-owned.
-    ROLE_EMAILS_EDITOR                [per-site]  ☐ human-supplied — see the provisioning runbook
+    ROLE_EMAILS_EDITOR               [per-site]  ☐ human-supplied — see the provisioning runbook
       Role allowlist — human-owned.
     ROLE_EMAILS_PUBLISHER            [per-site]  ☐ human-supplied — see the provisioning runbook
       Role allowlist — human-owned.
