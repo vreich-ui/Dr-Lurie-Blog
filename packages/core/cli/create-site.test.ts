@@ -480,6 +480,23 @@ test('the emitted netlify.toml + site.config.ts carry EXACTLY the canonical infr
   assert.ok(!tomlRedirects.some((r) => r.from === '/admin/content/*'), 'the pre-S1 splat form must not be emitted');
 });
 
+test('the emitted netlify.toml carries an ignore command covering both the site dir and packages/core', () => {
+  // Netlify only rebuilds a subdirectory-based site when files under its base
+  // directory changed. This site's MCP functions bundle the shared
+  // packages/core workspace, which lives outside sites/acme — without this
+  // ignore command a packages/core-only change ships stale functions (the gap
+  // that hit sites/platform + sites/fernwell in production, PR #501).
+  const plan = buildPlan({ name: 'acme' });
+  const toml = plan.files.find((f) => f.path === 'sites/acme/netlify.toml');
+  assert.ok(toml);
+
+  const ignoreLine = toml.content.split('\n').find((line) => /^\s*ignore\s*=/.test(line));
+  assert.ok(ignoreLine, 'expected an ignore = "..." line in the [build] block');
+  assert.match(ignoreLine, /sites\/acme\b/, 'ignore command must reference this site\'s own dir');
+  assert.match(ignoreLine, /packages\/core\b/, 'ignore command must reference the shared packages/core workspace');
+  assert.match(ignoreLine, /diff --quiet/, 'ignore command must use git diff --quiet semantics (0 = skip, 1 = build)');
+});
+
 test('re-running against an existing sites/<client>/ is a no-op plan-wise (the caller checks existence before writeFiles)', () => {
   // buildPlan itself is pure/idempotent — same input, same output — the
   // existence check that makes re-runs a no-op lives in main()'s CLI flow

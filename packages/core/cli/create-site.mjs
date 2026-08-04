@@ -445,6 +445,14 @@ const netlifyTomlTemplate = (ids) => `# Per-site Netlify config. The redirects h
 [build]
   publish = "dist"
   command = "(npx --no-install astro --version > /dev/null 2>&1 || npm ci --prefix ../.. --no-audit --no-fund) && npx --no-install astro build --config astro.config.ts"
+  # Netlify skips a build when nothing under the base directory (sites/${ids.clientSlug}) changed.
+  # Our MCP functions bundle the shared packages/core workspace, which lives OUTSIDE this
+  # base dir — so a packages/core-only change was being skipped and shipped stale functions
+  # (PR #501, 2026-08-04). This ignore command builds when EITHER sites/${ids.clientSlug} OR
+  # packages/core changed. exit 0 = skip, non-zero = build; \`git diff --quiet\` is 0 when
+  # unchanged. An empty $CACHED_COMMIT_REF (first/forced build) makes git error non-zero =>
+  # build, which is the safe default.
+  ignore = "git -C ../.. diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- sites/${ids.clientSlug} packages/core"
 [build.environment]
   NODE_VERSION = "20"
   # Same omission the root netlify.toml carries (W15 S3 parity): the secrets
