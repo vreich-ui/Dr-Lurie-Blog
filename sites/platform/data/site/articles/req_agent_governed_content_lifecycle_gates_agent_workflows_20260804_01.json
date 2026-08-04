@@ -1,8 +1,8 @@
 {
   "__generated": {
-    "at": "2026-08-04T13:08:34.769Z",
+    "at": "2026-08-04T15:58:01.877Z",
     "from": "objects/content_item/by-id/req_agent_governed_content_lifecycle_gates_agent_workflows_20260804_01.json",
-    "record_version": 2
+    "record_version": 6
   },
   "author": "Editorial Team",
   "claims": {
@@ -254,6 +254,172 @@
         "emphasis": "medium",
         "placement": "inline",
         "presentation": "section"
+      },
+      "visibility": "public"
+    },
+    {
+      "id": "n_6ebf2e52244d",
+      "kind": "content",
+      "private": {
+        "intent": "navigate",
+        "strategy": "context"
+      },
+      "public": {
+        "body": {
+          "content": [
+            {
+              "content": [
+                {
+                  "data": {},
+                  "marks": [],
+                  "nodeType": "text",
+                  "value": "For more on how this platform governs agent-assisted publishing, see:"
+                }
+              ],
+              "data": {},
+              "nodeType": "paragraph"
+            },
+            {
+              "content": [
+                {
+                  "content": [
+                    {
+                      "content": [
+                        {
+                          "content": [
+                            {
+                              "data": {},
+                              "marks": [],
+                              "nodeType": "text",
+                              "value": "Why Everything in the CMS Is an Object"
+                            }
+                          ],
+                          "data": {
+                            "uri": "https://kugel-platform.netlify.app/everything-is-an-object"
+                          },
+                          "nodeType": "hyperlink"
+                        }
+                      ],
+                      "data": {},
+                      "nodeType": "paragraph"
+                    }
+                  ],
+                  "data": {},
+                  "nodeType": "list-item"
+                },
+                {
+                  "content": [
+                    {
+                      "content": [
+                        {
+                          "content": [
+                            {
+                              "data": {},
+                              "marks": [],
+                              "nodeType": "text",
+                              "value": "When Content Needs a Human, and When It Doesn't"
+                            }
+                          ],
+                          "data": {
+                            "uri": "https://kugel-platform.netlify.app/when-content-needs-a-human"
+                          },
+                          "nodeType": "hyperlink"
+                        }
+                      ],
+                      "data": {},
+                      "nodeType": "paragraph"
+                    }
+                  ],
+                  "data": {},
+                  "nodeType": "list-item"
+                },
+                {
+                  "content": [
+                    {
+                      "content": [
+                        {
+                          "content": [
+                            {
+                              "data": {},
+                              "marks": [],
+                              "nodeType": "text",
+                              "value": "What Happens to an Article Before It's Ready to Publish"
+                            }
+                          ],
+                          "data": {
+                            "uri": "https://kugel-platform.netlify.app/what-happens-before-publish"
+                          },
+                          "nodeType": "hyperlink"
+                        }
+                      ],
+                      "data": {},
+                      "nodeType": "paragraph"
+                    }
+                  ],
+                  "data": {},
+                  "nodeType": "list-item"
+                },
+                {
+                  "content": [
+                    {
+                      "content": [
+                        {
+                          "content": [
+                            {
+                              "data": {},
+                              "marks": [],
+                              "nodeType": "text",
+                              "value": "How the System Grades Its Own Writing"
+                            }
+                          ],
+                          "data": {
+                            "uri": "https://kugel-platform.netlify.app/how-the-system-grades-its-own-writing"
+                          },
+                          "nodeType": "hyperlink"
+                        }
+                      ],
+                      "data": {},
+                      "nodeType": "paragraph"
+                    }
+                  ],
+                  "data": {},
+                  "nodeType": "list-item"
+                },
+                {
+                  "content": [
+                    {
+                      "content": [
+                        {
+                          "content": [
+                            {
+                              "data": {},
+                              "marks": [],
+                              "nodeType": "text",
+                              "value": "What Actually Needs AI in This System (and What Doesn't)"
+                            }
+                          ],
+                          "data": {
+                            "uri": "https://kugel-platform.netlify.app/what-needs-ai-and-what-doesnt"
+                          },
+                          "nodeType": "hyperlink"
+                        }
+                      ],
+                      "data": {},
+                      "nodeType": "paragraph"
+                    }
+                  ],
+                  "data": {},
+                  "nodeType": "list-item"
+                }
+              ],
+              "data": {},
+              "nodeType": "unordered-list"
+            }
+          ],
+          "data": {},
+          "nodeType": "document"
+        },
+        "title": "Related reading"
       },
       "visibility": "public"
     }
