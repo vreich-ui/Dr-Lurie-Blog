@@ -1,0 +1,95 @@
+{
+  "__generated": {
+    "at": "2026-08-04T15:04:27.394Z",
+    "from": "objects/content_item/by-id/req_agent_how_the_system_grades_its_own_writing_20260804_01.json",
+    "record_version": 2
+  },
+  "author": "Platform Documentation",
+  "deck": "Before AI-written content is trusted, it's scored against a rubric by a separate AI acting as judge — here's what that actually checks, and what it doesn't.",
+  "description": "An honest explanation of the quality-scoring layer behind AI-assisted content: what gets graded, who does the grading, and why a passing score today isn't a permanent verdict.",
+  "nodes": [
+    {
+      "id": "n_grade01",
+      "kind": "content",
+      "private": {
+        "intent": "educate",
+        "strategy": "hook"
+      },
+      "public": {
+        "body": "An AI wrote the draft. Something else has to answer the obvious next question: is it actually any good, or does it just look finished?",
+        "title": "It's finished. Is it good?"
+      },
+      "visibility": "public"
+    },
+    {
+      "id": "n_grade02",
+      "kind": "content",
+      "private": {
+        "intent": "educate",
+        "strategy": "explanation"
+      },
+      "public": {
+        "body": "The scoring checks specific, defined things rather than a vague sense of quality: whether each claim traces back to real evidence, whether citations are specific and checkable rather than vague, whether the sources used are appropriate authorities for what they're being used to support, and whether anything genuinely uncertain gets flagged as uncertain instead of stated with false confidence.",
+        "title": "What actually gets checked"
+      },
+      "visibility": "public"
+    },
+    {
+      "id": "n_grade03",
+      "kind": "content",
+      "private": {
+        "intent": "educate",
+        "strategy": "explanation"
+      },
+      "public": {
+        "body": "The grading itself is done by a separate AI acting as judge, not the same process that wrote the piece. It's given the finished content and, where available, the material the writer actually had access to — so it can check whether a claim was truly supported, not just whether it sounds supported. A rubric defines exactly what's being scored and how heavily each part counts.",
+        "title": "A second AI, acting as judge"
+      },
+      "visibility": "public"
+    },
+    {
+      "id": "n_grade04",
+      "kind": "content",
+      "private": {
+        "intent": "educate",
+        "strategy": "context"
+      },
+      "public": {
+        "body": "Worth saying plainly: these rubrics are still being tuned. The scoring weights are draft, under active review, not a finished, locked standard. A passing score today is a genuine, useful first read on the content — it is not yet the same as a permanent, fully calibrated verdict, and it's treated that way internally.",
+        "title": "Worth saying plainly: it's still being tuned"
+      },
+      "visibility": "public"
+    },
+    {
+      "id": "n_grade05",
+      "kind": "content",
+      "private": {
+        "intent": "reassure",
+        "strategy": "resolution"
+      },
+      "public": {
+        "body": "The value isn't that this replaces a person's judgment. It's that it catches an ungrounded claim or a weak citation before any reader sees it, on every single piece, without requiring a person to re-read every word of every draft by hand. That's a real floor to build on, even while the ceiling is still being calibrated.",
+        "title": "A floor, not a replacement for judgment"
+      },
+      "visibility": "public"
+    }
+  ],
+  "publication_context": {
+    "domain": "kugel-platform.netlify.app",
+    "publication_name": "Platform",
+    "topic_scope": "CMS content quality scoring"
+  },
+  "seo": {
+    "meta_description": "How AI-assisted content gets scored for quality before publication, what the rubric actually checks, and the honest limits of the system as it stands today.",
+    "meta_title": "How the System Grades Its Own Writing"
+  },
+  "slug": "how-the-system-grades-its-own-writing",
+  "taxonomy": {
+    "category": "guide",
+    "tags": [
+      "publishing",
+      "testing"
+    ]
+  },
+  "title": "How the System Grades Its Own Writing"
+}
