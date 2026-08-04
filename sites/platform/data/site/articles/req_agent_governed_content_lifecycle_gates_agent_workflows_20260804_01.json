@@ -1,0 +1,289 @@
+{
+  "__generated": {
+    "at": "2026-08-04T13:08:34.769Z",
+    "from": "objects/content_item/by-id/req_agent_governed_content_lifecycle_gates_agent_workflows_20260804_01.json",
+    "record_version": 2
+  },
+  "author": "Editorial Team",
+  "claims": {
+    "claim_list": [
+      {
+        "claim_id": "clm_release_governance",
+        "node_ids": [
+          "n_a3",
+          "n_a6"
+        ],
+        "notes": "Supported as a general release-governance concept, not as a platform-specific mechanics claim.",
+        "risk": "low",
+        "source_ids": [
+          "src_google_sre_release_engineering"
+        ],
+        "status": "verified",
+        "text": "Governed release practices commonly separate preparation, evidence gathering, approval, and activation decisions so teams can manage change with more control."
+      },
+      {
+        "claim_id": "clm_activation_separation",
+        "node_ids": [
+          "n_a6"
+        ],
+        "notes": "Used only as a conceptual analogy; the article does not claim the platform implements feature flags or separate activation controls.",
+        "risk": "medium",
+        "source_ids": [
+          "src_fowler_feature_toggles"
+        ],
+        "status": "verified",
+        "text": "Some governance models distinguish making a change available from activating it for users or runtime behavior."
+      },
+      {
+        "claim_id": "clm_platform_specific_unknowns",
+        "node_ids": [
+          "n_a2",
+          "n_a9"
+        ],
+        "notes": "Explicit uncertainty carried from editorial review to prevent unsupported product claims.",
+        "risk": "high",
+        "source_ids": [],
+        "status": "unverified",
+        "text": "Platform-specific lifecycle terminology, validation scope, authority controls, auditability, rollback, scheduling, and rollout mechanics require confirmation before operational use."
+      }
+    ]
+  },
+  "compliance": {
+    "requirements": [
+      {
+        "kind": "reader_safety",
+        "node_ids": [
+          "n_a2"
+        ],
+        "notes": "Early verification note included.",
+        "requirement_id": "req_conceptual_disclaimer",
+        "satisfied": true,
+        "text": "State clearly that the article describes governance patterns rather than confirmed product behavior."
+      },
+      {
+        "kind": "factual_safety",
+        "node_ids": [
+          "n_a2",
+          "n_a3",
+          "n_a4",
+          "n_a5",
+          "n_a6",
+          "n_a7",
+          "n_a9"
+        ],
+        "notes": "Lifecycle labels are framed as illustrative decision gates.",
+        "requirement_id": "req_avoid_product_mechanics",
+        "satisfied": true,
+        "text": "Avoid unsupported claims about platform-specific checkout, validation, patching, publishing, release, rollback, audit, permission, scheduling, or rollout mechanics."
+      }
+    ]
+  },
+  "deck": "A practical governance guide for teams that want agent-assisted content to move quickly without losing review, control, or accountability.",
+  "description": "This article describes governance patterns, not confirmed product behavior. Verify platform-specific terminology, lifecycle states, permissions, and controls before operational use.",
+  "editorial": {
+    "framework": "Question-led lifecycle governance: uncertainty, preparation, evidence, change review, approval, activation, verification.",
+    "writer_notes": "Built as conceptual governance guidance, not product documentation. Preserve cautious modal language until platform documentation or SME review confirms terminology and mechanics."
+  },
+  "nodes": [
+    {
+      "id": "n_a1",
+      "kind": "content",
+      "private": {
+        "agentNotes": "This opening uses the approved speed-versus-accountability tension to make cautious operators feel understood before introducing governance.",
+        "intent": "reassure",
+        "strategy": "hook"
+      },
+      "public": {
+        "body": "When agents can change content quickly, the real risk is not speed itself. The risk is losing the ability to see, review, and control what moves forward. An agent-generated update can look ready before a reviewer has confirmed the intent, checked the evidence, inspected the change, or decided when it should become visible. Lifecycle gates give teams a way to keep the benefits of acceleration while slowing down the few decisions that deserve deliberate attention.",
+        "eyebrow": "Governance",
+        "title": "Why content lifecycle gates matter when agents move fast"
+      },
+      "rendering": {
+        "emphasis": "high",
+        "placement": "inline",
+        "presentation": "section"
+      },
+      "visibility": "public"
+    },
+    {
+      "id": "n_a2",
+      "kind": "content",
+      "private": {
+        "agentNotes": "This section consolidates the required caveats early so the article remains useful without implying official platform mechanics.",
+        "intent": "educate",
+        "strategy": "context"
+      },
+      "public": {
+        "body": "This article describes governance patterns, not confirmed product behavior. Terms such as checkout, validation, patching, publishing, and release are used here as illustrative lifecycle gates. Before treating them as operational instructions, verify the platform's official terminology, supported controls, authority model, and state transitions with product documentation or a subject-matter expert.",
+        "title": "Before you rely on this"
+      },
+      "rendering": {
+        "emphasis": "high",
+        "placement": "inline",
+        "presentation": "callout"
+      },
+      "visibility": "public"
+    },
+    {
+      "id": "n_a3",
+      "kind": "content",
+      "private": {
+        "agentNotes": "This reframes provisional lifecycle labels as decision points, matching the narrative movement from terminology to governance intent.",
+        "intent": "educate",
+        "strategy": "explanation"
+      },
+      "public": {
+        "body": "A useful content lifecycle is more than a row of status labels. It is a sequence of questions a team answers before work advances: What object is being prepared? What evidence supports it? What changed? Who has reviewed it? What has been approved? When, if ever, should it become active for the intended audience or environment? Framing gates this way helps avoid bureaucracy for its own sake. Each gate reduces a specific uncertainty before the next decision is made.",
+        "title": "Think of the lifecycle as a sequence of decisions"
+      },
+      "rendering": {
+        "emphasis": "medium",
+        "placement": "inline",
+        "presentation": "section"
+      },
+      "visibility": "public"
+    },
+    {
+      "id": "n_a4",
+      "kind": "content",
+      "private": {
+        "agentNotes": "This node explains the first two gates while preserving cautious language about locks, commands, guarantees, and platform-specific validation scope.",
+        "intent": "educate",
+        "strategy": "explanation"
+      },
+      "public": {
+        "body": "In many workflows, a checkout-like gate marks the moment a team identifies what is under active work and what the intended change is meant to accomplish. That does not have to imply a specific lock, branch, record state, or platform command. The governance question is simpler: are we clear about the object, scope, owner, and purpose of the work? Validation is often one of the most important next gates because it can provide evidence that the work meets defined expectations. But validation should be treated as evidence, not certainty. A passing result may support review, yet it should not be described as a guarantee of safety, compliance, production readiness, or business correctness unless the platform's validation scope says so.",
+        "title": "Checkout and validation: preparing work and gathering evidence"
+      },
+      "rendering": {
+        "emphasis": "medium",
+        "placement": "inline",
+        "presentation": "section"
+      },
+      "visibility": "public"
+    },
+    {
+      "id": "n_a5",
+      "kind": "content",
+      "private": {
+        "agentNotes": "This section advances the reader from validation evidence to reviewable change accountability without claiming platform diff or patch mechanics.",
+        "intent": "navigate",
+        "strategy": "step"
+      },
+      "public": {
+        "body": "After evidence gathering, the operational question shifts from whether the work appears acceptable to what actually changed. A patching-like gate should make the change understandable enough for reviewers to evaluate intent, scope, and possible side effects. Teams should ask whether the change is limited to the expected content, whether the language still fits the intended audience, whether dependencies or references need review, and whether unresolved issues have been documented before the work advances.",
+        "title": "Patching: what changed, and can reviewers understand it?"
+      },
+      "rendering": {
+        "emphasis": "medium",
+        "placement": "inline",
+        "presentation": "section"
+      },
+      "visibility": "public"
+    },
+    {
+      "id": "n_a6",
+      "kind": "content",
+      "private": {
+        "agentNotes": "This node addresses the central publish/release ambiguity using general governance references while avoiding unsupported product semantics.",
+        "intent": "educate",
+        "strategy": "comparison"
+      },
+      "public": {
+        "body": "The boundary between publishing and release deserves special care. In many governed systems, approving or publishing an artifact is not always the same as activating it for an audience, environment, or runtime. Release engineering guidance often treats controlled delivery as a discipline of reducing risk around change, and related practices such as feature toggles show why availability and activation can be separate decisions in some systems. That does not prove how any particular content platform defines publish or release. The safer operating question is: has the team confirmed what each gate means before using it to expose agent-assisted work?",
+        "title": "Publishing versus release: why two gates may exist"
+      },
+      "rendering": {
+        "emphasis": "high",
+        "placement": "inline",
+        "presentation": "section"
+      },
+      "visibility": "public"
+    },
+    {
+      "id": "n_a7",
+      "kind": "content",
+      "private": {
+        "agentNotes": "This section reassures readers that humans or authorized owners remain accountable at high-impact gates without asserting RBAC or approval enforcement.",
+        "intent": "reassure",
+        "strategy": "recommendation"
+      },
+      "public": {
+        "body": "Agent assistance can often shorten drafting, editing, or restructuring cycles, but speed does not remove accountability. Teams should define who owns each gate. Authors or agents may prepare changes. Reviewers may evaluate quality, evidence, and fit. Authorized owners or operators should make high-impact decisions about approval, publishing, or release unless the platform's own enforcement model says otherwise. The important point is not to assume responsibility is handled automatically. Make ownership explicit before the workflow carries real operational impact.",
+        "title": "Who should be allowed to move content forward?"
+      },
+      "rendering": {
+        "emphasis": "medium",
+        "placement": "inline",
+        "presentation": "section"
+      },
+      "visibility": "public"
+    },
+    {
+      "id": "n_a8",
+      "kind": "content",
+      "private": {
+        "agentNotes": "This checklist provides the practical closure reviewers requested while keeping the guidance conceptual and non-product-specific.",
+        "intent": "navigate",
+        "strategy": "summary"
+      },
+      "public": {
+        "body": "Before advancing agent-assisted content toward release, teams can use a short readiness check: confirm the current state and intended next gate; identify the content object, owner, and audience; review validation output and understand what it does and does not prove; inspect the change for intent, scope, tone, references, and side effects; document open risks or unresolved questions; confirm whether publishing and release are separate decisions in the platform; verify who has authority to advance the work; and obtain explicit approval for high-impact exposure. The checklist is not a substitute for platform controls, but it helps teams ask the right questions before moving quickly.",
+        "title": "A practical pre-release checklist"
+      },
+      "rendering": {
+        "emphasis": "high",
+        "placement": "inline",
+        "presentation": "summary"
+      },
+      "visibility": "public"
+    },
+    {
+      "id": "n_a9",
+      "kind": "content",
+      "private": {
+        "agentNotes": "This closing resolves the journey with due-diligence questions and reader-visible references without converting them into platform claims.",
+        "intent": "educate",
+        "strategy": "resolution"
+      },
+      "public": {
+        "body": "Before relying on any lifecycle as a production procedure, confirm the platform's official lifecycle terms, what validation checks actually run, what a passing validation result means, who can advance content at each gate, whether review or approval is enforced, whether audit history is available, whether rollback is supported, whether scheduling or staged rollout exists, and what publish and release do in practice. Useful background on general release governance includes Google's Site Reliability Engineering chapter on release engineering at https://sre.google/sre-book/release-engineering/. If your workflow separates availability from activation, Martin Fowler's overview of feature toggles at https://martinfowler.com/articles/feature-toggles.html may also be a useful conceptual reference.",
+        "title": "What to verify before operational use"
+      },
+      "rendering": {
+        "emphasis": "medium",
+        "placement": "inline",
+        "presentation": "section"
+      },
+      "visibility": "public"
+    }
+  ],
+  "publication_context": {
+    "publication_name": "Platform",
+    "topic_scope": "Content governance for agent-assisted workflows"
+  },
+  "seo": {
+    "meta_description": "Learn how lifecycle gates can help teams govern agent-assisted content through review, validation, approval, and release decisions without overstating platform-specific behavior.",
+    "meta_title": "Lifecycle Gates for Agent-Assisted Content Workflows"
+  },
+  "slug": "governed-content-lifecycle-gates-agent-workflows",
+  "sources": {
+    "source_list": [
+      {
+        "accessed_at": "2026-08-04",
+        "name": "Site Reliability Engineering, Chapter 8: Release Engineering",
+        "publisher": "Google",
+        "source_id": "src_google_sre_release_engineering",
+        "url": "https://sre.google/sre-book/release-engineering/"
+      },
+      {
+        "accessed_at": "2026-08-04",
+        "name": "Feature Toggles",
+        "publisher": "Martin Fowler",
+        "source_id": "src_fowler_feature_toggles",
+        "url": "https://martinfowler.com/articles/feature-toggles.html"
+      }
+    ]
+  },
+  "title": "Lifecycle Gates for Agent-Assisted Content Workflows"
+}
