@@ -626,7 +626,7 @@ const renderTomlRedirectBlock = (redirect) =>
 const S1_TOML_COMMENT =
   '# W15 S1: one path segment (`:objectId`), unforced — the splat + force pair\n' +
   '# shadowed the static content library index at /admin/content (root\n' +
-  "# netlify.toml's comment has the full story).\n";
+  "# netlify.toml's comment has the full story.\n";
 
 const S1_SITE_CONFIG_ENTRY =
   "    // W15 S1: one path segment, so /admin/content itself keeps serving the\n" +
