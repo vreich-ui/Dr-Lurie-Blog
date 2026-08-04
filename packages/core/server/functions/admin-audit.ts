@@ -10,7 +10,8 @@
  * fields the verbs already persist.
  */
 import type { SiteBinding } from '../lib/site-binding.js';
-import { getAdminStateFromEvent, type LambdaContext } from '../lib/admin-auth.js';
+import type { LambdaContext } from '../lib/admin-auth.js';
+import { resolveAdminAccessFromEvent } from '../lib/request-roles.js';
 import { getSiteObjectsBlobStore } from '../lib/blob-store.js';
 import { getGovernanceBlobStore, resolveActivePolicies } from '../lib/governance-store.js';
 import { listAllObjectRecords, type ObjectVerbStore } from '../lib/object-verbs.js';
@@ -45,7 +46,7 @@ const parseLimit = (event: LambdaEvent): number => {
 const handlerImpl = async (event: LambdaEvent, context?: LambdaContext) => {
   if (event.httpMethod !== 'POST') return jsonResponse(405, { error: 'Method not allowed' });
 
-  const adminState = await getAdminStateFromEvent(event, context);
+  const adminState = await resolveAdminAccessFromEvent(event, context);
   if (!adminState.authenticated) return jsonResponse(401, { error: adminState.error ?? 'Unauthorized' });
   if (!adminState.isAdmin) return jsonResponse(403, { error: 'Admin access required' });
 

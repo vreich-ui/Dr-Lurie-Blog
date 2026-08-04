@@ -1,5 +1,6 @@
 import { PLATFORM_ENV_NAMES, readBoundEnv, type SiteBinding } from '../lib/site-binding.js';
-import { getAdminStateFromEvent, getHeader, type LambdaContext } from '../lib/admin-auth.js';
+import { getHeader, type LambdaContext } from '../lib/admin-auth.js';
+import { resolveAdminAccessFromEvent } from '../lib/request-roles.js';
 import { getArtifactBlobStore } from '../lib/blob-store.js';
 
 type LambdaEvent = {
@@ -34,7 +35,7 @@ const handlerImpl = async (event: LambdaEvent, context?: LambdaContext) => {
   }
 
   if (!hasValidNetlifyPublishSecret(event)) {
-    const adminState = await getAdminStateFromEvent(event, context);
+    const adminState = await resolveAdminAccessFromEvent(event, context);
     if (!adminState.authenticated) {
       return jsonResponse(401, {
         error: adminState.error || 'Authentication is required.',

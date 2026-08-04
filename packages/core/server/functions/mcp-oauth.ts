@@ -26,9 +26,9 @@
  * This endpoint only verifies the resulting Identity token and decides.
  */
 import { getSiteIdentity } from '../../lib/site-identity.js';
-import { getAdminStateFromEvent, type LambdaContext } from '../lib/admin-auth.js';
+import type { LambdaContext } from '../lib/admin-auth.js';
 import { getNetlifyBlobStore } from '../lib/blob-store.js';
-import { resolveRolesFromEvent } from '../lib/request-roles.js';
+import { resolveAdminAccessFromEvent } from '../lib/request-roles.js';
 import type { SiteBinding } from '../lib/site-binding.js';
 import {
   beginAuthorization,
@@ -280,17 +280,15 @@ const handlerImpl = async (event: LambdaEvent, context?: LambdaContext) => {
   // ─── consent: the one Identity-gated endpoint ────────────────────────────
   if (event.httpMethod !== 'POST') return json(405, { error: 'invalid_request', error_description: 'Use POST.' });
 
-  const adminState = await getAdminStateFromEvent(event, context);
+  const adminState = await resolveAdminAccessFromEvent(event, context);
   if (!adminState.authenticated || !adminState.email || !adminState.userId) {
     return json(401, { error: 'unauthorized', error_description: 'Sign in to the admin workspace first.' });
   }
 
-  const roles = await resolveRolesFromEvent(event, {
-    kind: 'human',
-    id: adminState.userId,
-    email: adminState.email,
-  });
-  const mayApprove = adminState.isAdmin || roles.includes('owner') || roles.includes('admin');
+  // S1 auth-dedupe: adminState.isAdmin is already the resolved role set
+  // (env bootstrap owners ∪ users-store tier) — no need to re-resolve roles
+  // a second time just to OR in an owner check.
+  const mayApprove = adminState.isAdmin || adminState.roles.includes('owner');
   if (!mayApprove) {
     // Authenticated but not an administrator: a reader account must not be
     // able to hand an external client the keys to the whole MCP surface.

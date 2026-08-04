@@ -1,5 +1,6 @@
 import { PLATFORM_ENV_NAMES, readBoundEnv, type SiteBinding } from '../lib/site-binding.js';
-import { getAdminStateFromEvent, getHeader, type LambdaContext } from '../lib/admin-auth.js';
+import { getHeader, type LambdaContext } from '../lib/admin-auth.js';
+import { resolveAdminAccessFromEvent, type AdminAccessState } from '../lib/request-roles.js';
 import { uploadImagesWithIntegrity, type UploadableImage } from '../lib/publisher-artifact-upload-client.js';
 import { requireArtifactReferenceArray, type ArtifactReference } from '../lib/artifacts.js';
 import { articleBodyV1Schema, type ArticleBodyNode } from '../../schema/article-content-v1.js';
@@ -141,26 +142,38 @@ const jsonResponse = (statusCode: number, body: Record<string, unknown>) => ({
   body: JSON.stringify(body),
 });
 
-const verifyAdminSession = async (event: LambdaEvent, context?: LambdaContext) => {
-  const adminState = await getAdminStateFromEvent(event, context);
+/** S1 auth-dedupe: resolves the admin session ONCE (full role resolution via
+ *  resolveAdminAccessFromEvent, not the shallow ADMIN_EMAILS-only check) and
+ *  returns either the 401/403 response to send verbatim, or the resolved
+ *  state for the caller to build a Principal from — avoids re-reading the
+ *  users store a second time for the same request. */
+const verifyAdminSession = async (
+  event: LambdaEvent,
+  context?: LambdaContext
+): Promise<{ error: ReturnType<typeof jsonResponse> } | { error?: undefined; adminState: AdminAccessState }> => {
+  const adminState = await resolveAdminAccessFromEvent(event, context);
 
   if (!adminState.authenticated) {
-    return jsonResponse(401, {
-      status: 'error',
-      success: false,
-      error: adminState.error || 'Authentication is required to run the publisher agent.',
-    });
+    return {
+      error: jsonResponse(401, {
+        status: 'error',
+        success: false,
+        error: adminState.error || 'Authentication is required to run the publisher agent.',
+      }),
+    };
   }
 
   if (!adminState.isAdmin) {
-    return jsonResponse(403, {
-      status: 'error',
-      success: false,
-      error: 'This user is not authorized to run the publisher agent.',
-    });
+    return {
+      error: jsonResponse(403, {
+        status: 'error',
+        success: false,
+        error: 'This user is not authorized to run the publisher agent.',
+      }),
+    };
   }
 
-  return undefined;
+  return { adminState };
 };
 
 /** Authorize, and derive the acting Principal for object-history attribution:
@@ -188,9 +201,9 @@ const verifyRequestAuthorization = async (
     };
   }
 
-  const sessionError = await verifyAdminSession(event, context);
-  if (sessionError) return { error: sessionError };
-  const adminState = await getAdminStateFromEvent(event, context);
+  const session = await verifyAdminSession(event, context);
+  if (session.error) return { error: session.error };
+  const { adminState } = session;
   return {
     principal: { kind: 'human', id: adminState.userId ?? '', email: adminState.email ?? '' },
   };
