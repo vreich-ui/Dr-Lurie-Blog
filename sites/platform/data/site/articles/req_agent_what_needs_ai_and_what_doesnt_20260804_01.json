@@ -1,8 +1,8 @@
 {
   "__generated": {
-    "at": "2026-08-04T15:34:05.177Z",
+    "at": "2026-08-04T16:22:45.140Z",
     "from": "objects/content_item/by-id/req_agent_what_needs_ai_and_what_doesnt_20260804_01.json",
-    "record_version": 2
+    "record_version": 6
   },
   "author": "Platform Documentation",
   "deck": "A cost-saving design principle running through the whole platform: if a step's job is to faithfully transform something already known, it shouldn't need a model call. If its job is genuine judgment, it should.",
@@ -83,6 +83,172 @@
       "public": {
         "body": "A structural or technical request — fixing a title, adjusting a category, re-checking a page against its site's rules, confirming something actually published — moves through the cheap, exact, near-instant path. A request that needs real writing, persuasion, or judgment about the content itself goes through the AI path, and that costs more. That's not a flaw to route around; it's the cost of doing something a fixed rule genuinely can't.",
         "title": "What this means when you're asking for something"
+      },
+      "visibility": "public"
+    },
+    {
+      "id": "n_5bbd4afbfda2",
+      "kind": "content",
+      "private": {
+        "intent": "navigate",
+        "strategy": "context"
+      },
+      "public": {
+        "body": {
+          "content": [
+            {
+              "content": [
+                {
+                  "data": {},
+                  "marks": [],
+                  "nodeType": "text",
+                  "value": "For more on how this platform governs agent-assisted publishing, see:"
+                }
+              ],
+              "data": {},
+              "nodeType": "paragraph"
+            },
+            {
+              "content": [
+                {
+                  "content": [
+                    {
+                      "content": [
+                        {
+                          "content": [
+                            {
+                              "data": {},
+                              "marks": [],
+                              "nodeType": "text",
+                              "value": "Lifecycle Gates for Agent-Assisted Content Workflows"
+                            }
+                          ],
+                          "data": {
+                            "uri": "https://kugel-platform.netlify.app/governed-content-lifecycle-gates-agent-workflows"
+                          },
+                          "nodeType": "hyperlink"
+                        }
+                      ],
+                      "data": {},
+                      "nodeType": "paragraph"
+                    }
+                  ],
+                  "data": {},
+                  "nodeType": "list-item"
+                },
+                {
+                  "content": [
+                    {
+                      "content": [
+                        {
+                          "content": [
+                            {
+                              "data": {},
+                              "marks": [],
+                              "nodeType": "text",
+                              "value": "Why Everything in the CMS Is an Object"
+                            }
+                          ],
+                          "data": {
+                            "uri": "https://kugel-platform.netlify.app/everything-is-an-object"
+                          },
+                          "nodeType": "hyperlink"
+                        }
+                      ],
+                      "data": {},
+                      "nodeType": "paragraph"
+                    }
+                  ],
+                  "data": {},
+                  "nodeType": "list-item"
+                },
+                {
+                  "content": [
+                    {
+                      "content": [
+                        {
+                          "content": [
+                            {
+                              "data": {},
+                              "marks": [],
+                              "nodeType": "text",
+                              "value": "When Content Needs a Human, and When It Doesn't"
+                            }
+                          ],
+                          "data": {
+                            "uri": "https://kugel-platform.netlify.app/when-content-needs-a-human"
+                          },
+                          "nodeType": "hyperlink"
+                        }
+                      ],
+                      "data": {},
+                      "nodeType": "paragraph"
+                    }
+                  ],
+                  "data": {},
+                  "nodeType": "list-item"
+                },
+                {
+                  "content": [
+                    {
+                      "content": [
+                        {
+                          "content": [
+                            {
+                              "data": {},
+                              "marks": [],
+                              "nodeType": "text",
+                              "value": "What Happens to an Article Before It's Ready to Publish"
+                            }
+                          ],
+                          "data": {
+                            "uri": "https://kugel-platform.netlify.app/what-happens-before-publish"
+                          },
+                          "nodeType": "hyperlink"
+                        }
+                      ],
+                      "data": {},
+                      "nodeType": "paragraph"
+                    }
+                  ],
+                  "data": {},
+                  "nodeType": "list-item"
+                },
+                {
+                  "content": [
+                    {
+                      "content": [
+                        {
+                          "content": [
+                            {
+                              "data": {},
+                              "marks": [],
+                              "nodeType": "text",
+                              "value": "How the System Grades Its Own Writing"
+                            }
+                          ],
+                          "data": {
+                            "uri": "https://kugel-platform.netlify.app/how-the-system-grades-its-own-writing"
+                          },
+                          "nodeType": "hyperlink"
+                        }
+                      ],
+                      "data": {},
+                      "nodeType": "paragraph"
+                    }
+                  ],
+                  "data": {},
+                  "nodeType": "list-item"
+                }
+              ],
+              "data": {},
+              "nodeType": "unordered-list"
+            }
+          ],
+          "data": {},
+          "nodeType": "document"
+        },
+        "title": "Related reading"
       },
       "visibility": "public"
     }
