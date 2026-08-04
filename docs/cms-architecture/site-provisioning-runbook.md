@@ -86,10 +86,14 @@ For everything NOT auto-generated in step 2:
 - **Tenancy axes** (`PDF_TOOL_PROJECT_ID`, `TRACKING_PROJECT_ID`,
   `TRACKING_SINK_URL`/`_TOKEN`): `PDF_TOOL_PROJECT_ID` defaults to the site
   slug — only set it if it must differ. The bridge URL/token are installed
-  automatically in step 2. `PDF_TOOL_STORAGE_SITE_ID`/`_TOKEN`
-  are **fleet-shared** — point at the existing shared pdf-tool storage
-  service, do not provision a new one. Tracking sink may be one shared
-  owner-DB (partitioned by `TRACKING_PROJECT_ID`) or per-site — your call.
+  automatically in step 2. `PDF_TOOL_STORAGE_SITE_ID`/`_TOKEN` are **per-site**
+  — provision a NEW dedicated Netlify machine account + Blobs-scoped PAT for
+  THIS client (`docs/agents/pdf-tool-storage-grant.md`'s "Credential
+  provisioning" steps); do not reuse another tenant's value. (Historically
+  every tenant read one shared pair pointed at Dr-Lurie's site — `platform`
+  moved off that arrangement 2026-08-04; treat the shared pair as legacy, not
+  the default for a new client.) Tracking sink may be one shared owner-DB
+  (partitioned by `TRACKING_PROJECT_ID`) or per-site — your call.
 - **AI keys** (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `NETLIFY_AUTH_TOKEN`):
   fleet-shared — reuse the existing fleet values, never mint per-client
   copies. `OPENAI_CHATKIT_WORKFLOW_ID` IS per-site — create a ChatKit

@@ -1,11 +1,39 @@
-# pdf-tool storage grants — Dr-Lurie as the grant provider
+# pdf-tool storage grants — per-site by default
 
-pdf-tool is stateless: it holds **no blob credentials of its own**. Platform
-mints a short-lived storage grant and forwards it server-side with each bridged
-pdf-tool call; pdf-tool uses the grant
-to write artifacts, templates, image-search state, and its job records
-directly into Dr-Lurie's Netlify Blob stores. Dr-Lurie therefore owns the
-storage, the credential, and the full artifact-job audit trail.
+pdf-tool is stateless: it holds **no blob credentials of its own**. Whichever
+site's Platform deployment bridges a call mints a short-lived storage grant,
+sourced from **that site's own** `PDF_TOOL_STORAGE_TOKEN` /
+`PDF_TOOL_STORAGE_SITE_ID` environment variables, and forwards it
+server-side with each bridged pdf-tool call; pdf-tool uses the grant to write
+artifacts, templates, image-search state, and its job records directly into
+whichever Netlify Blob store that grant names.
+
+These two env vars are read **per-site** (`packages/core/server/lib/
+pdf-tool-storage-grant.ts` calls `process.env` at request time, and every
+Netlify site has its own separate environment-variable scope) — so each
+tenant CAN have its own dedicated storage, and as of 2026-08-04 that is the
+**prescribed default for any new tenant**: provision a fresh dedicated pair
+per site rather than pointing a new site at someone else's.
+
+**Current state (2026-08-04):** historically every tenant site this repo runs
+(`kugel-platform`, `kugel-fernwell`, and the Dr-Lurie root deployment) read
+the exact same global pair, all pointed at Dr-Lurie's own Netlify site — so
+every tenant's templates/artifacts/image-search state physically lived
+inside Dr-Lurie's Blob storage, namespaced only by the `projectId` key
+prefix, not by any real per-tenant boundary. As of 2026-08-04, `kugel-platform`
+was given its **own dedicated** `PDF_TOOL_STORAGE_TOKEN` /
+`PDF_TOOL_STORAGE_SITE_ID` (a real Netlify Blobs-scoped PAT for platform's
+own site): platform's PDF templates now write to and read from its own
+storage, independent of Dr-Lurie's. `kugel-fernwell` and the Dr-Lurie root
+deployment were **not** changed — they remain on the original shared pair for
+now, pending the same move. No data was migrated in that cutover; nothing on
+the shared store was worth preserving for platform, so any platform-authored
+records left on the shared store are simply orphaned from platform's
+perspective, and that's intentional.
+
+Do not "fix" a site's dedicated `PDF_TOOL_STORAGE_TOKEN`/`PDF_TOOL_STORAGE_SITE_ID`
+back to another tenant's value, or to Dr-Lurie's, thinking it's a
+misconfiguration — a differing value across sites is the point, not a bug.
 
 Code: `packages/core/server/lib/pdf-tool-storage-grant.ts` (grant builder,
 canonical store list), `packages/core/server/lib/pdf-tool-client.ts` (secret-
@@ -61,12 +89,12 @@ MCP. Provisioning probe:
 
 | Grant field     | Store name        | What pdf-tool writes there                                                               |
 | --------------- | ----------------- | ---------------------------------------------------------------------------------------- |
-| `artifacts`     | `artifacts`       | Final artifact bytes (same store Dr-Lurie already uses)                                  |
-| `artifactIndex` | `artifact-index`  | ArtifactReference indexes (same store as Dr-Lurie)                                       |
+| `artifacts`     | `artifacts`       | Final artifact bytes (in whichever site's storage the grant names)                       |
+| `artifactIndex` | `artifact-index`  | ArtifactReference indexes (same site's storage)                                          |
 | `templates`     | `pdf-templates`   | PDF template definitions                                                                 |
 | `imageSearch`   | `image-search`    | Image-search banks, policies, candidate state                                            |
 | `renderData`    | `pdf-render-data` | Render-job input/intermediate data                                                       |
-| `jobs`          | `pdf-tool-jobs`   | **New**: pdf-tool job records — Dr-Lurie's own copy of the full artifact-job audit trail |
+| `jobs`          | `pdf-tool-jobs`   | **New**: pdf-tool job records — that site's own copy of the full artifact-job audit trail |
 
 Netlify Blob stores are created implicitly on first write; run
 `node scripts/provision-pdf-tool-stores.mjs` (with the two env vars set) to
@@ -74,30 +102,44 @@ prove all six exist and are writable with the grant credentials — it does a
 write → read → delete probe per store and prints a per-store verdict without
 ever printing the credentials.
 
-## Credential provisioning (human runbook)
+## Credential provisioning (human runbook — run once PER TENANT SITE)
+
+This used to read as a single one-time Dr-Lurie setup. It isn't: it's a
+per-tenant procedure. Run these five steps for **every** site that needs its
+own dedicated pdf-tool storage — a brand-new client via
+`docs/cms-architecture/site-provisioning-runbook.md`, or an existing tenant
+being moved off the legacy shared pair (the way `kugel-platform` was moved
+2026-08-04). Each run targets exactly one site; never point a new run at a
+site/team another tenant already uses.
 
 1. **Create a dedicated Netlify machine account** (a fresh Netlify user, e.g.
-   `pdf-tool-storage@…`) and give it access to **only** the Dr-Lurie
-   site/team — no other sites, no admin roles. This bounds the blast radius
-   of a leak to this one site.
+   `pdf-tool-storage-<tenant>@…`) and give it access to **only** the target
+   tenant's site/team — no other sites, no admin roles. This bounds the blast
+   radius of a leak to this one site.
 2. From that machine account, generate a **personal access token**
    (Netlify → User settings → Applications → New access token).
-3. In the Dr-Lurie site's Netlify environment variables, set:
+3. On **that tenant's own** Netlify site's environment variables (not
+   another tenant's, not Dr-Lurie's, unless Dr-Lurie is the actual target of
+   this run), set:
    - `PDF_TOOL_STORAGE_TOKEN` — the machine-account PAT
-   - `PDF_TOOL_STORAGE_SITE_ID` — the Dr-Lurie site API ID (Site settings →
-     Site details → Site ID)
+   - `PDF_TOOL_STORAGE_SITE_ID` — that tenant's own site API ID (Site
+     settings → Site details → Site ID)
      Scope both to Functions (and Builds if the provisioning probe runs in
      CI). **Never** expose either in client-side code, logs, or workflow JSON;
-     do not prefix with `PUBLIC_`.
+     do not prefix with `PUBLIC_`. Do not copy another tenant's value in —
+     that recreates the shared-storage arrangement this doc used to describe
+     as the default, which is exactly what a new tenant should avoid.
 4. Run the provisioning probe (step above) once after setting the vars.
-5. Set `PDF_TOOL_BASE_URL` and `PDF_TOOL_AGENT_RUN_TOKEN` on the site, then
-   verify the visible Platform bridge end-to-end: create one job, poll it, and
-   retrieve the verified request-scoped artifact. No grant/proof may appear in
-   the MCP response or structured logs.
+5. Set `PDF_TOOL_BASE_URL` and `PDF_TOOL_AGENT_RUN_TOKEN` on the site (these
+   two remain genuinely fleet-shared — the pdf-tool *service's* base URL and
+   bridge bearer, unrelated to storage), then verify the visible Platform
+   bridge end-to-end: create one job, poll it, and retrieve the verified
+   request-scoped artifact. No grant/proof may appear in the MCP response or
+   structured logs.
 
 The Platform bridge fails closed with
-`pdf_tool_storage_grant_not_configured` until step 3 is done. It never returns
-or logs the token and never writes it to any stored record.
+`pdf_tool_storage_grant_not_configured` until step 3 is done for that site. It
+never returns or logs the token and never writes it to any stored record.
 
 ## Agent workflow rules
 
@@ -127,8 +169,10 @@ or logs the token and never writes it to any stored record.
 The Netlify PAT currently transits agent context inside the grant. The
 planned hardening keeps the grant shape identical but sets
 `grantType: "exchange"` and puts an **opaque short-lived token** in `token`;
-Dr-Lurie exposes a server-to-server exchange endpoint that pdf-tool calls to
-swap the opaque token for the real credential. The PAT then never transits
+the storage-owning site (whichever site's storage the grant names — its own
+site, per the per-tenant model above) exposes a server-to-server exchange
+endpoint that pdf-tool calls to swap the opaque token for the real credential.
+The PAT then never transits
 agent context. Because consumers already treat `token` as opaque and the
 shape stays stable, this is a drop-in change: agents and workflow rules are
 unaffected, pdf-tool switches on `grantType`.

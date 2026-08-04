@@ -136,10 +136,10 @@ Env checklist:
       Inherited automatically from the shared pdf-tool Netlify service for the server-side artifact bridge.
     PDF_TOOL_AGENT_RUN_TOKEN         [fleet-shared]  inherited automatically from the shared pdf-tool service
       Inherited automatically and stored as a Functions-only secret; never written to the scaffold or printed.
-    PDF_TOOL_STORAGE_SITE_ID         [fleet-shared]  reuse the fleet value — do not create a new one
-      Points at the ONE shared pdf-tool storage service — reuse the fleet value, do not create a new one.
-    PDF_TOOL_STORAGE_TOKEN           [fleet-shared]  reuse the fleet value — do not create a new one
-      Auth for that shared service — reuse the fleet value.
+    PDF_TOOL_STORAGE_SITE_ID         [per-site]  ☐ human-supplied — see the provisioning runbook
+      This site's own pdf-tool storage grant target (Netlify site id) — not fleet-shared. Provision a NEW dedicated Netlify Blobs-scoped PAT + site id for THIS site (docs/agents/pdf-tool-storage-grant.md's "Credential provisioning" steps); do not reuse another tenant's value. (Historically every tenant read one shared pair pointed at a single site’s storage; platform moved off that 2026-08-04 — treat the shared pair as legacy, not the default for a new client.)
+    PDF_TOOL_STORAGE_TOKEN           [per-site]  ☐ human-supplied — see the provisioning runbook
+      Auth paired with PDF_TOOL_STORAGE_SITE_ID above — same rule: a dedicated PAT for THIS site, never another tenant's token. Same provisioning steps: docs/agents/pdf-tool-storage-grant.md.
     TRACKING_PROJECT_ID              [per-site]  ☐ human-supplied — see the provisioning runbook
       This client's partition in the tracking owner-DB (trk_<shortId> convention).
     TRACKING_SALT                    [per-site]  ☐ human-supplied — see the provisioning runbook

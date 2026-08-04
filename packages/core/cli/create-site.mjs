@@ -54,7 +54,7 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'
 
 // ─── the per-site env checklist (T11.7-provisioning-cli.md's table; keep in
 //     sync with docs/cms-architecture/site-provisioning-runbook.md and the
-//     T11.10 governance/secrets inventory when either changes) ──────────────
+//     T11.10 governance/secrets inventory when either changes) ───
 //
 // class: 'per-site' (unique per client, no safe default) | 'fleet-shared'
 //   (one value across the fleet — reuse it, do not mint a new one) |
@@ -159,13 +159,20 @@ export const ENV_CHECKLIST = [
       },
       {
         name: 'PDF_TOOL_STORAGE_SITE_ID',
-        cls: 'fleet-shared',
-        note: 'Points at the ONE shared pdf-tool storage service — reuse the fleet value, do not create a new one.',
+        cls: 'per-site',
+        note:
+          "This site's own pdf-tool storage grant target (Netlify site id) — not fleet-shared. Provision a NEW " +
+          "dedicated Netlify Blobs-scoped PAT + site id for THIS site (docs/agents/pdf-tool-storage-grant.md's " +
+          "\"Credential provisioning\" steps); do not reuse another tenant's value. (Historically every tenant read " +
+          'one shared pair pointed at a single site’s storage; platform moved off that 2026-08-04 — treat the shared ' +
+          'pair as legacy, not the default for a new client.)',
       },
       {
         name: 'PDF_TOOL_STORAGE_TOKEN',
-        cls: 'fleet-shared',
-        note: 'Auth for that shared service — reuse the fleet value.',
+        cls: 'per-site',
+        note:
+          "Auth paired with PDF_TOOL_STORAGE_SITE_ID above — same rule: a dedicated PAT for THIS site, never " +
+          "another tenant's token. Same provisioning steps: docs/agents/pdf-tool-storage-grant.md.",
       },
       {
         name: 'TRACKING_PROJECT_ID',
@@ -278,7 +285,7 @@ const DATA_SITE_SUBDIRS = [
   'articles',
 ];
 
-// ─── validation ─────────────────────────────────────────────────────────────
+// ─── validation ───
 
 const SLUG_RE = /^[a-z][a-z0-9-]{1,30}$/;
 
@@ -294,7 +301,7 @@ export const validateClientSlug = (name) => {
   return name;
 };
 
-// ─── plan ids ────────────────────────────────────────────────────────────────
+// ─── plan ids ───
 
 export const idsFor = (clientSlug) => {
   const clientId = clientSlug.replace(/-/g, '_');
@@ -307,7 +314,7 @@ export const idsFor = (clientSlug) => {
   };
 };
 
-// ─── file content templates ───────────────────────────────────────────────
+// ─── file content templates ───
 
 const titleCase = (slug) =>
   slug
@@ -862,7 +869,7 @@ export const CONVERSION_SEEDS = [
 ];
 `;
 
-// ─── the per-site policy bundle (W14 T14.2) ──────────────────────────────────
+// ─── the per-site policy bundle (W14 T14.2) ───
 //
 // T11.10 gave Dr-Lurie its own `config/approval-policy.ts` + `creation-policy.ts`
 // and T14.1 moved `media-policy.ts` + `policy-bindings.ts` alongside them. The
@@ -962,7 +969,7 @@ setActiveMediaPolicyProvider((): MediaPolicy => (mediaPolicy ??= resolveMediaPol
 setSiteIdentityConfigProvider((): unknown => siteIdentityConfig);
 `;
 
-// ─── W14 T14.1/T14.2: the BUILD ENTRY ────────────────────────────────────────
+// ─── W14 T14.1/T14.2: the BUILD ENTRY ───
 //
 // T14.1 moved the application shell into `packages/core/app` and made each
 // site a thin entry over it. A scaffolded site therefore needs four small
@@ -1141,7 +1148,7 @@ const { objectId } = Astro.props as Props;
 <PageObjectRenderer objectId={objectId} />
 `;
 
-// ─── bootstrap committed exports ─────────────────────────────────────────────
+// ─── bootstrap committed exports ───
 //
 // A site cannot render one page until its navigation objects are published:
 // PageLayout throws on a missing nav export BY DESIGN ("never leaves a surface
@@ -1278,7 +1285,7 @@ const bootstrap404PageExport = (brandName) =>
     ],
   });
 
-// ─── per-site Netlify function shims (W14 T14.3 prep) ────────────────────────
+// ─── per-site Netlify function shims (W14 T14.3 prep) ───
 //
 // Every core server function is a FACTORY over a SiteBinding; the thin file
 // that instantiates it is per-site by definition. Netlify resolves
@@ -1385,7 +1392,7 @@ export const coreFunctionNames = () => {
   return [...stems].sort();
 };
 
-// ─── plan builder ──────────────────────────────────────────────────────────────
+// ─── plan builder ───
 
 export const buildPlan = (opts) => {
   const clientSlug = validateClientSlug(opts.name);
@@ -1454,7 +1461,7 @@ export const buildPlan = (opts) => {
   return { clientSlug, ids, brandName, canonicalHost, dir, files };
 };
 
-// ─── rendering (dry-run / execution report) ─────────────────────────────────
+// ─── rendering (dry-run / execution report) ───
 
 export const renderEnvChecklist = (executed) => {
   const lines = [];
@@ -1529,7 +1536,7 @@ export const renderPlan = (plan, { netlifyToken }) => {
   return lines.join('\n');
 };
 
-// ─── execution ─────────────────────────────────────────────────────────────────
+// ─── execution ───
 
 export const writeFiles = (plan) => {
   for (const file of plan.files) {
@@ -1762,7 +1769,7 @@ export const executeNetlifyProvisioning = async (
   return { site, siteId, accountId, storeFailures, secretsSet, secretsFailed };
 };
 
-// ─── CLI entry ─────────────────────────────────────────────────────────────────
+// ─── CLI entry ───
 
 const parseArgs = (argv) => {
   const opts = { dryRun: false };
