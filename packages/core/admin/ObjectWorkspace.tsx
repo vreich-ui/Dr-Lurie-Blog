@@ -13,7 +13,7 @@
  * (the brief's scripted per-type drive) — until then the inspector generates a
  * read view and points visual edits at the canvas.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { AdminShell } from './AdminShell';
 import { getSiteIdentity } from '@core/lib/site-identity';
@@ -27,6 +27,7 @@ import { AgentChip, ChatComposer, ChatThread, useChat } from './chat';
 import { createObjectChat } from '@core/lib/admin/chat-client';
 import { IconAlertTriangle, IconExternalLink, IconPlus, IconRocket, IconWrench } from './icons';
 import { objectDisplayName, objectTypeLabel, idTooltip } from '@core/lib/admin/display-name';
+import { resolveWorkspaceObjectType } from '@core/lib/admin/object-type-resolve';
 import type { ObjectType, ObjectRecord, HistoryEntry } from '@core/schema/object-record-v1';
 import type { ReadinessGroup, CriterionStatus } from '@core/lib/admin/readiness-criteria';
 
@@ -399,18 +400,22 @@ function WorkspaceBody() {
   const [now, setNow] = useState(0);
   const [chatId, setChatId] = useState<string | undefined>(undefined);
   const [loc] = useState(() => (typeof window === 'undefined' ? { id: '', type: undefined } : parseLocation()));
+  // The resolved object type: `?type=` when the library link supplied it,
+  // otherwise derived from the id (prefix map + inventory fallback, W15 S1).
+  const typeRef = useRef<ObjectType | undefined>(loc.type);
   const chat = useChat(getToken, chatId);
 
   const load = async () => {
-    if (!loc.id || !loc.type) {
+    const type = typeRef.current;
+    if (!loc.id || !type) {
       setError('This object could not be identified. Open it from the content library.');
       setLoading(false);
       return;
     }
     const { getObjectRecord, callObjectVerb } = await import('@core/lib/edit-mode/verbs-client');
-    const { record } = await getObjectRecord(getToken, loc.type, loc.id);
+    const { record } = await getObjectRecord(getToken, type, loc.id);
     if (!record) {
-      setError(`${objectTypeLabel(loc.type)} "${loc.id}" was not found.`);
+      setError(`${objectTypeLabel(type)} "${loc.id}" was not found.`);
       setLoading(false);
       return;
     }
@@ -418,7 +423,7 @@ function WorkspaceBody() {
     setLoading(false);
     // readiness (best-effort)
     try {
-      const res = await callObjectVerb(getToken, { action: 'validate', object_type: loc.type, object_id: loc.id });
+      const res = await callObjectVerb(getToken, { action: 'validate', object_type: type, object_id: loc.id });
       setReadiness(readinessFromValidate(res.body ?? {}));
     } catch {
       setReadiness(null);
@@ -436,16 +441,29 @@ function WorkspaceBody() {
         /* ignore */
       }
     })();
-    load().catch((e) => {
+    (async () => {
+      // Bare deep links (W15 S1): /admin/content/<id> without `?type=` — the
+      // id prefix names the type for eleven governed types; content_item ids
+      // (req_*) and anything unprefixed resolve via one inventory lookup.
+      if (loc.id && !typeRef.current) {
+        typeRef.current = await resolveWorkspaceObjectType(getToken, loc.id);
+        if (!typeRef.current) {
+          setError(`"${loc.id}" was not found in the content library.`);
+          setLoading(false);
+          return;
+        }
+      }
+      await load();
+      // Chat-first (T9.14): the per-object conversation opens with the page.
+      if (loc.id && typeRef.current) {
+        createObjectChat(getToken, typeRef.current, loc.id)
+          .then(({ chat: created }) => setChatId(created.chat_id))
+          .catch(() => setChatId(undefined));
+      }
+    })().catch((e) => {
       setError(e instanceof Error ? e.message : 'Could not load this object.');
       setLoading(false);
     });
-    // Chat-first (T9.14): the per-object conversation opens with the page.
-    if (loc.id && loc.type) {
-      createObjectChat(getToken, loc.type, loc.id)
-        .then(({ chat: created }) => setChatId(created.chat_id))
-        .catch(() => setChatId(undefined));
-    }
   }, []);
 
   // Every accepted write refreshes the record — the preview re-renders and
