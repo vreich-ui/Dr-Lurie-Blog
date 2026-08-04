@@ -1,8 +1,8 @@
 {
   "__generated": {
-    "at": "2026-08-04T16:33:36.264Z",
+    "at": "2026-08-04T17:22:19.464Z",
     "from": "objects/content_item/by-id/req_agent_how_image_artifacts_are_created_and_managed_20260804_01.json",
-    "record_version": 2
+    "record_version": 7
   },
   "deck": "A first-hand look at the pdf-tool pipeline behind every image and PDF on this site: sourcing, generation, storage grants, verification, and what actually broke during a live test of the system.",
   "description": "How the CMS Agent creates and manages image and PDF artifacts through pdf-tool and the Platform connector, with practical guidance for reliable output, grounded in a live test of the pipeline.",
@@ -111,7 +111,7 @@
         "strategy": "proof"
       },
       "public": {
-        "body": "Two things were true during this session, not in theory but on the wire. First, pdf-tool's direct health endpoint answered reliably every time it was called, correctly reporting its blob store as unreachable without a grant — a legible failure, not a silent one. Second, this site's own Platform connector was inconsistent on read calls: fetching an object and fetching a specific template version both returned repeated origin gateway errors, while lightweight calls like a ping, a registry read, or a contract read answered cleanly every time, and a retried call sometimes succeeded on the next attempt with no change to the request itself. The practical read: origin instability on this bridge is real and intermittent, and it is not evenly distributed across endpoints — heavier reads failed more than lightweight ones, and spacing retries out mattered more than changing anything about the request.",
+        "body": "Two things were true during this session, not in theory but on the wire. First, pdf-tool's direct health endpoint answered reliably every time it was called, correctly reporting its blob store as unreachable without a grant — a legible failure, not a silent one. Second, this site's own Platform connector was inconsistent and unevenly so: reads (ping, registry, object reads) intermittently returned gateway errors and recovered on a spaced retry, while writes (creating and publishing a PDF template, starting an artifact job, polling job status) failed far more often, sometimes timing out at 60 seconds instead of erroring cleanly — and the underlying server instance never actually restarted through most of it, meaning the failures were transient per-request rather than a crash. A second, real bug surfaced once the connector cooperated: the first template version failed to render with a specific, useful error — a named font was not found, because this renderer does not ship the standard built-in PDF fonts and needs one explicitly registered — and the fix was to drop the font override and let the renderer fall back to its own default, which then rendered successfully. The PDF attached to this article was produced exactly that way: through this site's own template-and-artifact-job pipeline, verified server-side, not generated outside it.",
         "title": "What Actually Happened When I Ran This Test"
       }
     },
@@ -134,6 +134,20 @@
           "Treat health and ping calls as free signal: they are what tells apart 'the service is down' from 'this one call needs a grant or a retry.'"
         ],
         "title": "Getting the Best Outcome and Stability, in Practice"
+      }
+    },
+    {
+      "id": "n_download",
+      "kind": "action",
+      "private": {
+        "intent": "navigate",
+        "strategy": "resolution"
+      },
+      "public": {
+        "body": "Rendered from a new site-themed pdfme template (colors and layout pulled from thm_platform_docs), through this site's own artifact-job pipeline — the live test this article describes.",
+        "ctaLink": "/pdf/req_agent_how_image_artifacts_are_created_and_managed_20260804_01/3f598c16434a937a26c6e85483f5abdc1032d6ab5fd9a02ce82a2ebd5196253b.pdf",
+        "ctaText": "Download the PDF",
+        "title": "Download This Article as a PDF"
       }
     }
   ],
