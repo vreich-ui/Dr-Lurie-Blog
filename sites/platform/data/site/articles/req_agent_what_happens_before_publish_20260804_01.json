@@ -1,0 +1,108 @@
+{
+  "__generated": {
+    "at": "2026-08-04T15:05:25.017Z",
+    "from": "objects/content_item/by-id/req_agent_what_happens_before_publish_20260804_01.json",
+    "record_version": 2
+  },
+  "author": "Platform Documentation",
+  "deck": "A plain-language walk through the research, writing, and review steps behind an AI-assisted article — and when you don't need all of them.",
+  "description": "How a piece of AI-assisted content moves from a bare idea to something ready for a human to check, and why some content can skip most of that process entirely.",
+  "nodes": [
+    {
+      "id": "n_pipe01",
+      "kind": "content",
+      "private": {
+        "intent": "educate",
+        "strategy": "hook"
+      },
+      "public": {
+        "body": "By the time an article shows up ready for a human to review, it's already been through roughly a dozen distinct checks — not one AI writing in one pass, but a sequence of narrower jobs, each one checking or improving a specific thing the last one produced.",
+        "title": "A dozen checks before anyone sees a draft"
+      },
+      "visibility": "public"
+    },
+    {
+      "id": "n_pipe02",
+      "kind": "content",
+      "private": {
+        "intent": "educate",
+        "strategy": "step"
+      },
+      "public": {
+        "body": "It starts before any writing happens: making sure the topic is actually worth covering, understanding who's going to read it, and making sure there's a real angle rather than a generic restatement of the obvious.",
+        "title": "Before any writing happens"
+      },
+      "visibility": "public"
+    },
+    {
+      "id": "n_pipe03",
+      "kind": "content",
+      "private": {
+        "intent": "educate",
+        "strategy": "step"
+      },
+      "public": {
+        "body": "Research comes next, and the honest version of research matters more than the thorough-sounding version. A good research pass says plainly when it couldn't find enough to support a claim, rather than filling the gap with something plausible-sounding. That honesty is what everything after it depends on.",
+        "title": "Research that admits its own gaps"
+      },
+      "visibility": "public"
+    },
+    {
+      "id": "n_pipe04",
+      "kind": "content",
+      "private": {
+        "intent": "educate",
+        "strategy": "step"
+      },
+      "public": {
+        "body": "Drafting and rewriting follow, but not as one pass. Separate checks run afterward for whether it reads like a person wrote it, whether every claim still lines up with the evidence gathered earlier, whether the tone lands the way it's supposed to, and — a step that's easy to skip and shouldn't be — a simulated first read, catching the places a real reader would get confused or drop off.",
+        "title": "Drafting is not one pass"
+      },
+      "visibility": "public"
+    },
+    {
+      "id": "n_pipe05",
+      "kind": "content",
+      "private": {
+        "intent": "educate",
+        "strategy": "step"
+      },
+      "public": {
+        "body": "All of those checks get pulled into a single verdict before the piece moves on to being shaped into the exact structure the destination site requires. That handoff point is deliberate: editorial judgment happens first, technical formatting happens after, and the two are never mixed into one step.",
+        "title": "One verdict, then a separate handoff"
+      },
+      "visibility": "public"
+    },
+    {
+      "id": "n_pipe06",
+      "kind": "content",
+      "private": {
+        "intent": "educate",
+        "strategy": "resolution"
+      },
+      "public": {
+        "body": "Not everything needs to go through all of this. This article did not. Short factual updates, documentation, or content where the substance is already known and correct can be written directly and published through the same lifecycle — checked out, validated, published, released — without running the research-through-persuasion pipeline built for content that has to earn a reader's attention from nothing. The heavy pipeline is for when the content itself is the hard part. When it isn't, going straight to the object is the more honest choice, not a shortcut.",
+        "title": "Not everything needs all of this"
+      },
+      "visibility": "public"
+    }
+  ],
+  "publication_context": {
+    "domain": "kugel-platform.netlify.app",
+    "publication_name": "Platform",
+    "topic_scope": "CMS editorial pipeline"
+  },
+  "seo": {
+    "meta_description": "An editor's guide to the editorial pipeline behind AI-assisted articles: research, drafting, review passes, and the lighter path that skips most of it.",
+    "meta_title": "What Happens to an Article Before It's Ready to Publish"
+  },
+  "slug": "what-happens-before-publish",
+  "taxonomy": {
+    "category": "guide",
+    "tags": [
+      "publishing",
+      "architecture"
+    ]
+  },
+  "title": "What Happens to an Article Before It's Ready to Publish"
+}
