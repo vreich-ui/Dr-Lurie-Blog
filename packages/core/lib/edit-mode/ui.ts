@@ -43,6 +43,8 @@ import { activeMediaPolicy } from '../../lib/media-policy.js';
 import { getSiteIdentity } from '../../lib/site-identity.js';
 import { previewFieldChange, restoreRegion, snapshotRegion, type RegionSnapshot } from './preview.js';
 import { mountMarginaliaPanel } from './marginalia-panel.js';
+import { listMarginaliaThreads } from '../admin/marginalia-client.js';
+import type { MarginaliaThreadWithComments } from '../../schema/marginalia-v1.js';
 import {
   STYLES,
   ICON_SPARKLES,
@@ -559,6 +561,34 @@ export const mountEditMode = (options: MountOptions): void => {
     recordCache.delete(recordKey(objectType, objectId));
     if (objectType === 'content_item') nodeRoleCache.delete(objectId);
   };
+
+  // ── marginalia cache: same B4 discipline as the record cache above, applied
+  // to comment threads — entering edit mode also warms every visible
+  // object's threads, one list per distinct object, in parallel, so the
+  // Comments accordion opens from memory instead of paying a cold fetch.
+  // A write through the panel invalidates its own entry (mountMarginaliaPanel's
+  // onWrite callback), the same way object writes invalidate recordCache.
+  type MarginaliaThreadsResult = { threads: MarginaliaThreadWithComments[] };
+  const marginaliaCache = new Map<string, Promise<MarginaliaThreadsResult>>();
+  const cachedMarginaliaThreads = (objectType: string, objectId: string): Promise<MarginaliaThreadsResult> => {
+    const key = recordKey(objectType, objectId);
+    let cached = marginaliaCache.get(key);
+    if (!cached) {
+      cached = listMarginaliaThreads(getToken, objectType, objectId).then(
+        (result) => ({ threads: result.threads }),
+        (error: unknown) => {
+          marginaliaCache.delete(key);
+          throw error;
+        }
+      );
+      marginaliaCache.set(key, cached);
+    }
+    return cached;
+  };
+  const invalidateMarginaliaThreads = (objectType: string, objectId: string): void => {
+    marginaliaCache.delete(recordKey(objectType, objectId));
+  };
+
   const preloadRecords = (): void => {
     const targets = new Map<string, { type: string; id: string }>();
     const note = (target: EditTarget | undefined): void => {
@@ -574,7 +604,14 @@ export const mountEditMode = (options: MountOptions): void => {
     document
       .querySelectorAll<HTMLElement>(NAV_SELECTOR)
       .forEach((region) => note(deriveNavTarget(region.dataset as Record<string, string>)));
-    for (const { type, id } of targets.values()) void cachedRecord(type, id);
+    for (const { type, id } of targets.values()) {
+      void cachedRecord(type, id);
+      void cachedMarginaliaThreads(type, id);
+    }
+    // The taxonomy registry backs the article-settings category/tag pickers
+    // on EVERY content_item, regardless of what's on the current page — warm
+    // it unconditionally so that panel's first open never pays a cold fetch.
+    void cachedRecord('taxonomy', getSiteIdentity().taxonomyId);
   };
 
   const session = (objectType: string, objectId: string): EditSession => {
@@ -1664,12 +1701,18 @@ export const mountEditMode = (options: MountOptions): void => {
       logEl.innerHTML = '';
       const commentsBody = panel.querySelector<HTMLElement>('[data-em-acc-body="comments"]');
       if (commentsBody) {
-        void mountMarginaliaPanel(commentsBody, getToken, {
-          objectType: target.objectType,
-          objectId: target.objectId,
-          ...(target.sectionId !== undefined ? { sectionId: target.sectionId } : {}),
-          ...(target.nodeId !== undefined ? { nodeId: target.nodeId } : {}),
-        });
+        void mountMarginaliaPanel(
+          commentsBody,
+          getToken,
+          {
+            objectType: target.objectType,
+            objectId: target.objectId,
+            ...(target.sectionId !== undefined ? { sectionId: target.sectionId } : {}),
+            ...(target.nodeId !== undefined ? { nodeId: target.nodeId } : {}),
+          },
+          cachedMarginaliaThreads(target.objectType, target.objectId),
+          () => invalidateMarginaliaThreads(target.objectType, target.objectId)
+        );
       }
       return;
     }
