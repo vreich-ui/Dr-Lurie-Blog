@@ -42,18 +42,6 @@
  *   node packages/core/cli/create-site.mjs --name acme --dry-run
  *   node packages/core/cli/create-site.mjs --name acme
  *   node packages/core/cli/create-site.mjs --name acme --netlify-token $NETLIFY_API_TOKEN
- *   node packages/core/cli/create-site.mjs --name acme --provision-only --netlify-token $NETLIFY_API_TOKEN \
- *     --known-tenant-site kugel-platform --known-tenant-site kugel-fernwell --known-tenant-site dr-lurie-root
- *
- * `--known-tenant-site <netlify-site-name>` (repeatable): fleet-law storage
- * parity, enforced not just documented. PDF_TOOL_STORAGE_SITE_ID/TOKEN are
- * per-site, never fleet-shared (docs/agents/pdf-tool-storage-grant.md) — pass
- * every OTHER live tenant's Netlify site name and provisioning refuses to
- * finish if this site's storage target collides with one of theirs (checked
- * live via checkStorageGrantParity, below). Omit it and this check is
- * skipped entirely — it is additive, not required, so existing callers are
- * unaffected. See also the standalone scripts/audit-storage-grant-parity.mjs
- * for auditing an existing fleet without provisioning anything.
  */
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -332,6 +320,10 @@ export const CORE_BLOB_STORES = [
   // S4x (2/2): the tagged canvas Ask-AI proposal trail a save carries —
   // write-mostly training data, admin-object.ts's only consumer.
   'agent-learning',
+  // W15 S4 (MVP): Marginalia comment threads — the dedicated blob-store side
+  // channel getMarginaliaBlobStore reads/writes, independent of the object
+  // substrate's lock/version/patch lifecycle.
+  'marginalia',
 ];
 
 const DATA_SITE_SUBDIRS = [
@@ -1622,7 +1614,7 @@ export const writeFiles = (plan) => {
  * partway through, and the only safe retry is one that reuses the site it
  * already made).
  */
-export const findNetlifySite = async (fetchImpl, token, siteName) => {
+const findNetlifySite = async (fetchImpl, token, siteName) => {
   const response = await fetchImpl(`https://api.netlify.com/api/v1/sites?name=${encodeURIComponent(siteName)}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -1696,7 +1688,7 @@ const setNetlifyEnvVar = async (
   }
 };
 
-export const getNetlifyEnvVars = async (fetchImpl, token, accountId, siteId) => {
+const getNetlifyEnvVars = async (fetchImpl, token, accountId, siteId) => {
   const response = await fetchImpl(
     `https://api.netlify.com/api/v1/accounts/${accountId}/env?site_id=${encodeURIComponent(siteId)}`,
     { headers: { Authorization: `Bearer ${token}` } }
@@ -1708,85 +1700,11 @@ export const getNetlifyEnvVars = async (fetchImpl, token, accountId, siteId) => 
   return Array.isArray(variables) ? variables : [];
 };
 
-export const contextValue = (variable) => {
+const contextValue = (variable) => {
   const values = Array.isArray(variable?.values) ? variable.values : [];
   return (
     values.find((entry) => entry?.context === 'production' && typeof entry.value === 'string')?.value ||
     values.find((entry) => entry?.context === 'all' && typeof entry.value === 'string')?.value
-  );
-};
-
-/**
- * `checkStorageGrantParity` — the LIVE counterpart to ENV_CHECKLIST's
- * 'per-site' classification of PDF_TOOL_STORAGE_SITE_ID/TOKEN above: proves
- * (or disproves) that a set of named Netlify sites each has its OWN
- * dedicated pdf-tool storage target, rather than two tenants pointing at the
- * same physical Blobs store — the pre-2026-08-04 fleet default this repo is
- * moving off of (docs/agents/pdf-tool-storage-grant.md). Neither
- * PDF_TOOL_STORAGE_SITE_ID nor its paired token is ever committed (they are
- * per-site Netlify env values by design), so this is the only way to prove
- * parity: read the live values and compare.
- *
- * Deliberately takes an explicit list of site NAMES rather than discovering
- * "every site in the account" — an account-wide site-listing call isn't
- * exercised anywhere else in this file, so this composes only the two calls
- * already proven live here (site-by-name lookup, account-scoped env read)
- * instead of a new, unverified endpoint. Callers supply the fleet's known
- * tenant site names: the `--known-tenant-site` CLI flag below (provisioning
- * time) or scripts/audit-storage-grant-parity.mjs (standalone audit).
- *
- * Returns `{ rows, collisions }`:
- *   - rows: one entry per requested name — `{ siteName, status: 'ok' |
- *     'not-found' | 'unset', storageSiteId? }` ('unset' means the site
- *     exists but has no PDF_TOOL_STORAGE_SITE_ID yet — not itself a parity
- *     violation, just not provisioned; the bridge already fails closed for
- *     it, docs/agents/pdf-tool-storage-grant.md).
- *   - collisions: groups of 2+ DIFFERENT site names that reported the SAME
- *     non-empty storageSiteId — the actual parity violation.
- */
-export const checkStorageGrantParity = async (fetchImpl, token, siteNames) => {
-  const rows = [];
-  for (const siteName of siteNames) {
-    const site = await findNetlifySite(fetchImpl, token, siteName);
-    const siteId = site?.id || site?.site_id;
-    const accountId = site?.account_id;
-    if (!site || !siteId || !accountId) {
-      rows.push({ siteName, status: 'not-found' });
-      continue;
-    }
-    const variables = await getNetlifyEnvVars(fetchImpl, token, accountId, siteId);
-    const storageSiteId = contextValue(variables.find((variable) => variable?.key === 'PDF_TOOL_STORAGE_SITE_ID'));
-    rows.push(storageSiteId ? { siteName, status: 'ok', storageSiteId } : { siteName, status: 'unset' });
-  }
-
-  const byStorageSiteId = new Map();
-  for (const row of rows) {
-    if (row.status !== 'ok') continue;
-    const group = byStorageSiteId.get(row.storageSiteId) || [];
-    group.push(row.siteName);
-    byStorageSiteId.set(row.storageSiteId, group);
-  }
-  const collisions = [...byStorageSiteId.entries()]
-    .filter(([, siteNamesSharingIt]) => siteNamesSharingIt.length > 1)
-    .map(([storageSiteId, siteNamesSharingIt]) => ({ storageSiteId, siteNames: siteNamesSharingIt }));
-
-  return { rows, collisions };
-};
-
-/**
- * Throws if `siteName` is one of the sites in a `checkStorageGrantParity`
- * collision group. Split out from `executeNetlifyProvisioning` so the
- * enforcement decision is a small, pure, directly-testable unit — the
- * surrounding function is all network I/O.
- */
-export const assertNoStorageGrantCollision = ({ collisions }, siteName) => {
-  const ownCollision = collisions.find((c) => c.siteNames.includes(siteName));
-  if (!ownCollision) return;
-  throw new Error(
-    `PDF_TOOL_STORAGE_SITE_ID parity violation: '${siteName}' shares storage target ` +
-      `'${ownCollision.storageSiteId}' with ${ownCollision.siteNames.filter((n) => n !== siteName).join(', ')}. ` +
-      'Provision a dedicated PDF_TOOL_STORAGE_TOKEN/PDF_TOOL_STORAGE_SITE_ID for THIS site (docs/agents/' +
-      'pdf-tool-storage-grant.md "Credential provisioning") and re-run --provision-only.'
   );
 };
 
@@ -1836,15 +1754,7 @@ const resolvePdfToolBridgeEnv = async (
  */
 export const executeNetlifyProvisioning = async (
   plan,
-  {
-    token,
-    fetchImpl = fetch,
-    getStoreImpl,
-    siteName = undefined,
-    fleetEnv = process.env,
-    pdfToolSiteName = 'pdf-x',
-    knownTenantSiteNames = [],
-  }
+  { token, fetchImpl = fetch, getStoreImpl, siteName = undefined, fleetEnv = process.env, pdfToolSiteName = 'pdf-x' }
 ) => {
   // The Netlify subdomain is globally unique, so it cannot always equal the
   // client slug (W14 T14.3: `platform.netlify.app` was taken). `siteName`
@@ -1853,23 +1763,6 @@ export const executeNetlifyProvisioning = async (
   const site = await createNetlifySite(fetchImpl, token, siteName || plan.clientSlug);
   const siteId = site.id || site.site_id;
   const accountId = site.account_id;
-
-  // W15-storage-parity: this repo's fleet law is "no two tenants share a
-  // pdf-tool storage target" (docs/agents/pdf-tool-storage-grant.md). A
-  // brand-new site has nothing set yet, so this is a no-op on the first run
-  // — the real bite is a --provision-only RE-run after the operator has set
-  // PDF_TOOL_STORAGE_TOKEN/SITE_ID by hand (the runbook's step 3): if what
-  // they set collides with a sibling tenant passed via --known-tenant-site,
-  // provisioning refuses to finish rather than silently recreating the
-  // shared-storage arrangement the fleet is moving off of.
-  let storageParity;
-  if (knownTenantSiteNames.length) {
-    storageParity = await checkStorageGrantParity(fetchImpl, token, [
-      site.name,
-      ...knownTenantSiteNames.filter((name) => name !== site.name),
-    ]);
-    assertNoStorageGrantCollision(storageParity, site.name);
-  }
 
   let getStore = getStoreImpl;
   if (!getStore) {
@@ -1935,7 +1828,7 @@ export const executeNetlifyProvisioning = async (
     }
   }
 
-  return { site, siteId, accountId, storeFailures, secretsSet, secretsFailed, storageParity };
+  return { site, siteId, accountId, storeFailures, secretsSet, secretsFailed };
 };
 
 // ─── CLI entry ───
@@ -1962,10 +1855,6 @@ const parseArgs = (argv) => {
       opts.provisionOnly = true;
     } else if (arg === '--netlify-site-name') {
       opts.netlifySiteName = argv[i + 1];
-      i += 1;
-    } else if (arg === '--known-tenant-site') {
-      opts.knownTenantSites = opts.knownTenantSites || [];
-      opts.knownTenantSites.push(argv[i + 1]);
       i += 1;
     }
   }
@@ -2006,21 +1895,11 @@ export const main = async (argv) => {
 
   if (netlifyToken) {
     console.log('[create-site] provisioning the Netlify site + blob stores…');
-    const result = await executeNetlifyProvisioning(plan, {
-      token: netlifyToken,
-      siteName: opts.netlifySiteName,
-      knownTenantSiteNames: opts.knownTenantSites || [],
-    });
+    const result = await executeNetlifyProvisioning(plan, { token: netlifyToken, siteName: opts.netlifySiteName });
     console.log(`[create-site] Netlify site created: id=${result.siteId}`);
     for (const storeName of CORE_BLOB_STORES) {
       const failed = result.storeFailures.find((f) => f.storeName === storeName);
       console.log(failed ? `  FAILED   ${storeName}: ${failed.message}` : `  ok       ${storeName}`);
-    }
-    if (result.storageParity) {
-      console.log('[create-site] pdf-tool storage-grant parity vs. known tenant sites:');
-      for (const row of result.storageParity.rows) {
-        console.log(`  ${row.status.padEnd(9)} ${row.siteName}${row.storageSiteId ? ` -> ${row.storageSiteId}` : ''}`);
-      }
     }
     if (result.secretsSet.length) console.log(`[create-site] generated + set: ${result.secretsSet.join(', ')}`);
     if (result.secretsFailed.length) {
