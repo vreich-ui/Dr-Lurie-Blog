@@ -1199,7 +1199,7 @@ export const getStaticPaths = (async () => {
     if (skip.reason === 'file_route') continue;
     if (skip.reason === 'loader_owned_page_type') continue;
     console.warn(
-      `[objectPage] NOT serving ${skip.objectId} at ${skip.route} — ${skip.reason}. ` +
+      \`[objectPage] NOT serving \${skip.objectId} at \${skip.route} — \${skip.reason}. \` +
         'The published page is store-backed but unreachable; pick a route nobody else owns.'
     );
   }
@@ -1397,7 +1397,6 @@ configureMcp({
   objectStoreHandler: createObjectStoreHandler(siteBinding),
   deployStatusHandler: createDeployStatusHandler(siteBinding),
 });
-
 export * from '../../../../packages/core/server/functions/mcp.js';
 `;
 
