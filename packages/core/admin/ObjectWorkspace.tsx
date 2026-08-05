@@ -71,7 +71,7 @@ function hasUnpublishedChanges(record: Rec): boolean {
   return typeof receiptRev !== 'number' || receiptRev !== record.content_revision;
 }
 
-// ─── generated inspector VIEW ────────────────────────────────────────────────────────────
+// ─── generated inspector VIEW
 
 function FieldValue({ value }: { value: unknown }) {
   if (value === null || value === undefined) return <span className="text-[var(--adm-text-muted)]">—</span>;
@@ -126,7 +126,7 @@ function GeneratedInspector({ record, onEditOnSite }: { record: Rec; onEditOnSit
   );
 }
 
-// ─── readiness from validate ──────────────────────────────────────────────────────────────────────
+// ─── readiness from validate
 
 function readinessFromValidate(body: Record<string, unknown>): ReadinessGroup[] {
   const blockers = Array.isArray(body.blockers) ? (body.blockers as unknown[]) : [];
@@ -156,7 +156,7 @@ function readinessFromValidate(body: Record<string, unknown>): ReadinessGroup[] 
   return [{ id: 'validation', label: 'Validation', criteria }];
 }
 
-// ─── article settings (T9.20 workspace parity with the canvas panel) ─────────
+// ─── article settings (T9.20 workspace parity with the canvas panel)
 // Same fields, same registry-backed pickers, same edit-time contract
 // validation — all through set_article_meta under EditSession.
 
@@ -329,7 +329,7 @@ function ArticleSettingsCard({ record, onSaved }: { record: Rec; onSaved: () => 
   );
 }
 
-// ─── dedicated-agent selector (T9.26 §4a; Owner assigns, Admin reads) ────
+// ─── dedicated-agent selector (T9.26 §4a; Owner assigns, Admin reads)
 
 function DedicatedAgentPicker({ objectId, owner }: { objectId: string; owner: boolean }) {
   const [profiles, setProfiles] = useState<{ profile_id: string; name: string; status: string }[]>([]);
@@ -386,7 +386,7 @@ function DedicatedAgentPicker({ objectId, owner }: { objectId: string; owner: bo
   );
 }
 
-// ─── workspace body ───────────────────────────────────────────────────────────────
+// ─── workspace body
 
 function WorkspaceBody() {
   const { toast } = useToast();
