@@ -15,21 +15,31 @@ tenant CAN have its own dedicated storage, and as of 2026-08-04 that is the
 **prescribed default for any new tenant**: provision a fresh dedicated pair
 per site rather than pointing a new site at someone else's.
 
-**Current state (2026-08-04):** historically every tenant site this repo runs
+**Current state (2026-08-05):** historically every tenant site this repo runs
 (`kugel-platform`, `kugel-fernwell`, and the Dr-Lurie root deployment) read
 the exact same global pair, all pointed at Dr-Lurie's own Netlify site — so
 every tenant's templates/artifacts/image-search state physically lived
 inside Dr-Lurie's Blob storage, namespaced only by the `projectId` key
-prefix, not by any real per-tenant boundary. As of 2026-08-04, `kugel-platform`
-was given its **own dedicated** `PDF_TOOL_STORAGE_TOKEN` /
-`PDF_TOOL_STORAGE_SITE_ID` (a real Netlify Blobs-scoped PAT for platform's
-own site): platform's PDF templates now write to and read from its own
-storage, independent of Dr-Lurie's. `kugel-fernwell` and the Dr-Lurie root
-deployment were **not** changed — they remain on the original shared pair for
-now, pending the same move. No data was migrated in that cutover; nothing on
-the shared store was worth preserving for platform, so any platform-authored
-records left on the shared store are simply orphaned from platform's
-perspective, and that's intentional.
+prefix, not by any real per-tenant boundary. `kugel-platform` was moved off
+that arrangement 2026-08-04 (its own dedicated `PDF_TOOL_STORAGE_TOKEN` /
+`PDF_TOOL_STORAGE_SITE_ID`, a real Netlify Blobs-scoped PAT for platform's
+own site). `kugel-fernwell` followed 2026-08-05 — its own dedicated pair is
+set and **live-verified**: a real create → list → deactivate round trip
+through the Fernwell MCP bridge succeeded against `PDF_TOOL_STORAGE_SITE_ID`
+pointed at Fernwell's own site. Neither cutover migrated data; nothing on the
+shared store was worth preserving for either tenant, so any records they left
+behind on the shared store are simply orphaned from their perspective, and
+that's intentional.
+
+The Dr-Lurie root deployment's `PDF_TOOL_STORAGE_SITE_ID` has always resolved
+to its own site (it was the physical target the "shared pair" pointed at, not
+a borrower of someone else's), so by the letter of the parity rule — no two
+*different* tenants sharing a value — it already passes. What's still open is
+softer: its token is the one that used to be handed around as the de facto
+fleet-shared credential, so there's a reasonable case for rotating it too as
+hygiene (a machine account scoped to only Dr-Lurie's site, same as the other
+two got), even though nothing is functionally broken today. Track this as an
+open decision, not a confirmed gap.
 
 Do not "fix" a site's dedicated `PDF_TOOL_STORAGE_TOKEN`/`PDF_TOOL_STORAGE_SITE_ID`
 back to another tenant's value, or to Dr-Lurie's, thinking it's a
@@ -63,13 +73,13 @@ tenant's credentials are rotated, and periodically otherwise, the same way
 `scripts/audit-site-admin-parity.mjs` is used for the unrelated admin-parity
 surface.
 
-**Current state (2026-08-05):** `platform` has its own dedicated pair
-(2026-08-04 cutover). `fernwell` and `dr-lurie` **still share the legacy
-pair** — this is the known, tracked gap the enforcement above exists to stop
-from recurring once it's closed. Closing it needs a human to run the five
-"Credential provisioning" steps below for each of those two sites (a fresh
-Netlify machine account + PAT per site is not something an agent session can
-mint); once done, `audit-storage-grant-parity.mjs` is how to prove it stuck.
+**Current state (2026-08-05):** `platform` (2026-08-04) and `fernwell`
+(2026-08-05, live-verified) each have their own dedicated pair. `dr-lurie`
+already passes the letter of the rule (see above) but is a candidate for a
+token rotation as hygiene. The credential-provisioning half of this always
+needs a human to run the five steps below (a fresh Netlify machine account +
+PAT per site is not something an agent session can mint); once run,
+`audit-storage-grant-parity.mjs` is how to prove it stuck.
 
 Code: `packages/core/server/lib/pdf-tool-storage-grant.ts` (grant builder,
 canonical store list), `packages/core/server/lib/pdf-tool-client.ts` (secret-

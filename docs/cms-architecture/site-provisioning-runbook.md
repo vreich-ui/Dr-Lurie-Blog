@@ -91,9 +91,12 @@ For everything NOT auto-generated in step 2:
   THIS client (`docs/agents/pdf-tool-storage-grant.md`'s "Credential
   provisioning" steps); do not reuse another tenant's value. (Historically
   every tenant read one shared pair pointed at Dr-Lurie's site — `platform`
-  moved off that arrangement 2026-08-04; `fernwell` and `dr-lurie` have not
-  yet, and are the known open gap — treat the shared pair as legacy, not the
-  default for a new client.) Tracking sink may be one shared owner-DB
+  moved off that arrangement 2026-08-04, `fernwell` followed 2026-08-05
+  (live-verified via a real create/list/deactivate round trip). `dr-lurie`'s
+  `SITE_ID` has always resolved to itself, so it already passes the letter of
+  the rule; rotating its token off the old fleet-shared credential is an open
+  hygiene question, not a confirmed gap — treat the shared pair as legacy,
+  not the default for a new client.) Tracking sink may be one shared owner-DB
   (partitioned by `TRACKING_PROJECT_ID`) or per-site — your call.
 
   **This is enforced, not just documented, as of 2026-08-05.** Re-run step 2
