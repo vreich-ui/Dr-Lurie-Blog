@@ -25,6 +25,7 @@ import { LockBanner, HistoryTimeline, ReadinessList } from './data';
 import { ObjectPreview } from './ObjectPreview';
 import { AgentChip, ChatComposer, ChatThread, useChat } from './chat';
 import { createObjectChat } from '@core/lib/admin/chat-client';
+import { MarginaliaThreadList } from './MarginaliaThreadList';
 import { IconAlertTriangle, IconExternalLink, IconPlus, IconRocket, IconWrench } from './icons';
 import { objectDisplayName, objectTypeLabel, idTooltip } from '@core/lib/admin/display-name';
 import { resolveWorkspaceObjectType } from '@core/lib/admin/object-type-resolve';
@@ -70,7 +71,7 @@ function hasUnpublishedChanges(record: Rec): boolean {
   return typeof receiptRev !== 'number' || receiptRev !== record.content_revision;
 }
 
-// ─── generated inspector VIEW ─────────────────────────────────────────────────
+// ─── generated inspector VIEW ─────────────────────────────────────────────────────────────
 
 function FieldValue({ value }: { value: unknown }) {
   if (value === null || value === undefined) return <span className="text-[var(--adm-text-muted)]">—</span>;
@@ -125,7 +126,7 @@ function GeneratedInspector({ record, onEditOnSite }: { record: Rec; onEditOnSit
   );
 }
 
-// ─── readiness from validate ──────────────────────────────────────────────────
+// ─── readiness from validate ────────────────────────────────────────────────────────────────────
 
 function readinessFromValidate(body: Record<string, unknown>): ReadinessGroup[] {
   const blockers = Array.isArray(body.blockers) ? (body.blockers as unknown[]) : [];
@@ -328,7 +329,7 @@ function ArticleSettingsCard({ record, onSaved }: { record: Rec; onSaved: () => 
   );
 }
 
-// ─── dedicated-agent selector (T9.26 §4a; Owner assigns, Admin reads) ────────
+// ─── dedicated-agent selector (T9.26 §4a; Owner assigns, Admin reads) ────
 
 function DedicatedAgentPicker({ objectId, owner }: { objectId: string; owner: boolean }) {
   const [profiles, setProfiles] = useState<{ profile_id: string; name: string; status: string }[]>([]);
@@ -385,7 +386,7 @@ function DedicatedAgentPicker({ objectId, owner }: { objectId: string; owner: bo
   );
 }
 
-// ─── workspace body ───────────────────────────────────────────────────────────
+// ─── workspace body ─────────────────────────────────────────────────────────────────────────
 
 function WorkspaceBody() {
   const { toast } = useToast();
@@ -750,6 +751,11 @@ function WorkspaceBody() {
           tabs={[
             { id: 'details', label: 'Details', content: <GeneratedInspector record={record} onEditOnSite={url} /> },
             { id: 'history', label: 'History', content: <HistoryTimeline entries={history} now={now || undefined} /> },
+            {
+              id: 'comments',
+              label: 'Comments',
+              content: <MarginaliaThreadList objectType={record.object_type} objectId={record.object_id} />,
+            },
             {
               id: 'raw',
               label: 'Raw',
