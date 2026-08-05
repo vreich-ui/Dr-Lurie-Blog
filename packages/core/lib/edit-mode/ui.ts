@@ -230,7 +230,7 @@ export const mountEditMode = (options: MountOptions): void => {
     document.head.append(style);
   }
 
-  // ── chrome ──────────────────────────────────────────────────────────
+  // ── chrome
   const bar = document.createElement('div');
   bar.className = 'dl-em-bar';
   bar.innerHTML =
@@ -346,7 +346,7 @@ export const mountEditMode = (options: MountOptions): void => {
   const busy = (label: string): HTMLElement =>
     log('sys', `<span class="dl-em-busy"><i></i><i></i><i></i></span>${escapeHtml(label)}`);
 
-  // ── save-button dirty state (Slice D) ─────────────────────────────────
+  // ── save-button dirty state (Slice D)
   // A form's Save draft is disabled when the fields match the last-saved
   // baseline (nothing to save). Any edit enables it; a successful save
   // re-baselines to the just-saved values → disabled again (after a brief
@@ -610,7 +610,7 @@ export const mountEditMode = (options: MountOptions): void => {
     });
   };
 
-  // ── tray (B5): rows say WHAT changed WHERE, not a req_* id ───────────────────────
+  // ── tray (B5): rows say WHAT changed WHERE, not a req_* id
   // "object · verb · location": the label is the object's human name (title/
   // route/type) and the note summarizes the unpublished ops from the record's
   // history — "Image added to Resolution", "Text edited in Hook · +2 more".
@@ -896,7 +896,7 @@ export const mountEditMode = (options: MountOptions): void => {
     panel.classList.remove('dl-em-open');
   });
 
-  // ── edit-mode toggling ──────────────────────────────────────────
+  // ── edit-mode toggling
   const setEditMode = (on: boolean): void => {
     document.body.classList.toggle('dl-em-on', on);
     try {
@@ -921,7 +921,7 @@ export const mountEditMode = (options: MountOptions): void => {
   fab.addEventListener('click', () => setEditMode(true));
   q<HTMLButtonElement>(bar, '[data-em-exit]').addEventListener('click', () => setEditMode(false));
 
-  // ── gap "+" affordances: add a section (pages) or a block (articles) ──────
+  // ── gap "+" affordances: add a section (pages) or a block (articles)
   type Gap = {
     kind: 'section' | 'node';
     host: string;
@@ -1177,7 +1177,7 @@ export const mountEditMode = (options: MountOptions): void => {
     scheduleGapRebuild();
   };
 
-  // ── delete (Slice C): remove an element as a reviewable draft op ─────────
+  // ── delete (Slice C): remove an element as a reviewable draft op
   // Nodes → remove_node on the article. Sections — inline OR shared_ref — →
   // remove_section on the HOST page instance: deleting a shared section from
   // a page removes the page's REFERENCE; the sec_* object itself remains.
@@ -1216,7 +1216,7 @@ export const mountEditMode = (options: MountOptions): void => {
     scheduleGapRebuild();
   };
 
-  // ── hover chip ───────────────────────────────────────────────
+  // ── hover chip
   let hotRegion: HTMLElement | undefined;
   let chipHideTimer: number | undefined;
 
@@ -1473,7 +1473,7 @@ export const mountEditMode = (options: MountOptions): void => {
     { passive: true, signal }
   );
 
-  // ── selection tracking ────────────────────────────────────────────
+  // ── selection tracking
   let currentSelectionText: string | undefined;
   let selectionRegion: HTMLElement | undefined;
   document.addEventListener(
@@ -1499,7 +1499,7 @@ export const mountEditMode = (options: MountOptions): void => {
     { signal }
   );
 
-  // ── panel ─────────────────────────────────────────────────────────────
+  // ── panel
   let panelState: PanelState | undefined;
   let panelTarget: EditTarget | undefined;
   let panelRegion: HTMLElement | undefined;
@@ -1757,7 +1757,7 @@ export const mountEditMode = (options: MountOptions): void => {
     }
   };
 
-  // ── AI image references ("Re: portrait.png") ─────────────────────
+  // ── AI image references ("Re: portrait.png")
   // A section that carries images gets clickable chips in the chat. Arming a
   // chip guarantees the image has a blob-store copy with a public /img/* URL
   // (existing repo images are mirrored through the same upload pipeline —
@@ -1817,7 +1817,7 @@ export const mountEditMode = (options: MountOptions): void => {
     inputEl.focus();
   };
 
-  // ── manual edit / image forms ────────────────────────────────
+  // ── manual edit / image forms
   // What people are used to: click the pencil, type in fields, save. Save is
   // the same reviewable draft path the AI uses (checkout → patch) — publishing
   // stays a separate act. The image tool is the DELIBERATE way to change an
@@ -2022,7 +2022,7 @@ export const mountEditMode = (options: MountOptions): void => {
     captureSaveBaseline(); // starts disabled — nothing to save until an edit
   };
 
-  // ── role / annotation editor (W7.7) ──────────────────────────
+  // ── role / annotation editor (W7.7)
   // The semantic layer, editable where the block lives: strategy (the job the
   // block does in the story), intent (what it does to the reader), and agent
   // notes. Saves ride the SAME reviewable path (update_node on private
@@ -2115,7 +2115,7 @@ export const mountEditMode = (options: MountOptions): void => {
     await refreshPending();
   };
 
-  // ── article settings form (T9.20, capability #3/#4; author: T9.23a) ─────
+  // ── article settings form (T9.20, capability #3/#4; author: T9.23a)
   // Body-level metadata via set_article_meta under the SAME EditSession:
   // slug (contract-validated at edit time), author (free-text byline),
   // description, category + tags against the site taxonomy registry (novel
@@ -2319,7 +2319,7 @@ export const mountEditMode = (options: MountOptions): void => {
     await refreshPending();
   };
 
-  // ── navigation copy form ──────────────────────────────────
+  // ── navigation copy form
   // Chrome edits ride the NAV grammar (set_nav_meta / update_item /
   // upsert_group / remove+upsert_action — nav-editor.ts), never page ops.
   // Copy only: item labels, group titles, brand text, footer note. Targets/
@@ -2728,7 +2728,7 @@ export const mountEditMode = (options: MountOptions): void => {
     log('sys', 'Discarded — nothing saved.');
   });
 
-  // ── activation ───────────────────────────────────────────────
+  // ── activation
   let savedMode = '0';
   try {
     savedMode = sessionStorage.getItem(MODE_KEY) ?? '0';
