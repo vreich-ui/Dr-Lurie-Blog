@@ -35,6 +35,42 @@ Do not "fix" a site's dedicated `PDF_TOOL_STORAGE_TOKEN`/`PDF_TOOL_STORAGE_SITE_
 back to another tenant's value, or to Dr-Lurie's, thinking it's a
 misconfiguration — a differing value across sites is the point, not a bug.
 
+## Parity enforcement (2026-08-05) — no longer just a reminder
+
+The per-site rule above used to be documentation only: `create-site`'s env
+checklist named the two vars and asked a human to provision fresh ones, but
+nothing checked that they actually did. That's now backed by code:
+
+- **`checkStorageGrantParity`** (`packages/core/cli/create-site.mjs`) reads
+  `PDF_TOOL_STORAGE_SITE_ID` live off a list of named Netlify sites and
+  reports any two that share a value — the exact shape of the pre-2026-08-04
+  bug.
+- **`create-site --provision-only --netlify-token … --known-tenant-site
+  <name>`** (repeatable) calls it during genesis/provisioning: if the site
+  being provisioned collides with a sibling tenant you named, the run
+  refuses to finish. A brand-new site has nothing set yet, so this only
+  bites on the follow-up `--provision-only` run after you've set the two env
+  vars by hand (step 3 below) — which is exactly when it matters.
+- **`node scripts/audit-storage-grant-parity.mjs --site <name> --site
+  <name> …`** is the standalone check for an already-live fleet — run it any
+  time against every known tenant site to prove (or disprove) parity without
+  provisioning anything. Exit code 1 on any collision.
+
+None of this can run without a live Netlify API token (these two vars are
+per-site env values, never committed — there is nothing repo-only to check).
+Treat the audit script as the standing verification step: run it after any
+tenant's credentials are rotated, and periodically otherwise, the same way
+`scripts/audit-site-admin-parity.mjs` is used for the unrelated admin-parity
+surface.
+
+**Current state (2026-08-05):** `platform` has its own dedicated pair
+(2026-08-04 cutover). `fernwell` and `dr-lurie` **still share the legacy
+pair** — this is the known, tracked gap the enforcement above exists to stop
+from recurring once it's closed. Closing it needs a human to run the five
+"Credential provisioning" steps below for each of those two sites (a fresh
+Netlify machine account + PAT per site is not something an agent session can
+mint); once done, `audit-storage-grant-parity.mjs` is how to prove it stuck.
+
 Code: `packages/core/server/lib/pdf-tool-storage-grant.ts` (grant builder,
 canonical store list), `packages/core/server/lib/pdf-tool-client.ts` (secret-
 preserving bridge), and the artifact tools in `packages/core/server/functions/mcp.ts`.

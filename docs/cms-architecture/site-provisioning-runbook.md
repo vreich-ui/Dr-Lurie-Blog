@@ -91,9 +91,19 @@ For everything NOT auto-generated in step 2:
   THIS client (`docs/agents/pdf-tool-storage-grant.md`'s "Credential
   provisioning" steps); do not reuse another tenant's value. (Historically
   every tenant read one shared pair pointed at Dr-Lurie's site — `platform`
-  moved off that arrangement 2026-08-04; treat the shared pair as legacy, not
-  the default for a new client.) Tracking sink may be one shared owner-DB
+  moved off that arrangement 2026-08-04; `fernwell` and `dr-lurie` have not
+  yet, and are the known open gap — treat the shared pair as legacy, not the
+  default for a new client.) Tracking sink may be one shared owner-DB
   (partitioned by `TRACKING_PROJECT_ID`) or per-site — your call.
+
+  **This is enforced, not just documented, as of 2026-08-05.** Re-run step 2
+  with `--known-tenant-site <name>` (repeatable — every other live tenant's
+  Netlify site name) after setting the two vars by hand, and provisioning
+  refuses to finish if this site's value collides with a sibling's. To check
+  an already-live fleet without provisioning anything:
+  `node scripts/audit-storage-grant-parity.mjs --site <name> --site <name> …`
+  (needs a Netlify token; exits 1 on any collision). See
+  `docs/agents/pdf-tool-storage-grant.md`'s "Parity enforcement" section.
 - **AI keys** (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `NETLIFY_AUTH_TOKEN`):
   fleet-shared — reuse the existing fleet values, never mint per-client
   copies. `OPENAI_CHATKIT_WORKFLOW_ID` IS per-site — create a ChatKit
