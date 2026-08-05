@@ -8,6 +8,15 @@
  * section opens and does nothing else — all fetch/render/compose logic for
  * this section lives here.
  *
+ * `preloaded` (optional): ui.ts warms every visible object's comment threads
+ * the moment edit mode activates (the same "pay the wait up front" B4
+ * discipline as its object-record cache), so this panel's FIRST paint reuses
+ * that promise instead of a cold fetch. Every write (resolve/reply/create)
+ * still re-fetches live via `refresh()`, and calls `onWrite` so ui.ts drops
+ * its now-stale cache entry — the next preload or reopen gets fresh data.
+ * With no `preloaded` promise supplied (e.g. a caller reached this object
+ * some other way), the panel falls back to its own cold fetch, unchanged.
+ *
  * The routing decision of whether a send REPLIES to an existing open thread
  * at this exact anchor or OPENS a new one is a pure predicate
  * (`resolveComposerAction`) so it is unit-tested without a DOM, the same
@@ -83,7 +92,9 @@ export const resolveComposerAction = (
 export const mountMarginaliaPanel = async (
   container: HTMLElement,
   getToken: GetToken,
-  target: MarginaliaPanelTarget
+  target: MarginaliaPanelTarget,
+  preloaded?: Promise<{ threads: MarginaliaThreadWithComments[] }>,
+  onWrite?: () => void
 ): Promise<void> => {
   container.innerHTML =
     `<div class="dl-em-log dl-em-marg-log" data-em-marg-log></div>` +
@@ -145,6 +156,7 @@ export const mountMarginaliaPanel = async (
 
   const resolve = async (threadId: string, status: MarginaliaThreadStatus): Promise<void> => {
     await setMarginaliaThreadStatus(getToken, target.objectType, target.objectId, threadId, status);
+    onWrite?.();
     await refresh();
   };
 
@@ -163,6 +175,7 @@ export const mountMarginaliaPanel = async (
         });
       }
       textarea.value = '';
+      onWrite?.();
       await refresh();
     } finally {
       sendButton.disabled = false;
@@ -178,5 +191,11 @@ export const mountMarginaliaPanel = async (
   });
 
   logEl.innerHTML = `<div class="dl-em-msg dl-em-sys">Loading comments…</div>`;
-  await refresh();
+  if (preloaded) {
+    const result = await preloaded;
+    threads = result.threads;
+    renderThreads();
+  } else {
+    await refresh();
+  }
 };
