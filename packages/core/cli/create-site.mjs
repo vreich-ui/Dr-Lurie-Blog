@@ -332,6 +332,10 @@ export const CORE_BLOB_STORES = [
   // S4x (2/2): the tagged canvas Ask-AI proposal trail a save carries —
   // write-mostly training data, admin-object.ts's only consumer.
   'agent-learning',
+  // W15 S4 (MVP): Marginalia comment threads — the dedicated blob-store side
+  // channel getMarginaliaBlobStore reads/writes, independent of the object
+  // substrate's lock/version/patch lifecycle.
+  'marginalia',
 ];
 
 const DATA_SITE_SUBDIRS = [
@@ -1542,7 +1546,6 @@ configureMcp({
   objectStoreHandler: createObjectStoreHandler(siteBinding),
   deployStatusHandler: createDeployStatusHandler(siteBinding),
 });
-
 export * from '../../../../packages/core/server/functions/mcp.js';
 `;
 

@@ -18,7 +18,12 @@ import type { SiteBinding } from '../lib/site-binding.js';
 import type { LambdaContext } from '../lib/admin-auth.js';
 import { resolveAdminAccessFromEvent } from '../lib/request-roles.js';
 import type { ArtifactIndexStore } from '../lib/artifact-index.js';
-import { getAgentLearningBlobStore, getArtifactIndexBlobStore, getSiteObjectsBlobStore } from '../lib/blob-store.js';
+import {
+  getAgentLearningBlobStore,
+  getArtifactIndexBlobStore,
+  getMarginaliaBlobStore,
+  getSiteObjectsBlobStore,
+} from '../lib/blob-store.js';
 import { getGovernanceBlobStore, resolveActivePolicies } from '../lib/governance-store.js';
 import {
   handleObjectVerb,
@@ -26,6 +31,7 @@ import {
   type AgentLearningWriteStore,
   type ObjectVerbStore,
 } from '../lib/object-verbs.js';
+import type { MarginaliaStore } from '../lib/marginalia-store.js';
 import { buildStoreValidationContext } from '../lib/object-validation-context.js';
 import type { ObjectType } from '../../schema/object-record-v1.js';
 import type { Principal } from '../../schema/object-record-v1.js';
@@ -105,6 +111,9 @@ const buildHandlerImpl = (binding: SiteBinding) => async (event: LambdaEvent, co
     // may carry a tagged Ask-AI proposal trail marker; handleObjectVerb writes
     // it here, atomically with the patch, once the patch itself has persisted.
     const agentLearningStore = (await getAgentLearningBlobStore(event)) as unknown as AgentLearningWriteStore;
+    // W15 S4 (MVP): the same threading pattern as agentLearningStore above —
+    // the ONLY caller-supplied dependency the four marginalia_* actions need.
+    const marginaliaStore = (await getMarginaliaBlobStore(event)) as unknown as MarginaliaStore;
     const result = await handleObjectVerb(store, request.data, principal, {
       validationContext,
       roles,
@@ -112,6 +121,7 @@ const buildHandlerImpl = (binding: SiteBinding) => async (event: LambdaEvent, co
       creationPolicy: creation,
       publishDeps: { exportRoot: binding.dataRoot },
       agentLearningStore,
+      marginaliaStore,
     });
     return jsonResponse(result.status, result.body);
   } catch (error) {

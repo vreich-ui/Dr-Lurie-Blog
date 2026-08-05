@@ -19,8 +19,9 @@ import { PLATFORM_ENV_NAMES, readBoundEnv, type SiteBinding } from '../lib/site-
 
 import { getHeader } from '../lib/admin-auth.js';
 import type { ArtifactIndexStore } from '../lib/artifact-index.js';
-import { getArtifactIndexBlobStore, getSiteObjectsBlobStore } from '../lib/blob-store.js';
+import { getArtifactIndexBlobStore, getMarginaliaBlobStore, getSiteObjectsBlobStore } from '../lib/blob-store.js';
 import { handleObjectVerb, objectVerbRequestSchema, type ObjectVerbStore } from '../lib/object-verbs.js';
+import type { MarginaliaStore } from '../lib/marginalia-store.js';
 import { buildStoreValidationContext } from '../lib/object-validation-context.js';
 import type { ObjectType } from '../../schema/object-record-v1.js';
 import type { Principal } from '../../schema/object-record-v1.js';
@@ -112,9 +113,15 @@ const buildHandlerImpl = (binding: SiteBinding) => async (event: LambdaEvent) =>
       ...(artifactIndexStore ? { artifactIndexStore } : {}),
       artifactRefSources: [parsed.value],
     });
+    // W15 S4 (MVP): the same threading pattern object-store.ts already uses
+    // for the site-objects/artifact-index stores above — agents reach the
+    // four marginalia_* actions over the publish key exactly like every
+    // other object verb.
+    const marginaliaStore = (await getMarginaliaBlobStore(event)) as unknown as MarginaliaStore;
     const result = await handleObjectVerb(store, request.data, agentPrincipal(parsed.value), {
       validationContext,
       publishDeps: { exportRoot: binding.dataRoot },
+      marginaliaStore,
     });
     return jsonResponse(result.status, result.body);
   } catch (error) {

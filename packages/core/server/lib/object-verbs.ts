@@ -84,7 +84,7 @@ import {
 } from './object-inventory.js';
 import { publishObject, type PublishObjectDeps } from './object-publish.js';
 import { checkPublishGate } from './publish-gate.js';
-import { resolveRolesForPrincipal } from './roles.js';
+import { canDecideReview, resolveRolesForPrincipal } from './roles.js';
 import { isGovernedObjectType, type ApprovalPolicy } from '../../lib/approval-policy.js';
 import {
   activeCreationPolicy,
@@ -94,6 +94,14 @@ import {
 } from '../../lib/creation-policy.js';
 import { approvalPinSchema, decideReview, discardProposal, publishActionSchema, submitReview } from './review-state.js';
 import { isAgentLearningTrailOp, type AgentLearningRecord } from '../../lib/admin/agent-learning-trail.js';
+import {
+  addMarginaliaComment,
+  createMarginaliaThread,
+  listMarginaliaThreads,
+  setMarginaliaThreadStatus,
+  type MarginaliaStore,
+} from './marginalia-store.js';
+import { marginaliaThreadStatusSchema } from '../../schema/marginalia-v1.js';
 
 // ─── store shape ──────────────────────────────────────────────────────────────
 
@@ -318,6 +326,39 @@ export const objectVerbRequestSchema = z.discriminatedUnion('action', [
     artifact_set: z.array(z.string().min(1)).optional(),
     release_build: z.enum(['defer', 'release']).optional(),
   }),
+  // ─── W15 S4 (MVP): Marginalia — canvas commenting/annotation threads,
+  // persisted in a DEDICATED blob store (getMarginaliaBlobStore), not the
+  // governed object substrate: no lock is required for any of these four.
+  z.object({
+    action: z.literal('marginalia_create'),
+    object_type: objectTypeSchema,
+    object_id: objectId,
+    section_id: z.string().min(1).optional(),
+    node_id: z.string().min(1).optional(),
+    field: z.string().min(1).optional(),
+    selected_text: z.string().min(1).optional(),
+    body: z.string().min(1),
+  }),
+  z.object({
+    action: z.literal('marginalia_reply'),
+    object_type: objectTypeSchema,
+    object_id: objectId,
+    thread_id: z.string().min(1),
+    body: z.string().min(1),
+    parent_comment_id: z.string().min(1).optional(),
+  }),
+  z.object({
+    action: z.literal('marginalia_list'),
+    object_type: objectTypeSchema,
+    object_id: objectId,
+  }),
+  z.object({
+    action: z.literal('marginalia_resolve'),
+    object_type: objectTypeSchema,
+    object_id: objectId,
+    thread_id: z.string().min(1),
+    status: marginaliaThreadStatusSchema,
+  }),
 ]);
 
 export type ObjectVerbRequest = z.infer<typeof objectVerbRequestSchema>;
@@ -365,6 +406,15 @@ export type HandleObjectVerbOptions = {
    * from the ops array and silently dropped, never applied as a content op.
    */
   agentLearningStore?: AgentLearningWriteStore;
+  /**
+   * W15 S4 (MVP): the Marginalia blob store (getMarginaliaBlobStore) —
+   * threaded through by both admin-object.ts and object-store.ts exactly the
+   * way agentLearningStore is above. Absent: the four marginalia_* actions
+   * 500 with a clear "not configured" message rather than throwing on a
+   * missing store — a caller that forgets to wire it fails loudly, not
+   * silently, at the one place that would otherwise NPE deep in the store.
+   */
+  marginaliaStore?: MarginaliaStore;
 };
 
 // ─── small helpers ────────────────────────────────────────────────────────────
@@ -534,6 +584,20 @@ const creationDenied = (
     object_type: objectType,
     allowed_agents: rule === 'open' ? [] : rule.agents,
   });
+};
+
+/**
+ * W15 S4 (MVP) commenting gate: same posture as canDecideReview — any human
+ * with at least one configured role, OR any agent principal, may comment/
+ * reply/resolve. An email with no configured role has no standing (matches
+ * decideReview's human check in review-state.ts exactly); agents are always
+ * allowed, the same allowance decideReview grants the detached approval
+ * agent. Returns the 403 to serve, or undefined when commenting is allowed.
+ */
+const marginaliaDenied = (principal: Principal, roles: readonly Role[] | undefined): ObjectVerbResult | undefined => {
+  if (principal.kind === 'agent') return undefined;
+  if (canDecideReview(roles ?? [])) return undefined;
+  return err(403, { error: 'Commenting requires a configured role.' });
 };
 
 // ─── read-only bulk enumeration (T9.11) ───────────────────────────────────────
@@ -1664,6 +1728,81 @@ export const handleObjectVerb = async (
         { nowMs: ts, validationContext: context, ...options.publishDeps }
       );
       return { status: result.status, body: result.body };
+    }
+
+    // ─── W15 S4 (MVP): Marginalia ────────────────────────────────────────────
+    case 'marginalia_create': {
+      const denied = marginaliaDenied(principal, options.roles);
+      if (denied) return denied;
+      if (!options.marginaliaStore) {
+        return err(500, { error: 'Marginalia store is not configured for this endpoint.' });
+      }
+      const record = await loadRecord(store, objectRecordKey(request.object_type, request.object_id));
+      if (!record) return err(404, { error: 'Object record not found', not_found: true });
+
+      const { thread, comment } = await createMarginaliaThread(options.marginaliaStore, {
+        objectType: request.object_type,
+        objectId: request.object_id,
+        anchor: {
+          ...(request.section_id !== undefined ? { sectionId: request.section_id } : {}),
+          ...(request.node_id !== undefined ? { nodeId: request.node_id } : {}),
+          ...(request.field !== undefined ? { field: request.field } : {}),
+          ...(request.selected_text !== undefined ? { selectedText: request.selected_text } : {}),
+        },
+        body: request.body,
+        author: principal,
+        at: timestamp,
+        contentRevision: record.content_revision,
+      });
+      return ok({ thread: { ...thread, comments: [comment] } });
+    }
+
+    case 'marginalia_reply': {
+      const denied = marginaliaDenied(principal, options.roles);
+      if (denied) return denied;
+      if (!options.marginaliaStore) {
+        return err(500, { error: 'Marginalia store is not configured for this endpoint.' });
+      }
+      const record = await loadRecord(store, objectRecordKey(request.object_type, request.object_id));
+      if (!record) return err(404, { error: 'Object record not found', not_found: true });
+
+      const result = await addMarginaliaComment(options.marginaliaStore, {
+        objectType: request.object_type,
+        objectId: request.object_id,
+        threadId: request.thread_id,
+        body: request.body,
+        author: principal,
+        at: timestamp,
+        contentRevision: record.content_revision,
+        ...(request.parent_comment_id !== undefined ? { parentCommentId: request.parent_comment_id } : {}),
+      });
+      if (!result.ok) return err(404, { error: 'Thread not found', not_found: true });
+      return ok({ comment: result.comment });
+    }
+
+    case 'marginalia_list': {
+      if (!options.marginaliaStore) {
+        return err(500, { error: 'Marginalia store is not configured for this endpoint.' });
+      }
+      // Read-only — no role/agent gate, same posture as object_get/object_list.
+      const threads = await listMarginaliaThreads(options.marginaliaStore, request.object_type, request.object_id);
+      return ok({ threads });
+    }
+
+    case 'marginalia_resolve': {
+      const denied = marginaliaDenied(principal, options.roles);
+      if (denied) return denied;
+      if (!options.marginaliaStore) {
+        return err(500, { error: 'Marginalia store is not configured for this endpoint.' });
+      }
+      const result = await setMarginaliaThreadStatus(options.marginaliaStore, {
+        objectType: request.object_type,
+        objectId: request.object_id,
+        threadId: request.thread_id,
+        status: request.status,
+      });
+      if (!result.ok) return err(404, { error: 'Thread not found', not_found: true });
+      return ok({ thread: result.thread });
     }
   }
 };

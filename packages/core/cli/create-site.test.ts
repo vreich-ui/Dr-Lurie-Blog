@@ -29,11 +29,7 @@ import {
   validateClientSlug,
   writeFiles,
 } from './create-site.mjs';
-import {
-  CANONICAL_INFRA_REDIRECTS,
-  parseNetlifyTomlRedirects,
-  parseSiteConfigRedirects,
-} from './admin-parity.mjs';
+import { CANONICAL_INFRA_REDIRECTS, parseNetlifyTomlRedirects, parseSiteConfigRedirects } from './admin-parity.mjs';
 import { navigationBodySchema } from '../schema/bodies/navigation-v1.js';
 import { sectionTemplateBodySchema } from '../schema/bodies/section-template-v1.js';
 import { siteBodySchema } from '../schema/bodies/site-v1.js';
@@ -167,6 +163,7 @@ test('CORE_BLOB_STORES matches the store-name literals in blob-store.ts/governan
       'commerce',
       'commerce-events',
       'governance',
+      'marginalia', // W15 S4 (MVP): comment threads, independent of the object substrate's lock/version lifecycle
       'opt-ins',
       'site-objects',
       'tracking-events',
@@ -482,7 +479,10 @@ test('the emitted netlify.toml + site.config.ts carry EXACTLY the canonical infr
   assert.ok(toml && siteConfig);
 
   const tomlRedirects = parseNetlifyTomlRedirects(toml.content);
-  assert.deepEqual(tomlRedirects, CANONICAL_INFRA_REDIRECTS.map((r) => ({ ...r })));
+  assert.deepEqual(
+    tomlRedirects,
+    CANONICAL_INFRA_REDIRECTS.map((r) => ({ ...r }))
+  );
 
   const configRedirects = parseSiteConfigRedirects(siteConfig.content);
   assert.deepEqual(
@@ -508,7 +508,7 @@ test('the emitted netlify.toml carries an ignore command covering both the site 
 
   const ignoreLine = toml.content.split('\n').find((line) => /^\s*ignore\s*=/.test(line));
   assert.ok(ignoreLine, 'expected an ignore = "..." line in the [build] block');
-  assert.match(ignoreLine, /sites\/acme\b/, 'ignore command must reference this site\'s own dir');
+  assert.match(ignoreLine, /sites\/acme\b/, "ignore command must reference this site's own dir");
   assert.match(ignoreLine, /packages\/core\b/, 'ignore command must reference the shared packages/core workspace');
   assert.match(ignoreLine, /diff --quiet/, 'ignore command must use git diff --quiet semantics (0 = skip, 1 = build)');
 });

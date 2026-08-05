@@ -285,6 +285,64 @@ export const TOOL_DEFINITIONS_PART2: ToolDefinition[] = [
       ['object_type', 'object_id', 'decision']
     ),
   },
+  // ── Marginalia (W15 S4, MVP): canvas commenting/annotation threads on ANY
+  //    of the twelve governed object types, persisted in a DEDICATED blob
+  //    store independent of the object's own lock/version/patch lifecycle —
+  //    none of these four require a held lock_token. ──
+  {
+    name: 'marginalia_create',
+    description:
+      'Open a new comment thread on a CMS object (any of the twelve governed types), with its first comment. No lock required — comments are a side channel, not a body write. Optionally scope the thread to a page section (section_id) or an article node (node_id) — the same anchor tuple edit-mode targets use; omit both to comment on the object as a whole. Returns the created thread with its one comment.',
+    inputSchema: objectSchema(
+      {
+        object_type: objectTypeEnumSchema(),
+        object_id: stringSchema(),
+        section_id: stringSchema('Optional: scope the thread to this page section instance id.'),
+        node_id: stringSchema('Optional: scope the thread to this article (content_item) node id.'),
+        field: stringSchema('Reserved for a future field-level anchor; omit for now.'),
+        selected_text: stringSchema('Reserved for a future selected-text span anchor; omit for now.'),
+        body: stringSchema('The comment text.'),
+      },
+      ['object_type', 'object_id', 'body']
+    ),
+  },
+  {
+    name: 'marginalia_reply',
+    description:
+      'Add a comment to an existing Marginalia thread. No lock required. parent_comment_id is accepted and stored but this MVP client renders a flat list (reply-threading UI is a documented follow-up).',
+    inputSchema: objectSchema(
+      {
+        object_type: objectTypeEnumSchema(),
+        object_id: stringSchema(),
+        thread_id: stringSchema('The thread id from marginalia_create / marginalia_list.'),
+        body: stringSchema('The comment text.'),
+        parent_comment_id: stringSchema('Optional: the comment this one replies to.'),
+      },
+      ['object_type', 'object_id', 'thread_id', 'body']
+    ),
+  },
+  {
+    name: 'marginalia_list',
+    description: 'List every Marginalia thread (each with its full comment list, oldest first) for one CMS object.',
+    inputSchema: objectSchema({ object_type: objectTypeEnumSchema(), object_id: stringSchema() }, [
+      'object_type',
+      'object_id',
+    ]),
+  },
+  {
+    name: 'marginalia_resolve',
+    description:
+      'Set a Marginalia thread\'s status: "resolved" | "dismissed" | "open" (re-opens). One status flag per thread, not per comment. No lock required.',
+    inputSchema: objectSchema(
+      {
+        object_type: objectTypeEnumSchema(),
+        object_id: stringSchema(),
+        thread_id: stringSchema('The thread id from marginalia_create / marginalia_list.'),
+        status: { type: 'string', enum: ['open', 'resolved', 'dismissed'], description: 'The new thread status.' },
+      },
+      ['object_type', 'object_id', 'thread_id', 'status']
+    ),
+  },
   {
     name: 'object_discard',
     description:

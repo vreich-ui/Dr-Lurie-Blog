@@ -109,8 +109,10 @@ const requireOptional = (name: 'verifyArticleImagesHandler') => {
 };
 
 const saveArtifactHandler: SiblingHandler = (event, context) => requireSiblings().saveArtifactHandler(event, context);
-export const objectStoreHandler: SiblingHandler = (event, context) => requireSiblings().objectStoreHandler(event, context);
-export const deployStatusHandler: SiblingHandler = (event, context) => requireSiblings().deployStatusHandler(event, context);
+export const objectStoreHandler: SiblingHandler = (event, context) =>
+  requireSiblings().objectStoreHandler(event, context);
+export const deployStatusHandler: SiblingHandler = (event, context) =>
+  requireSiblings().deployStatusHandler(event, context);
 export const verifyArticleImagesHandler: SiblingHandler = (event, context) =>
   requireOptional('verifyArticleImagesHandler')(event, context);
 import {
@@ -888,6 +890,42 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
         publish_action: input.publish_action,
         approval_pin: input.approval_pin,
       });
+    // ── Marginalia (W15 S4, MVP) → object-store.ts (publish key injected). ──
+    case 'marginalia_create':
+      return callObjectAction(event, {
+        action: 'marginalia_create',
+        object_type: input.object_type,
+        object_id: input.object_id,
+        section_id: input.section_id,
+        node_id: input.node_id,
+        field: input.field,
+        selected_text: input.selected_text,
+        body: input.body,
+      });
+    case 'marginalia_reply':
+      return callObjectAction(event, {
+        action: 'marginalia_reply',
+        object_type: input.object_type,
+        object_id: input.object_id,
+        thread_id: input.thread_id,
+        body: input.body,
+        parent_comment_id: input.parent_comment_id,
+      });
+    case 'marginalia_list':
+      return callObjectAction(event, {
+        action: 'marginalia_list',
+        object_type: input.object_type,
+        object_id: input.object_id,
+      });
+    case 'marginalia_resolve':
+      return callObjectAction(event, {
+        action: 'marginalia_resolve',
+        object_type: input.object_type,
+        object_id: input.object_id,
+        thread_id: input.thread_id,
+        status: input.status,
+      });
+
     case 'object_discard':
       return callObjectAction(event, {
         action: 'discard',
