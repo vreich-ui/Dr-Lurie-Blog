@@ -38,6 +38,7 @@ import {
   idsFor,
   ENV_CHECKLIST,
   CORE_BLOB_STORES,
+  buildPlan,
 } from './create-site.mjs';
 import { siteReaderRouteTemplates } from './site-reader-route-templates.mjs';
 
@@ -550,7 +551,9 @@ export const computeAdminParity = (target) => {
     'create-site’s env checklist names every admin-critical env var (values stay human/provisioning-owned)',
     'packages/core (fleet law)',
     missingEnv.length ? 'GAP' : 'PASS',
-    missingEnv.length ? `missing rows: ${missingEnv.map((e) => e.name).join(', ')}` : 'all admin-critical names declared'
+    missingEnv.length
+      ? `missing rows: ${missingEnv.map((e) => e.name).join(', ')}`
+      : 'all admin-critical names declared'
   );
 
   // 12. Blob-store probe coverage: the provisioning probe list must cover
@@ -568,7 +571,33 @@ export const computeAdminParity = (target) => {
       : `${CORE_BLOB_STORES.length} stores probed; core references ${literals.length}`
   );
 
-  // 13+. The human gates — real requirements no repo check can prove. Named
+  // 13. Genesis regression guard (W15 S3 follow-up, 2026-08-05): platform
+  //     and fernwell were BOTH born with no admin-only nav group in their
+  //     header, so a signed-in admin had no visible way into /admin at
+  //     all — auth and the route always worked, there was just no door.
+  //     No prior check here caught it because the missing piece is live
+  //     CMS content (the nav_header object), not a repo file — outside
+  //     what an all-repo, no-network audit can see for an EXISTING tenant.
+  //     What IS checkable is create-site's own genesis output for the
+  //     NEXT tenant: exercise the real buildPlan() and confirm it emits
+  //     the admin group, so this can't quietly regress again.
+  const genesisPlan = buildPlan({ name: 'admin-parity-probe' });
+  const genesisNavFile = genesisPlan.files.find(
+    (f) => f.path === 'sites/admin-parity-probe/data/site/navigation/nav_header.json'
+  );
+  const genesisNavBody = genesisNavFile ? JSON.parse(genesisNavFile.content) : undefined;
+  const genesisHasAdminGroup = Boolean(genesisNavBody?.groups?.some((g) => g.adminOnly));
+  add(
+    'admin-nav-genesis',
+    'create-site births every new tenant with an admin-only nav group already in nav_header, so the workspace has a visible door from day one',
+    'packages/core (fleet law) — create-site genesis',
+    genesisHasAdminGroup ? 'PASS' : 'GAP',
+    genesisHasAdminGroup
+      ? 'buildPlan() emits an adminOnly nav group in the bootstrap nav_header.json'
+      : 'buildPlan() does NOT emit an adminOnly nav group — a new tenant would be born with the same invisible-admin-workspace gap platform and fernwell had'
+  );
+
+  // 14+. The human gates — real requirements no repo check can prove. Named
   //      here so the table is the complete truth, not the automatable subset.
   add(
     'identity-enabled',
@@ -579,7 +608,9 @@ export const computeAdminParity = (target) => {
   );
   add(
     'admin-env-values',
-    `Admin env VALUES set on the tenant site: ${ADMIN_CRITICAL_ENV.filter((e) => e.provisioner.startsWith('human')).map((e) => e.name).join(', ')}`,
+    `Admin env VALUES set on the tenant site: ${ADMIN_CRITICAL_ENV.filter((e) => e.provisioner.startsWith('human'))
+      .map((e) => e.name)
+      .join(', ')}`,
     'human (Netlify console / secret custody — runbook §3)',
     'HUMAN',
     'The audit proves the names are declared; the values live only in Netlify env and cannot be verified from the repo.'
@@ -629,7 +660,7 @@ const S1_TOML_COMMENT =
   "# netlify.toml's comment has the full story).\n";
 
 const S1_SITE_CONFIG_ENTRY =
-  "    // W15 S1: one path segment, so /admin/content itself keeps serving the\n" +
+  '    // W15 S1: one path segment, so /admin/content itself keeps serving the\n' +
   '    // static content library (the splat form swallowed the library index).\n' +
   "    { from: '/admin/content/:objectId', to: '/admin/content/__workspace', status: 200 },";
 
@@ -685,7 +716,11 @@ export const planAdminParityFixes = (siteDir, { write = false } = {}) => {
       'm'
     );
     if (staleBlockRe.test(toml)) {
-      note('admin-rewrite-s1', 'replace stale /admin/content/* splat rule with the S1 single-segment form', target.tomlPath);
+      note(
+        'admin-rewrite-s1',
+        'replace stale /admin/content/* splat rule with the S1 single-segment form',
+        target.tomlPath
+      );
       toml = toml.replace(staleBlockRe, `${S1_TOML_COMMENT}${renderTomlRedirectBlock(ADMIN_CONTENT_REWRITE)}\n`);
       changed = true;
     }
@@ -699,7 +734,11 @@ export const planAdminParityFixes = (siteDir, { write = false } = {}) => {
         target.tomlPath
       );
       toml = `${toml.trimEnd()}\n\n# W15 S2 admin parity: canonical infra redirects added by migrate-site --admin-parity.\n${missing
-        .map((m) => (m.from === ADMIN_CONTENT_REWRITE.from ? `${S1_TOML_COMMENT}${renderTomlRedirectBlock(m)}` : renderTomlRedirectBlock(m)))
+        .map((m) =>
+          m.from === ADMIN_CONTENT_REWRITE.from
+            ? `${S1_TOML_COMMENT}${renderTomlRedirectBlock(m)}`
+            : renderTomlRedirectBlock(m)
+        )
         .join('\n\n')}\n`;
       changed = true;
     }
