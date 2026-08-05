@@ -79,6 +79,29 @@ every current tenant and emitted by `create-site` for future ones, but a
 site scaffolded from an old checkout would drift silently — add them as
 audit checks + `--write` fixes in a follow-up.
 
+**2026-08-05 addendum — a category of parity this whole audit was blind to.**
+Wolf hit it directly: `platform` had fully correct `/admin` auth (confirmed
+`isAdmin: true, tier: "owner"` from a live token) but no "Admin" link
+anywhere on the site — `nav_header`'s header navigation had no admin-only
+nav group, so a signed-in admin had no visible door into the workspace at
+all. Every check above is a repo file or a build artifact; `nav_header` is
+live CMS content in each tenant's own blob store, invisible to a read-only,
+no-network, no-store-access audit by design. Fixed live on `platform`
+(2026-08-04). **`fernwell` has the identical gap, confirmed live, not yet
+fixed as of this writing.** `create-site`'s genesis output now includes the
+admin nav group by default (`ADMIN_NAV_GROUP` in `create-site.mjs`), proven
+by a new 13th automatable check (`admin-nav-genesis` in `admin-parity.mjs`)
+that exercises the real `buildPlan()` output — so a brand-new tenant is born
+with the link already there. That check only covers FUTURE genesis, though;
+it cannot and does not prove any EXISTING tenant's live content, which is
+exactly the blind spot that let this ship unnoticed on two tenants. If
+another content-parity gap like this turns up, the honest fix is the same
+shape: patch the live content by hand per tenant, then close the genesis
+side so it can't recur — there is no way to make a repo-only audit prove
+live content short of giving it real store access, which is a deliberate
+non-goal today (see this module's file header: "read-only, no network, no
+store access").
+
 **Client sites outside this repo: none.** `13-separation-plan.md` confirms
 all clients share this one monorepo today ("the only thing NOT yet separated
 is the physical asset boundary"); the live tenants are exactly the three

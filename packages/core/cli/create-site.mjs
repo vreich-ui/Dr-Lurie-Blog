@@ -52,6 +52,50 @@ import { siteReaderRouteTemplates } from './site-reader-route-templates.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 
+// ─── W15 S3 follow-up (2026-08-05): the fleet-wide admin-nav gap. Every
+// EXISTING tenant (platform, fernwell) was born without an admin-only nav
+// group in its header — S3's parity audit never caught it because it is
+// live CMS content (the nav_header object), not a repo file, so nothing
+// checkable-from-the-repo ever proved it was missing. The admin workspace
+// itself always worked (auth + /admin route are fleet law, shell-routes.ts);
+// there was simply no visible link INTO it, so a newly signed-in admin saw
+// no change and no way in short of typing /admin by hand. Fixed live on
+// existing tenants by hand; this constant is the genesis-side fix so EVERY
+// FUTURE `create-site` run is born with the link already there. Routes
+// mirror shell-routes.ts's fleet-wide /admin/* surface — identical on every
+// tenant, so this group needs no per-site parameterization.
+export const ADMIN_NAV_GROUP = {
+  id: 'g_admin',
+  title: 'Admin',
+  adminOnly: true,
+  items: [
+    {
+      id: 'i_admin_dashboard',
+      label: 'Dashboard',
+      description: 'Admin home — overview and quick actions.',
+      target: { kind: 'route', href: '/admin' },
+    },
+    {
+      id: 'i_admin_content',
+      label: 'Content library',
+      description: 'Browse everything by human name — pages, articles, sections, and more.',
+      target: { kind: 'route', href: '/admin/content' },
+    },
+    {
+      id: 'i_admin_agents',
+      label: 'Agents',
+      description: 'Chat with CMS Agents across any object.',
+      target: { kind: 'route', href: '/admin/agents' },
+    },
+    {
+      id: 'i_admin_maintenance',
+      label: 'Maintenance',
+      description: 'Blob browser, diagnostics, and wipe tools (Owner-only).',
+      target: { kind: 'route', href: '/admin/maintenance' },
+    },
+  ],
+};
+
 // ─── the per-site env checklist (T11.7-provisioning-cli.md's table; keep in
 //     sync with docs/cms-architecture/site-provisioning-runbook.md and the
 //     T11.10 governance/secrets inventory when either changes) ───
@@ -163,7 +207,7 @@ export const ENV_CHECKLIST = [
         note:
           "This site's own pdf-tool storage grant target (Netlify site id) — not fleet-shared. Provision a NEW " +
           "dedicated Netlify Blobs-scoped PAT + site id for THIS site (docs/agents/pdf-tool-storage-grant.md's " +
-          "\"Credential provisioning\" steps); do not reuse another tenant's value. (Historically every tenant read " +
+          '"Credential provisioning" steps); do not reuse another tenant\'s value. (Historically every tenant read ' +
           'one shared pair pointed at a single site’s storage; platform moved off that 2026-08-04 — treat the shared ' +
           'pair as legacy, not the default for a new client.)',
       },
@@ -171,7 +215,7 @@ export const ENV_CHECKLIST = [
         name: 'PDF_TOOL_STORAGE_TOKEN',
         cls: 'per-site',
         note:
-          "Auth paired with PDF_TOOL_STORAGE_SITE_ID above — same rule: a dedicated PAT for THIS site, never " +
+          'Auth paired with PDF_TOOL_STORAGE_SITE_ID above — same rule: a dedicated PAT for THIS site, never ' +
           "another tenant's token. Same provisioning steps: docs/agents/pdf-tool-storage-grant.md.",
       },
       {
@@ -207,7 +251,11 @@ export const ENV_CHECKLIST = [
           'AI provider key — reuse the fleet value. Admin-critical: the /admin agents hub and every per-object ' +
           'chat instantiate a provider adapter (both providers are v1 — Wolf 2026-07-16).',
       },
-      { name: 'OPENAI_API_KEY', cls: 'fleet-shared', note: 'AI provider key — reuse the fleet value (second v1 adapter).' },
+      {
+        name: 'OPENAI_API_KEY',
+        cls: 'fleet-shared',
+        note: 'AI provider key — reuse the fleet value (second v1 adapter).',
+      },
       // OPENAI_CHATKIT_WORKFLOW_ID was removed W15 S2: ChatKit retired at
       // T9.24 (OQ-W9-1) — the in-house agents hub replaced it and no core
       // code reads the variable any more.
@@ -684,6 +732,11 @@ export const navHeaderBody = {
       id: 'g_primary',
       items: [{ id: 'i_home', label: 'Home', target: { kind: 'route', href: '/' } }],
     },
+    // W15 S3 follow-up: admin-only nav group, born with every new site so
+    // the fleet-wide admin-nav gap (see ADMIN_NAV_GROUP's comment) can't
+    // recur for a future client. Client sites remain free to relabel/move
+    // this group; only its absence is the fleet-law problem.
+    ${JSON.stringify(ADMIN_NAV_GROUP, null, 2).replace(/\n/g, '\n    ')},
   ],
 };
 
@@ -1219,6 +1272,11 @@ const bootstrapNavHeaderExport = (brandName) =>
         id: 'g_primary',
         items: [{ id: 'i_home', label: 'Home', target: { kind: 'route', href: '/' } }],
       },
+      // W15 S3 follow-up: see ADMIN_NAV_GROUP's comment — the committed
+      // placeholder export gets the same admin-only group as the seed
+      // template so the immediate scaffold matches what the seed drive
+      // would later publish.
+      ADMIN_NAV_GROUP,
     ],
   });
 

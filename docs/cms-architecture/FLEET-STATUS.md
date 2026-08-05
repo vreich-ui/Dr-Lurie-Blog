@@ -1,8 +1,10 @@
 # Fleet status — W15
 
-_Last verified: 2026-08-04, same-day follow-up after the S6 report below. Re-run `node scripts/audit-site-admin-parity.mjs --all` any time for a live check._
+_Last verified: 2026-08-05, same-day follow-up on the admin-nav gap below. Re-run `node scripts/audit-site-admin-parity.mjs --all` any time for a live check._
 
 **Correction to the original S6 report:** S6 (below) found S3 and S4x reporting "merged" on GitHub with their commits NOT reachable from `main` — a squash-merge race. That was true when S6 ran. It is no longer true: S3 was re-landed clean as PR #505 (merged), S4x's context-enrichment half landed as PR #504 (merged), and both are now real, verified, ancestor-of-`main` commits. The leaked `/test-article-dry-run` post on `kugel-platform` that S6 flagged is fixed by that same S3 landing. The S6 trigger has been disabled so it doesn't fire again and re-report this as broken.
+
+**2026-08-05 correction — "admin parity" below means CODE parity, not content parity.** Wolf hit this directly: platform's `/admin` login and roles were fully correct, but there was no "Admin" link anywhere on the live site — `nav_header`'s header navigation had no admin-only group, so a signed-in admin had no visible door in short of typing `/admin` by hand. S3's audit (the "12/12" table below, now 13/13) never caught it and COULDN'T have: `nav_header` is live CMS content in each tenant's own blob store, not a repo file, and the audit is deliberately repo-only, no-network, no-store-access. Fixed live on `platform` (published + released 2026-08-04). `fernwell` has the identical gap, confirmed live, **not yet fixed** — see the tenant table below. `create-site`'s genesis output now includes the admin nav group by default (a new 13th automatable check, `admin-nav-genesis`, proves it), so this cannot recur for a future client. It CAN still recur for retrofits of very old site trees predating this fix — the check only proves fresh genesis, not any existing tenant's live content.
 
 ## What to review first
 
@@ -25,12 +27,14 @@ Also landed same-day, unrelated to W15 but worth knowing about: the PDF template
 
 ## Tenant admin parity (S2's audit script, current)
 
-| Tenant | Admin parity | Notes |
-|---|---|---|
-| Dr-Lurie (root) | ✅ 12/12 | |
-| Platform | ✅ 12/12 | leaked test post fixed by S3's `postDir` pin |
-| Fernwell | ✅ 12/12 | |
-| Future clients | ✅ proven | `create-site --dry-run` genesis plan checked; no files written |
+**This table is CODE/build parity only** — routes, function shims, redirects, config bundles, reader loaders, env-checklist coverage, blob-store probe coverage, and (new, 2026-08-05) whether genesis emits the admin nav group. It is NOT a check of any tenant's live content, so a tenant can show a clean row here and still be missing something content-side (exactly what happened with the admin nav link — see the correction above).
+
+| Tenant | Admin parity (code) | Admin nav link (live content) | Notes |
+|---|---|---|---|
+| Dr-Lurie (root) | ✅ 13/13 | ✅ present | had the admin nav group from creation |
+| Platform | ✅ 13/13 | ✅ present | leaked test post fixed by S3's `postDir` pin; admin nav group added + released 2026-08-05 |
+| Fernwell | ✅ 13/13 | ❌ **missing** | confirmed live 2026-08-05 — no admin-only nav group in `nav_header`; `/admin` itself works fine if you go there directly, there's just no link to it |
+| Future clients | ✅ proven | ✅ proven | `create-site --dry-run` genesis plan now includes the admin nav group (`admin-nav-genesis` check); `--admin-parity` on an old site tree can still miss it since the fix is genesis-side, not a retrofit-script fix |
 
 All three tenants still need the same three account-authority steps before `/admin` fully works:
 
