@@ -1,8 +1,8 @@
 {
   "__generated": {
-    "at": "2026-08-05T11:31:36.805Z",
+    "at": "2026-08-05T16:25:41.075Z",
     "from": "objects/content_item/by-id/req_agent_downloadable_pdfs_on_the_platform_20260805_01.json",
-    "record_version": 2
+    "record_version": 7
   },
   "author": "Platform Documentation",
   "deck": "The platform can turn written content into a real, downloadable PDF — free and instant, no AI model involved. Here's what that actually looks like today, honestly, including what it can't do yet.",
@@ -48,6 +48,19 @@
       "visibility": "public"
     },
     {
+      "id": "n_pdf03b",
+      "kind": "content",
+      "private": {
+        "intent": "reassure",
+        "strategy": "proof"
+      },
+      "public": {
+        "body": "Both gaps described above were traced to their exact cause today, not guessed at: the renderer's plugin set only ever registered plain text, and a separate normalization step was silently discarding every page after the first regardless of how many were defined. Both turned out to be small, isolated fixes in the same file, verified by generating real PDFs — a five-page template rendering as five pages, not one; rectangle, line, image and table elements rendering alongside text on one page. The fix is written, tested, and delivered as a reviewable change. It has not been merged or deployed yet, so the platform's live behavior is unchanged as of this writing: still one page, still text only. This paragraph is the thing to update once it lands.",
+        "title": "What Changed Today, Before It's Live"
+      },
+      "visibility": "public"
+    },
+    {
       "id": "n_pdf04",
       "kind": "action",
       "private": {
@@ -58,6 +71,21 @@
         "ctaLink": "https://kugel-platform.netlify.app/pdf/req_agent_what_needs_ai_and_what_doesnt_20260804_01/e158a6644e3a027b6b7220318e66c5e03c3de9579804e546b83601692369860a.pdf",
         "ctaText": "Download the field guide (PDF)",
         "label": "Field guide PDF"
+      },
+      "visibility": "public"
+    },
+    {
+      "id": "n_pdf06",
+      "kind": "action",
+      "private": {
+        "intent": "convert",
+        "strategy": "resolution"
+      },
+      "public": {
+        "body": "Rendered from this site's own on-brand pdfme template — colors pulled straight from the platform's palette — through the same artifact-job pipeline described above. Still a single page of styled text, matching exactly what the live renderer can do today.",
+        "ctaLink": "https://kugel-platform.netlify.app/pdf/req_agent_downloadable_pdfs_on_the_platform_20260805_01/86ce92f7653dfb6c6e98b5c59cc9b2e90727230ff336ec8d2aaab47610281c14.pdf",
+        "ctaText": "Download this article (PDF)",
+        "title": "Download This Article as a PDF"
       },
       "visibility": "public"
     },
