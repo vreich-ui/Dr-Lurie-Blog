@@ -71,7 +71,7 @@ function hasUnpublishedChanges(record: Rec): boolean {
   return typeof receiptRev !== 'number' || receiptRev !== record.content_revision;
 }
 
-// ─── generated inspector VIEW ─────────────────────────────────────────────────────────────
+// ─── generated inspector VIEW ────────────────────────────────────────────────────────────
 
 function FieldValue({ value }: { value: unknown }) {
   if (value === null || value === undefined) return <span className="text-[var(--adm-text-muted)]">—</span>;
@@ -126,7 +126,7 @@ function GeneratedInspector({ record, onEditOnSite }: { record: Rec; onEditOnSit
   );
 }
 
-// ─── readiness from validate ────────────────────────────────────────────────────────────────────
+// ─── readiness from validate ──────────────────────────────────────────────────────────────────────
 
 function readinessFromValidate(body: Record<string, unknown>): ReadinessGroup[] {
   const blockers = Array.isArray(body.blockers) ? (body.blockers as unknown[]) : [];
@@ -386,7 +386,7 @@ function DedicatedAgentPicker({ objectId, owner }: { objectId: string; owner: bo
   );
 }
 
-// ─── workspace body ─────────────────────────────────────────────────────────────────────────
+// ─── workspace body ───────────────────────────────────────────────────────────────
 
 function WorkspaceBody() {
   const { toast } = useToast();
