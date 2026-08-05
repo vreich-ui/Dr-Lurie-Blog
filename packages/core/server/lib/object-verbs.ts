@@ -103,7 +103,7 @@ import {
 } from './marginalia-store.js';
 import { marginaliaThreadStatusSchema } from '../../schema/marginalia-v1.js';
 
-// ─── store shape ────────────────────────────────────────────────────────────────────
+// ─── store shape ──────────────────────────────────────────────────────────────
 
 export type ObjectVerbStore = ObjectLockStore & {
   list(options: { prefix: string; directories?: boolean; paginate?: boolean }): Promise<BlobListResponse>;
@@ -114,7 +114,7 @@ export type AgentLearningWriteStore = {
   setJSON(key: string, value: unknown): Promise<void | { modified: boolean; etag?: string }>;
 };
 
-// ─── request grammar (per-action) ────────────────────────────────────────────────────
+// ─── request grammar (per-action) ────────────────────────────────────────────
 
 const leaseSeconds = z.number().int().positive().optional();
 const opsField = z.array(z.unknown());
@@ -264,7 +264,7 @@ export const objectVerbRequestSchema = z.discriminatedUnion('action', [
     body: z.unknown().optional(),
     requested_id: z.string().min(1).optional(),
   }),
-  // ─── T1.4 review-state wiring ────────────────────────────────
+  // ─── T1.4 review-state wiring ───────────────────────────────────────────
   z.object({
     action: z.literal('submit_review'),
     object_type: objectTypeSchema,
@@ -417,7 +417,7 @@ export type HandleObjectVerbOptions = {
   marginaliaStore?: MarginaliaStore;
 };
 
-// ─── small helpers ─────────────────────────────────────────────────────────────────
+// ─── small helpers ────────────────────────────────────────────────────────────
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   Boolean(value && typeof value === 'object' && !Array.isArray(value));
@@ -600,7 +600,7 @@ const marginaliaDenied = (principal: Principal, roles: readonly Role[] | undefin
   return err(403, { error: 'Commenting requires a configured role.' });
 };
 
-// ─── read-only bulk enumeration (T9.11) ───────────────────────────────────
+// ─── read-only bulk enumeration (T9.11) ───────────────────────────────────────
 
 /**
  * Load every object record across all types — the read-only sweep the audit
@@ -630,7 +630,7 @@ export const listAllObjectRecords = async (
   return records;
 };
 
-// ─── the dispatcher ───────────────────────────────────────────────────────────────────
+// ─── the dispatcher ───────────────────────────────────────────────────────────
 
 export const handleObjectVerb = async (
   store: ObjectVerbStore,
@@ -1586,7 +1586,7 @@ export const handleObjectVerb = async (
 
     // ─── T1.4 review-state wiring (UI wiring only; no gate/review logic
     // lives here — everything below calls straight into the already-built
-    // T1.3/T1.4 pure functions) ──────────────────────────────────
+    // T1.3/T1.4 pure functions) ────────────────────────────────────────────
 
     case 'submit_review': {
       const key = objectRecordKey(request.object_type, request.object_id);
@@ -1730,7 +1730,7 @@ export const handleObjectVerb = async (
       return { status: result.status, body: result.body };
     }
 
-    // ─── W15 S4 (MVP): Marginalia ────────────────────────────────
+    // ─── W15 S4 (MVP): Marginalia ────────────────────────────────────────────
     case 'marginalia_create': {
       const denied = marginaliaDenied(principal, options.roles);
       if (denied) return denied;
