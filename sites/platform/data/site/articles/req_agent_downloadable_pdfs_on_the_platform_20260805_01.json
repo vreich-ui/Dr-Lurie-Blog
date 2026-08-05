@@ -1,8 +1,8 @@
 {
   "__generated": {
-    "at": "2026-08-05T18:59:40.559Z",
+    "at": "2026-08-05T19:49:01.431Z",
     "from": "objects/content_item/by-id/req_agent_downloadable_pdfs_on_the_platform_20260805_01.json",
-    "record_version": 19
+    "record_version": 23
   },
   "author": "Platform Documentation",
   "deck": "The platform can turn any article into a real, downloadable PDF -- free, instant, and with no AI model involved. It now supports multiple pages, photos, and tables, not just plain text on a single page.",
@@ -86,8 +86,8 @@
         "strategy": "resolution"
       },
       "public": {
-        "body": "Rendered from this site's own on-brand pdfme template, using the platform's real colors, through the same artifact-job pipeline described above. This is the multi-page version: three pages, a cover photo, and a comparison table, generated the same way any editor can generate one from their own article.",
-        "ctaLink": "https://kugel-platform.netlify.app/pdf/req_agent_downloadable_pdfs_on_the_platform_20260805_01/e388cc98fdcc4c28486449272d6cd8cf74cde1b80108bc92657a55671c4f5c43.pdf",
+        "body": "Rendered from this site's own on-brand pdfme template, using the platform's real colors, through the same artifact-job pipeline described above. This is the multi-page version: three pages, a sharper cover photo, and a comparison table, generated the same way any editor can generate one from their own article.",
+        "ctaLink": "https://kugel-platform.netlify.app/pdf/req_agent_downloadable_pdfs_on_the_platform_20260805_01/b10e18cb0f75885deb5f99c668173af7082a8757583dee0fd9c31e95ca3046cc.pdf",
         "ctaText": "Download this article (PDF)",
         "title": "Download This Article as a PDF"
       },
