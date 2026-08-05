@@ -70,6 +70,7 @@ const SEED_MODULES = [
   'taxonomy-seed-data.mjs',
   'themes-seed-data.mjs',
   'section-templates-seed-data.mjs',
+  'templates-seed-data.mjs', // W15 S3 follow-up: starter page-template recipes
 ];
 
 const loadSeeds = async () => {

@@ -38,6 +38,7 @@ import { navigationBodySchema } from '../schema/bodies/navigation-v1.js';
 import { sectionTemplateBodySchema } from '../schema/bodies/section-template-v1.js';
 import { siteBodySchema } from '../schema/bodies/site-v1.js';
 import { taxonomyBodySchema } from '../schema/bodies/taxonomy-v1.js';
+import { templateBodySchema } from '../schema/bodies/template-v1.js';
 import { themeBodySchema } from '../schema/bodies/theme-v1.js';
 import { expectedAcmeDryRun } from '../../../tests/fixtures/create-site-dry-run-acme.mjs';
 
@@ -75,7 +76,7 @@ test('idsFor scopes every generated id to the client — no cross-client collisi
   assert.notEqual(acme.themeId, other.themeId);
 });
 
-test('buildPlan scaffolds the full baseline pack: config bundle + empty export tree + five seed modules', () => {
+test('buildPlan scaffolds the full baseline pack: config bundle + empty export tree + six seed modules', () => {
   const plan = buildPlan({ name: 'acme' });
   const relPaths = plan.files.map((f) => f.path);
 
@@ -90,6 +91,7 @@ test('buildPlan scaffolds the full baseline pack: config bundle + empty export t
     'sites/acme/seeds/taxonomy-seed-data.mjs',
     'sites/acme/seeds/themes-seed-data.mjs',
     'sites/acme/seeds/section-templates-seed-data.mjs',
+    'sites/acme/seeds/templates-seed-data.mjs',
     // W14 T14.2: the per-site policy bundle. Without policy-bindings.ts the
     // shell cannot resolve site identity and the site does not build at all.
     'sites/acme/config/approval-policy.ts',
@@ -371,6 +373,7 @@ test('scaffolded seed bodies parse against the real object schemas, and ids stay
     const tax = await import(path.join(scratchDir, 'seeds', 'taxonomy-seed-data.mjs'));
     const theme = await import(path.join(scratchDir, 'seeds', 'themes-seed-data.mjs'));
     const stpl = await import(path.join(scratchDir, 'seeds', 'section-templates-seed-data.mjs'));
+    const tpl = await import(path.join(scratchDir, 'seeds', 'templates-seed-data.mjs'));
 
     assert.equal(siteBodySchema.safeParse(site.siteBody).success, true);
     assert.equal(navigationBodySchema.safeParse(nav.navHeaderBody).success, true);
@@ -379,6 +382,18 @@ test('scaffolded seed bodies parse against the real object schemas, and ids stay
     assert.equal(themeBodySchema.safeParse(theme.themeDefaultBody).success, true);
     for (const seed of stpl.CONVERSION_SEEDS) {
       const result = sectionTemplateBodySchema.safeParse(seed.body);
+      assert.equal(
+        result.success,
+        true,
+        `${seed.objectId}: ${result.success ? '' : JSON.stringify(result.error?.issues)}`
+      );
+    }
+    assert.deepEqual(
+      tpl.CONVERSION_SEEDS.map((seed) => seed.objectId),
+      ['tpl_interior', 'tpl_landing', 'tpl_legal']
+    );
+    for (const seed of tpl.CONVERSION_SEEDS) {
+      const result = templateBodySchema.safeParse(seed.body);
       assert.equal(
         result.success,
         true,

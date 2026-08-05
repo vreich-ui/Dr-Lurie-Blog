@@ -87,8 +87,7 @@ nav group, so a signed-in admin had no visible door into the workspace at
 all. Every check above is a repo file or a build artifact; `nav_header` is
 live CMS content in each tenant's own blob store, invisible to a read-only,
 no-network, no-store-access audit by design. Fixed live on `platform`
-(2026-08-04). **`fernwell` has the identical gap, confirmed live, not yet
-fixed as of this writing.** `create-site`'s genesis output now includes the
+(2026-08-04). `create-site`'s genesis output now includes the
 admin nav group by default (`ADMIN_NAV_GROUP` in `create-site.mjs`), proven
 by a new 13th automatable check (`admin-nav-genesis` in `admin-parity.mjs`)
 that exercises the real `buildPlan()` output — so a brand-new tenant is born
@@ -101,6 +100,54 @@ side so it can't recur — there is no way to make a repo-only audit prove
 live content short of giving it real store access, which is a deliberate
 non-goal today (see this module's file header: "read-only, no network, no
 store access").
+
+**CORRECTION (2026-08-05, later the same day): `fernwell` was NOT actually
+fixed by the above.** This addendum's own text said so at the time
+("confirmed live, not yet fixed as of this writing") but the commit message
+that landed alongside it (`92444ba8`, "W15-S3 follow-up: bake admin nav
+group into genesis, close audit blind spot") claimed "fixed live on existing
+tenants by hand" for BOTH tenants — inaccurate for `fernwell`. Confirmed by
+direct `object_get` on `fernwell`'s live `nav_header` (record version 4,
+`groups: [g_primary]` only, unchanged since T14.9 genesis) immediately
+before the real fix: an admin signed into `kugel-fernwell.netlify.app`
+still had no visible door into `/admin`. Patched live the same session
+(`object_checkout` → `object_patch` [`upsert_group`, `g_admin` at position
+1] → `object_publish` → `object_checkin` → `release_to_production`,
+confirmed `deployStatus: "ready"` + `productionConfirmed: true` on commit
+`e384e26`). **Lesson for future retrofits: a commit message claiming a live
+fix on tenant X is not proof — re-`object_get` the tenant's own store before
+believing it.**
+
+**2026-08-05 addendum #2 — the starter-template gap (found auditing the
+above).** Chasing the nav-group fix surfaced a second, larger content-parity
+gap in the same blind spot: `create-site` scaffolds a starter
+SECTION-template set (five `stpl_*` recipes) but never scaffolded a starter
+TEMPLATE set (`tpl_interior`/`tpl_landing`/`tpl_legal` — the whole-page
+recipes a Page object's `template` field points at, W2.5). Every tenant born
+through the CLI (`platform`, `fernwell`) therefore has **zero** `template`
+objects; only `drlurie` has the three (built by hand, pre-genesis).
+`platform` additionally has one bespoke `template` of its own
+(`tpl_object_reference`, content-specific to documenting object types) — not
+a substitute for the generic starter set. Fixed the same shape as the
+nav-group gap: `create-site.mjs` gained a `templatesSeedTemplate()` generator
+(mirroring `sectionTemplatesSeedTemplate()`, same three bodies as
+`drlurie`'s hand-built set verbatim — neutral starter copy, no
+client-specific data) wired into `buildPlan()`'s file list;
+`site-genesis-drive.mjs`'s `SEED_MODULES` now includes
+`templates-seed-data.mjs`; a 14th automatable check (`template-genesis` in
+`admin-parity.mjs`) proves `buildPlan()` emits all three going forward. Per
+Wolf's explicit scope (2026-08-05): every genesis'd site should carry the
+full set of governed object TYPES (already true fleet-wide — `content_item`
+/ `tracking_config` / `editorial_voice` / `product` all validate against the
+shared core schema regardless of tenant) and the SYSTEM-owned starter
+templates, but deliberately NOT actual `content_item` / `tracking_config` /
+`editorial_voice` / `product` instances — those are real publication
+content a synthetic or new tenant has no business having invented for it.
+`fernwell`'s own `sites/fernwell/seeds/templates-seed-data.mjs` was added to
+match; live instantiation on `fernwell` (`object_create` × 3 + publish +
+release) is the remaining step, tracked the same way as the nav-group fix
+was. `platform` carries the identical gap and is NOT fixed here (out of the
+scope Wolf gave this session) — flagged for a follow-up in the same shape.
 
 **Client sites outside this repo: none.** `13-separation-plan.md` confirms
 all clients share this one monorepo today ("the only thing NOT yet separated
@@ -177,6 +224,11 @@ Human steps:
   `/test-article-dry-run` (Dr-Lurie's leaked test post) should 404 and the
   `/library` listing should no longer show it. Console: Netlify →
   **kugel-platform** → Deploys.
+- ⏳ **Starter templates** (2026-08-05 addendum #2) — `platform` has zero
+  `tpl_interior`/`tpl_landing`/`tpl_legal` objects, same gap as `fernwell`
+  had. Not fixed in this pass (out of scope); `sites/platform/seeds/` needs
+  its own `templates-seed-data.mjs` plus a live `object_create` × 3 +
+  publish + release, same recipe as fernwell's fix.
 
 ## Fernwell (`sites/fernwell` → Netlify project `kugel-fernwell`)
 
@@ -215,6 +267,14 @@ Human steps:
   `/learn/library` serves (empty until fernwell has articles) and a
   published `content_item` becomes reachable at its permalink. Console:
   Netlify → **kugel-fernwell** → Deploys.
+- ✅ **Admin nav group** (2026-08-05 correction, above) — `nav_header` was
+  actually missing `g_admin` despite the same-day commit claiming otherwise;
+  patched live and confirmed released (commit `e384e26`,
+  `productionConfirmed: true`).
+- ⏳ **Starter templates** (2026-08-05 addendum #2) — `sites/fernwell/seeds/
+  templates-seed-data.mjs` now exists (matching drlurie's
+  tpl_interior/tpl_landing/tpl_legal); the live `object_create` × 3 + publish
+  + release step is the remaining piece, not yet run as of this writing.
 
 ---
 

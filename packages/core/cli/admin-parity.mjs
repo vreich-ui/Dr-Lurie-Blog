@@ -597,7 +597,32 @@ export const computeAdminParity = (target) => {
       : 'buildPlan() does NOT emit an adminOnly nav group — a new tenant would be born with the same invisible-admin-workspace gap platform and fernwell had'
   );
 
-  // 14+. The human gates — real requirements no repo check can prove. Named
+  // 14. Starter-template genesis guard (W15 S3 follow-up, 2026-08-05): the
+  //     CLI scaffolded a starter SECTION-template set but never a starter
+  //     TEMPLATE set (tpl_interior/tpl_landing/tpl_legal — the whole-page
+  //     recipes, W2.5) — every genesis'd tenant (platform, fernwell) was
+  //     therefore born with zero template objects, unlike Dr-Lurie (built by
+  //     hand pre-genesis). Not a PageType gap — PageTypes are schema law
+  //     regardless — but an agent creating a page on a genesis'd tenant had
+  //     no starter recipe to instantiate from. Checked the same way as #13:
+  //     exercise the real buildPlan() and confirm it emits the seed file.
+  const genesisTemplatesFile = genesisPlan.files.find(
+    (f) => f.path === `sites/admin-parity-probe/seeds/templates-seed-data.mjs`
+  );
+  const genesisTemplateIds = genesisTemplatesFile
+    ? [...genesisTemplatesFile.content.matchAll(/objectId:\s*'([^']+)'/g)].map((m) => m[1])
+    : [];
+  add(
+    'template-genesis',
+    'create-site births every new tenant with the three starter page-template recipes (tpl_interior/tpl_landing/tpl_legal), matching the canonical starter set',
+    'packages/core (fleet law) — create-site genesis',
+    genesisTemplateIds.length === 3 ? 'PASS' : 'GAP',
+    genesisTemplateIds.length === 3
+      ? `seeds/templates-seed-data.mjs emits ${genesisTemplateIds.join(', ')}`
+      : `seeds/templates-seed-data.mjs is missing or incomplete (found: ${genesisTemplateIds.join(', ') || 'none'}) — a new tenant would have no starter page recipe to instantiate from`
+  );
+
+  // 15+. The human gates — real requirements no repo check can prove. Named
   //      here so the table is the complete truth, not the automatable subset.
   add(
     'identity-enabled',
