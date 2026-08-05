@@ -1,0 +1,34 @@
+{
+  "__generated": {
+    "at": "2026-08-05T09:43:33.755Z",
+    "from": "objects/section/by-id/sec_cta_banner.json",
+    "record_version": 3
+  },
+  "section": {
+    "data": {
+      "actions": [
+        {
+          "label": "Start here",
+          "style": "primary",
+          "target": {
+            "kind": "page",
+            "page": "page_start"
+          }
+        },
+        {
+          "label": "Browse the library",
+          "style": "secondary",
+          "target": {
+            "kind": "page",
+            "page": "page_library"
+          }
+        }
+      ],
+      "body": "<p>Follow the golden path from checkout to publish — or dive into the library and see the ideas in the wild.</p>",
+      "compact": false,
+      "heading": "Everything's governed. Start where it clicks."
+    },
+    "id": "s_f87af8565708",
+    "type": "cta_banner"
+  }
+}
