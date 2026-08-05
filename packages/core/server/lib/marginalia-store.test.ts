@@ -10,7 +10,7 @@ import {
 } from './marginalia-store.js';
 import type { Principal } from '../../schema/object-record-v1.js';
 
-// ─── injected-store pattern (agent-learning-patch.test.ts's makeStore) ───────
+// ─── injected-store pattern (agent-learning-patch.test.ts's makeStore) ───────────
 
 const makeStore = (): MarginaliaStore & { blobs: Map<string, string> } => {
   const blobs = new Map<string, string>();
