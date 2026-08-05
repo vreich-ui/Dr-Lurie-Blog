@@ -1,0 +1,96 @@
+{
+  "__generated": {
+    "at": "2026-08-05T11:31:36.805Z",
+    "from": "objects/content_item/by-id/req_agent_downloadable_pdfs_on_the_platform_20260805_01.json",
+    "record_version": 2
+  },
+  "author": "Platform Documentation",
+  "deck": "The platform can turn written content into a real, downloadable PDF — free and instant, no AI model involved. Here's what that actually looks like today, honestly, including what it can't do yet.",
+  "description": "How PDF generation works on this platform: a deterministic, zero-cost template render, what it can produce today, and the two platform-side gaps that currently limit it to a single page of styled text.",
+  "nodes": [
+    {
+      "id": "n_pdf01",
+      "kind": "content",
+      "private": {
+        "intent": "educate",
+        "strategy": "hook"
+      },
+      "public": {
+        "body": "Everything on this platform lives as a web page by default. But sometimes what you actually want is a document — something a reader can download, save, print, or forward without opening a browser. The platform can produce that: a real PDF, generated from the same written content, through the same governed object system as everything else.",
+        "title": "Content doesn't have to stay on the page"
+      },
+      "visibility": "public"
+    },
+    {
+      "id": "n_pdf02",
+      "kind": "content",
+      "private": {
+        "intent": "educate",
+        "strategy": "explanation"
+      },
+      "public": {
+        "body": "A PDF here is built from a template — a layout with named fields — plus the data that fills those fields in. Nothing about turning text into a laid-out page requires a model to run: it's a direct, mechanical render, the same \"already known, so a rule can do it\" principle covered in the platform's article on what needs AI and what doesn't. That means generating a PDF costs nothing and returns in seconds, the same whether it's generated once or a hundred times.",
+        "title": "How it actually works"
+      },
+      "visibility": "public"
+    },
+    {
+      "id": "n_pdf03",
+      "kind": "content",
+      "private": {
+        "intent": "educate",
+        "strategy": "context"
+      },
+      "public": {
+        "body": "Right now, a generated PDF is a single page of styled text — but styled meaningfully: real color, real hierarchy, sized headings, the platform's own palette rather than plain black-on-white. That's enough for a field guide, a one-page summary, a printable reference sheet. It is not yet able to lay out multiple pages, embed a diagram, or place a photograph inside the document — two separate, known gaps on the generation side mean those don't work yet, not a limit of what a PDF template is capable of in general.",
+        "title": "What it can do today, honestly"
+      },
+      "visibility": "public"
+    },
+    {
+      "id": "n_pdf04",
+      "kind": "action",
+      "private": {
+        "intent": "convert",
+        "strategy": "step"
+      },
+      "public": {
+        "ctaLink": "https://kugel-platform.netlify.app/pdf/req_agent_what_needs_ai_and_what_doesnt_20260804_01/e158a6644e3a027b6b7220318e66c5e03c3de9579804e546b83601692369860a.pdf",
+        "ctaText": "Download the field guide (PDF)",
+        "label": "Field guide PDF"
+      },
+      "visibility": "public"
+    },
+    {
+      "id": "n_pdf05",
+      "kind": "content",
+      "private": {
+        "intent": "reassure",
+        "strategy": "resolution"
+      },
+      "public": {
+        "body": "Nothing about how you'd ask for a PDF needs to change when multi-page layouts and embedded graphics become available — the request stays the same; only what comes back gets richer. Until then, a single well-designed page, in the site's own colors, is the honest ceiling, and it's still a real, working, free document — not a placeholder.",
+        "title": "What changes once the gaps close"
+      },
+      "visibility": "public"
+    }
+  ],
+  "publication_context": {
+    "domain": "kugel-platform.netlify.app",
+    "publication_name": "Platform",
+    "topic_scope": "CMS artifact generation"
+  },
+  "seo": {
+    "meta_description": "How the platform generates downloadable PDF documents from written content — a free, deterministic render, its current single-page text-only ceiling, and what's needed to unlock more.",
+    "meta_title": "Downloadable PDFs on the Platform"
+  },
+  "slug": "downloadable-pdfs-on-the-platform",
+  "taxonomy": {
+    "category": "guide",
+    "tags": [
+      "publishing",
+      "architecture"
+    ]
+  },
+  "title": "Downloadable PDFs: Turning Platform Content Into a Document"
+}
