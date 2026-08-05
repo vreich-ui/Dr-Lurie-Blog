@@ -100,9 +100,6 @@ describe('resolveComposerAction', () => {
   it('a whole-object target (no sectionId/nodeId) matches only whole-object threads', () => {
     const wholeObjectTarget = { objectType: 'site', objectId: 'site_acme' };
     const threads = [thread({ id: 'mgt_whole', anchor: { objectType: 'site', objectId: 'site_acme' } })];
-    assert.deepStrictEqual(resolveComposerAction(threads, wholeObjectTarget), {
-      kind: 'reply',
-      threadId: 'mgt_whole',
-    });
+    assert.deepStrictEqual(resolveComposerAction(threads, wholeObjectTarget), { kind: 'reply', threadId: 'mgt_whole' });
   });
 });
