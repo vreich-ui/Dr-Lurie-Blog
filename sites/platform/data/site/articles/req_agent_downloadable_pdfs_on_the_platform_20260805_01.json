@@ -1,12 +1,16 @@
 {
   "__generated": {
-    "at": "2026-08-05T16:25:41.075Z",
+    "at": "2026-08-05T16:46:38.687Z",
     "from": "objects/content_item/by-id/req_agent_downloadable_pdfs_on_the_platform_20260805_01.json",
-    "record_version": 7
+    "record_version": 12
   },
   "author": "Platform Documentation",
   "deck": "The platform can turn written content into a real, downloadable PDF — free and instant, no AI model involved. Here's what that actually looks like today, honestly, including what it can't do yet.",
   "description": "How PDF generation works on this platform: a deterministic, zero-cost template render, what it can produce today, and the two platform-side gaps that currently limit it to a single page of styled text.",
+  "image": {
+    "alt": "Abstract illustration of layered document pages in the platform's blue, teal, and gold palette, representing written content turned into a downloadable PDF.",
+    "src": "/img/req_agent_downloadable_pdfs_on_the_platform_20260805_01/27fb639a67688f8fa02327e62e4f5759d83eda776c91bff0f500364939ec76ef.webp"
+  },
   "nodes": [
     {
       "id": "n_pdf01",
