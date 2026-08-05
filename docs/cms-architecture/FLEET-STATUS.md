@@ -1,6 +1,8 @@
 # Fleet status — W15
 
-_Last verified: 2026-08-05, same-day follow-up on the admin-nav gap below. Re-run `node scripts/audit-site-admin-parity.mjs --all` any time for a live check._
+_Last verified: 2026-08-05, second same-day pass — genesis fix merged (#515) and the S1/S4x rows below corrected against `git log`, which had drifted from what actually landed. Re-run `node scripts/audit-site-admin-parity.mjs --all` any time for a live check._
+
+**2026-08-05, second correction — S1 and S4x rows below were stale.** Both showed as partial/not-started when `main` already had the real work: S1's remaining 3 fixes (auth dedupe, client-side failure states, and a follow-up header-button duplicate-check bug found while diagnosing Wolf's login issue) landed via #511 and #513; S4x's items 9–15 (save-gated Ask-AI proposal capture) landed via #510. Corrected below.
 
 **Correction to the original S6 report:** S6 (below) found S3 and S4x reporting "merged" on GitHub with their commits NOT reachable from `main` — a squash-merge race. That was true when S6 ran. It is no longer true: S3 was re-landed clean as PR #505 (merged), S4x's context-enrichment half landed as PR #504 (merged), and both are now real, verified, ancestor-of-`main` commits. The leaked `/test-article-dry-run` post on `kugel-platform` that S6 flagged is fixed by that same S3 landing. The S6 trigger has been disabled so it doesn't fire again and re-report this as broken.
 
@@ -14,12 +16,12 @@ Everything code-side from S1–S4x is on `main` and verified. What's left is alm
 
 | Stage | What it was | Status | PR |
 |---|---|---|---|
-| S1 | Admin core repairs | Merged (partial — 1 of 4 planned fixes; the other 3 were never diagnosed) | [#500](https://github.com/vreich-ui/platform/pull/500) |
+| S1 | Admin core repairs — all 4 planned fixes | **Merged, complete**: library routing/deep-link fix (#500), auth dedupe + client-side failure states (#511), header-button duplicate admin-check bug found during follow-up (#513) | [#500](https://github.com/vreich-ui/platform/pull/500), [#511](https://github.com/vreich-ui/platform/pull/511), [#513](https://github.com/vreich-ui/platform/pull/513) |
 | S2 | Fleet admin genesis + parity audit | Merged, verified | [#502](https://github.com/vreich-ui/platform/pull/502) |
-| S3 | Retrofit existing tenants to parity | **Merged and live in main** (re-landed clean after #503 hit real conflicts against S1+S2) | [#505](https://github.com/vreich-ui/platform/pull/505) (supersedes #503) |
+| S3 | Retrofit existing tenants to parity | **Merged and live in main** (re-landed clean after #503 hit real conflicts against S1+S2); genesis-side follow-up (admin nav group + 13th audit check) merged 2026-08-05 | [#505](https://github.com/vreich-ui/platform/pull/505) (supersedes #503), [#515](https://github.com/vreich-ui/platform/pull/515) |
 | S4 | Marginalia editor (full canvas interaction model) | Deferred for cost — not started | — |
 | S4x | Ask-AI context enrichment, items 1–8 (unplanned add-on, not Marginalia) | **Merged and live in main** | [#504](https://github.com/vreich-ui/platform/pull/504) |
-| S4x (cont.) | Save-gated Ask-AI proposal capture for CMS Agent learning, items 9–15 | Prompt drafted, not yet scheduled or run | — |
+| S4x (cont.) | Save-gated Ask-AI proposal capture for CMS Agent learning, items 9–15 | **Merged and live in main** | [#510](https://github.com/vreich-ui/platform/pull/510) |
 | S5 | Client publishing chat (LibreChat) | Deferred for cost — not started, nothing in CMS-Agent either | — |
 | S6 | Fleet verification pass | Done — see correction above. Trigger disabled to prevent a re-fire. | [#506](https://github.com/vreich-ui/platform/pull/506) |
 
@@ -46,8 +48,7 @@ All three tenants still need the same three account-authority steps before `/adm
 
 - [ ] **ADMIN_EMAILS + Netlify Identity + first-Owner sign-in**, per tenant (platform, fernwell) — in progress.
 - [ ] **12-store blob probe run**, per tenant — nothing in the repo can do this without a live Netlify token.
-- [ ] **Decide on the S4x continuation** (items 9–15 — full rejection-history capture as CMS Agent learning data, gated strictly on the editor's Save) — prompt is ready, just needs scheduling.
-- [ ] **Finish S1** — 3 of the original 4 admin-core fixes ("library routing, failure states, auth dedupe") were never diagnosed past the one that landed.
+- [ ] **Fix fernwell's live admin nav content** — same gap platform had, confirmed live 2026-08-05, not yet fixed (needs fernwell-scoped write access; self-serve prompt given to Wolf directly).
 - [ ] **Decide on S4 (Marginalia) and S5 (publishing chat)** — both still parked on cost. No action needed unless you want to restart one.
 - [ ] **Housekeeping, low priority**: fold the S2 and S6 state-of-play sidecar entries into `state-of-play.md` proper (queued as `W15.FOLD` in `queue.tsv`, deferred for cost — it's a ~412 KB file with no cheap partial-write path here).
 - [ ] **Branch cleanup**: 7 now-dead W15 branches are safe to delete (`w15/s1-admin-core-repairs`, `w15/s2-fleet-admin-genesis`, `w15/s3-tenant-retrofit`, `w15/s3-resolved`, `w15/s3-docs-completion`, `w15/s4x-ask-ai-context-enrichment`, `w15/s6-verification-records`) — needs someone with real repo write access, the agent sessions here don't have branch-delete permission.
