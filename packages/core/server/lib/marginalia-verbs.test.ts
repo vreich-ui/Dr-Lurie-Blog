@@ -8,7 +8,7 @@ import { marginaliaThreadKey } from './marginalia-store-keys.js';
 import type { MarginaliaStore } from './marginalia-store.js';
 import type { ObjectRecord, Principal } from '../../schema/object-record-v1.js';
 
-// ─── injected-store pattern (agent-learning-patch.test.ts's makeStore) ───────
+// ─── injected-store pattern (agent-learning-patch.test.ts's makeStore) ───────────
 
 const makeSiteObjectsStore = (seed: ObjectRecord) => {
   const blobs = new Map<string, string>();
