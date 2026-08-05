@@ -269,3 +269,18 @@ export const getTrackingEventsBlobStore = async (event: unknown, binding?: SiteB
 export const getAgentLearningBlobStore = async (event: unknown, binding?: SiteBinding): Promise<BlobStore> => {
   return getNetlifyBlobStore('agent-learning', event, binding);
 };
+
+/**
+ * W15 S4 (MVP): Marginalia — canvas commenting/annotation threads, anchored
+ * to {objectType, objectId, sectionId?, nodeId?, field?, selectedText?}. A
+ * dedicated side-channel store (the agent-learning precedent above): comments
+ * must be postable by multiple people concurrently without taking the
+ * content object's edit lock (object_patch's checkout/lock_token/
+ * expected_record_version machinery), so threads/comments live independently
+ * of the object substrate's lock/version/patch lifecycle. Eventual
+ * consistency is fine — no CAS anywhere in this store; every write
+ * (including resolve/dismiss) is an unconditional setJSON.
+ */
+export const getMarginaliaBlobStore = async (event: unknown, binding?: SiteBinding): Promise<BlobStore> => {
+  return getNetlifyBlobStore('marginalia', event, binding);
+};

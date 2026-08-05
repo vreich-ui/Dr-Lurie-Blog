@@ -119,7 +119,7 @@ Env checklist:
       BOOTSTRAP OWNER allowlist — /admin is unusable until this is set (or an invite exists): members are implicit Owners forever (roles.ts env fallback; a wiped users store can never lock the operator out). Human-owned; placeholder: the operator’s real email. Runbook: site-provisioning-runbook.md §admin.
     ROLE_EMAILS_ADMIN                [per-site]  ☐ human-supplied — see the provisioning runbook
       Role allowlist — human-owned.
-    ROLE_EMAILS_EDITOR               [per-site]  ☐ human-supplied — see the provisioning runbook
+    ROLE_EMAILS_EDITOR                [per-site]  ☐ human-supplied — see the provisioning runbook
       Role allowlist — human-owned.
     ROLE_EMAILS_PUBLISHER            [per-site]  ☐ human-supplied — see the provisioning runbook
       Role allowlist — human-owned.
@@ -172,6 +172,6 @@ ADMIN WORKSPACE BOOTSTRAP (human gate — runbook site-provisioning-runbook.md �
   2. Set ADMIN_EMAILS on the site to the operator’s real email(s) — bootstrap Owners; the
      users store can be empty/wiped and these addresses still get in.
   3. Invite the first Owner via /admin/settings/admins (or rely on ADMIN_EMAILS alone).
-  Blob stores backing the workspace (probed automatically when a token is supplied): site-objects, workflows, artifacts, artifact-index, commerce, agent-chats, agent-profiles, governance, users, opt-ins, commerce-events, tracking-events, agent-learning.
+  Blob stores backing the workspace (probed automatically when a token is supplied): site-objects, workflows, artifacts, artifact-index, commerce, agent-chats, agent-profiles, governance, users, opt-ins, commerce-events, tracking-events, agent-learning, marginalia.
   Verify any tenant any time:  node scripts/audit-site-admin-parity.mjs --site sites/<client>
 `;
