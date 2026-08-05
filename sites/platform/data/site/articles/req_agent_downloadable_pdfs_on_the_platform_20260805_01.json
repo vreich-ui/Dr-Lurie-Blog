@@ -1,15 +1,15 @@
 {
   "__generated": {
-    "at": "2026-08-05T16:46:38.687Z",
+    "at": "2026-08-05T18:59:40.559Z",
     "from": "objects/content_item/by-id/req_agent_downloadable_pdfs_on_the_platform_20260805_01.json",
-    "record_version": 12
+    "record_version": 19
   },
   "author": "Platform Documentation",
-  "deck": "The platform can turn written content into a real, downloadable PDF — free and instant, no AI model involved. Here's what that actually looks like today, honestly, including what it can't do yet.",
-  "description": "How PDF generation works on this platform: a deterministic, zero-cost template render, what it can produce today, and the two platform-side gaps that currently limit it to a single page of styled text.",
+  "deck": "The platform can turn any article into a real, downloadable PDF -- free, instant, and with no AI model involved. It now supports multiple pages, photos, and tables, not just plain text on a single page.",
+  "description": "How PDF generation works on this platform: a deterministic, zero-cost template render that now supports multiple pages, embedded images, and real tables, confirmed live with this article's own downloadable PDF.",
   "image": {
-    "alt": "Abstract illustration of layered document pages in the platform's blue, teal, and gold palette, representing written content turned into a downloadable PDF.",
-    "src": "/img/req_agent_downloadable_pdfs_on_the_platform_20260805_01/27fb639a67688f8fa02327e62e4f5759d83eda776c91bff0f500364939ec76ef.webp"
+    "alt": "Photo illustration of layered documents and printed pages, representing an article turned into a polished, multi-page PDF.",
+    "src": "/img/req_agent_downloadable_pdfs_on_the_platform_20260805_01/a6d3fc164ba3710755f1395b3150c91b2373dae88cfada36b6c6005f6d15b4df.webp"
   },
   "nodes": [
     {
@@ -46,8 +46,8 @@
         "strategy": "context"
       },
       "public": {
-        "body": "Right now, a generated PDF is a single page of styled text — but styled meaningfully: real color, real hierarchy, sized headings, the platform's own palette rather than plain black-on-white. That's enough for a field guide, a one-page summary, a printable reference sheet. It is not yet able to lay out multiple pages, embed a diagram, or place a photograph inside the document — two separate, known gaps on the generation side mean those don't work yet, not a limit of what a PDF template is capable of in general.",
-        "title": "What it can do today, honestly"
+        "body": "A generated PDF is no longer limited to a single page of plain text. It can flow across as many pages as an article actually needs, and each page can include more than paragraphs: photos, colored panels, dividing lines, and real tables, all in the site's own colors. A short field guide can still fit on one page if that is all it needs. A longer guide, like this one, can spread out, include a picture, and close with a clean comparison table, all generated automatically from the article itself.",
+        "title": "What it can do now"
       },
       "visibility": "public"
     },
@@ -59,8 +59,8 @@
         "strategy": "proof"
       },
       "public": {
-        "body": "Both gaps described above were traced to their exact cause today, not guessed at: the renderer's plugin set only ever registered plain text, and a separate normalization step was silently discarding every page after the first regardless of how many were defined. Both turned out to be small, isolated fixes in the same file, verified by generating real PDFs — a five-page template rendering as five pages, not one; rectangle, line, image and table elements rendering alongside text on one page. The fix is written, tested, and delivered as a reviewable change. It has not been merged or deployed yet, so the platform's live behavior is unchanged as of this writing: still one page, still text only. This paragraph is the thing to update once it lands.",
-        "title": "What Changed Today, Before It's Live"
+        "body": "The two gaps described in earlier drafts of this article are fixed and confirmed live. The renderer now recognizes every element type it is supposed to (text, images, colored boxes, dividing lines, and tables), and the bug that used to quietly drop every page after the first has been corrected. The proof is this very document: it was generated fresh, as a three-page PDF with a photo on the cover and a real comparison table on the closing page. Download it from the button below and you get a live example, not a mockup.",
+        "title": "What Changed, Now Confirmed Live"
       },
       "visibility": "public"
     },
@@ -86,8 +86,8 @@
         "strategy": "resolution"
       },
       "public": {
-        "body": "Rendered from this site's own on-brand pdfme template — colors pulled straight from the platform's palette — through the same artifact-job pipeline described above. Still a single page of styled text, matching exactly what the live renderer can do today.",
-        "ctaLink": "https://kugel-platform.netlify.app/pdf/req_agent_downloadable_pdfs_on_the_platform_20260805_01/86ce92f7653dfb6c6e98b5c59cc9b2e90727230ff336ec8d2aaab47610281c14.pdf",
+        "body": "Rendered from this site's own on-brand pdfme template, using the platform's real colors, through the same artifact-job pipeline described above. This is the multi-page version: three pages, a cover photo, and a comparison table, generated the same way any editor can generate one from their own article.",
+        "ctaLink": "https://kugel-platform.netlify.app/pdf/req_agent_downloadable_pdfs_on_the_platform_20260805_01/e388cc98fdcc4c28486449272d6cd8cf74cde1b80108bc92657a55671c4f5c43.pdf",
         "ctaText": "Download this article (PDF)",
         "title": "Download This Article as a PDF"
       },
@@ -113,7 +113,7 @@
     "topic_scope": "CMS artifact generation"
   },
   "seo": {
-    "meta_description": "How the platform generates downloadable PDF documents from written content — a free, deterministic render, its current single-page text-only ceiling, and what's needed to unlock more.",
+    "meta_description": "How the platform generates downloadable PDF documents from written content -- a free, deterministic render that now supports multiple pages, photos, and tables.",
     "meta_title": "Downloadable PDFs on the Platform"
   },
   "slug": "downloadable-pdfs-on-the-platform",
