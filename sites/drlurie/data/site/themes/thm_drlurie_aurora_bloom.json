@@ -1,0 +1,52 @@
+{
+  "__generated": {
+    "at": "2026-08-05T19:00:35.327Z",
+    "from": "objects/theme/by-id/thm_drlurie_aurora_bloom.json",
+    "record_version": 2
+  },
+  "description": "A warm dusk palette — deep plum primary, coral-rose secondary, luminous marigold gold, teal accent — with editorial type, airy rhythm, soft corners and elevated shadow. Built to feel confident and expressive without losing readability.",
+  "name": "Aurora Bloom",
+  "scope": "one_off",
+  "tokens": {
+    "colors": {
+      "accent": "oklch(0.68 0.11 190)",
+      "bg-page": "oklch(0.98 0.012 90)",
+      "bg-page-dark": "oklch(0.18 0.03 330)",
+      "bg-surface": "oklch(0.955 0.02 60)",
+      "dark:accent": "oklch(0.78 0.10 190)",
+      "dark:bg-page": "oklch(0.18 0.03 330)",
+      "dark:bg-surface": "oklch(0.23 0.035 330)",
+      "dark:gold": "oklch(0.84 0.13 85)",
+      "dark:primary": "oklch(0.72 0.13 340)",
+      "dark:secondary": "oklch(0.74 0.15 30)",
+      "dark:text-default": "oklch(0.90 0.015 90)",
+      "dark:text-heading": "oklch(0.96 0.01 90)",
+      "dark:text-muted": "oklch(0.90 0.015 90 / 70%)",
+      "gold": "oklch(0.80 0.13 85)",
+      "primary": "oklch(0.42 0.13 340)",
+      "secondary": "oklch(0.62 0.16 25)",
+      "text-default": "oklch(0.32 0.02 330)",
+      "text-heading": "oklch(0.24 0.03 330)",
+      "text-muted": "oklch(0.32 0.02 330 / 72%)"
+    },
+    "fonts": {
+      "heading": "'Playfair Display', 'Times New Roman', serif",
+      "sans": "'Inter Variable'",
+      "serif": "'Source Serif 4', Georgia, serif"
+    },
+    "layout": {
+      "containerWidth": "default",
+      "sectionRhythm": "airy"
+    },
+    "shape": {
+      "buttonShape": "pill",
+      "radius": "soft",
+      "shadow": "elevated"
+    },
+    "type": {
+      "headingWeight": "bold",
+      "scale": "editorial"
+    }
+  },
+  "whenToUse": "Pick this over the calm clinical default when you want the site to feel expressive, premium and warm — e.g. a seasonal campaign or brand refresh. Copy the default instead to restore the understated production look."
+}
