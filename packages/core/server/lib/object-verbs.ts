@@ -554,6 +554,96 @@ const mintOpsIds = (rawOps: readonly unknown[]): { ops: unknown[]; minted: Minte
   return { ops, minted };
 };
 
+// ─── D3-sharedref: denormalize a shared_ref's target display name ─────────────
+
+type JsonRecord = Record<string, unknown>;
+
+const isSharedRefSection = (section: unknown): section is JsonRecord & { data: JsonRecord } =>
+  isRecord(section) && section.type === 'shared_ref' && isRecord(section.data);
+
+/**
+ * Stamp `data.sectionName` on any `upsert_section` / `update_section_data` op
+ * that creates or touches a `shared_ref`-typed section, resolving the
+ * target's current display name through `context.resolveSharedSectionName`
+ * (object-validate.ts). That resolver is backed by the SAME preloaded object
+ * snapshot validation itself already builds for this write
+ * (object-validation-context.ts) — so this adds no extra store read, it
+ * piggybacks on one that has to happen anyway to check the ref resolves at
+ * all. ObjectPreview.tsx then renders the stamped copy directly, so reads
+ * stay free and synchronous instead of dereferencing the target at
+ * render/preview time (see section-v1.ts's shared_ref field comment for the
+ * staleness tradeoff this denormalization accepts — the stamped name is only
+ * as fresh as the last write that touched THIS ref; renaming the target does
+ * not retroactively update every page that shared_refs it, and nothing in
+ * this codebase does that for any other denormalized display field either,
+ * e.g. object-impact.ts recomputes "what points at this" on demand rather
+ * than maintaining a live back-index).
+ *
+ * A target that doesn't resolve — a dangling ref (the target section was
+ * deleted, or never existed) or simply no resolver being wired for this call
+ * (e.g. a harness with no validationContext) — leaves `sectionName` UNSET
+ * rather than throwing (and rather than stamping `null`: object-patch-
+ * apply.ts's engine reserves `null` as its fields-unset marker and refuses
+ * it outright inside a whole-value `upsert_section` payload — see section-
+ * v1.ts's shared_ref field comment for why "couldn't resolve" and "never
+ * attempted" are consequently the SAME absent-key state, not a null-vs-
+ * undefined distinction). Reference-integrity enforcement (does this id
+ * resolve at all?) is validateObject's job (object-validate.ts's
+ * requireObject), not this step's; this step only ever adds a display
+ * label, never blocks a write.
+ *
+ * `update_section_data` merges `fields` into an existing section's `data`
+ * and never touches `type`, so whether an op is "about" a shared_ref has to
+ * be read off the CURRENT record — the section `section_id` addresses,
+ * before this patch applies. The effective target id is `fields.section`
+ * when the op is changing it, else the section's existing target (an
+ * `update_section_data` on a shared_ref that omits `section` from `fields`
+ * is re-affirming the same target, e.g. touching `visibility` via a
+ * different op in the same batch — still worth re-stamping in case the
+ * target was renamed since the ref was last written). When the target can't
+ * be resolved, `fields.sectionName` is likewise left unset — NOT set to
+ * `null`, which under this op's merge semantics would actively DELETE any
+ * name already stamped there; an unresolved re-stamp attempt should leave a
+ * previously-good name in place rather than blanking it.
+ */
+const stampSharedRefSectionNames = (
+  ops: readonly unknown[],
+  currentBody: unknown,
+  context: ObjectValidationContext
+): unknown[] => {
+  const currentSections: unknown[] =
+    isRecord(currentBody) && Array.isArray(currentBody.sections) ? currentBody.sections : [];
+  const nameFor = (targetId: string): string | undefined => context.resolveSharedSectionName?.(targetId);
+
+  return ops.map((raw) => {
+    if (!isRecord(raw) || typeof raw.op !== 'string') return raw; // malformed → let the engine reject it
+
+    if (raw.op === 'upsert_section' && isSharedRefSection(raw.section) && typeof raw.section.data.section === 'string') {
+      const name = nameFor(raw.section.data.section);
+      if (name === undefined) return raw; // unresolved — leave the payload exactly as sent
+      const op = deepClone(raw) as JsonRecord;
+      const data = (op.section as JsonRecord).data as JsonRecord;
+      data.sectionName = name;
+      return op;
+    }
+
+    if (raw.op === 'update_section_data' && typeof raw.section_id === 'string' && isRecord(raw.fields)) {
+      const current = currentSections.find((section) => isRecord(section) && section.id === raw.section_id);
+      if (isSharedRefSection(current)) {
+        const targetId = typeof raw.fields.section === 'string' ? raw.fields.section : current.data.section;
+        const name = typeof targetId === 'string' ? nameFor(targetId) : undefined;
+        if (name !== undefined) {
+          const op = deepClone(raw) as JsonRecord;
+          (op.fields as JsonRecord).sectionName = name;
+          return op;
+        }
+      }
+    }
+
+    return raw;
+  });
+};
+
 /** `learning/<yyyy-mm-dd>/<compact-ts>-<object_type>-<object_id>.json` — the commerce-events date-directory idiom. */
 const agentLearningRecordKey = (objectType: ObjectType, objectId: string, at: string): string => {
   const date = at.slice(0, 10);
@@ -657,20 +747,39 @@ export const listAllObjectRecords = async (
   options: { status?: 'active' | 'archived' } = {}
 ): Promise<ObjectRecord[]> => {
   // The 13 per-type listings are independent — issue them together instead of
-  // one at a time (no ordering constraint on `list` itself).
+  // one at a time (no ordering constraint on `list` itself). A transient
+  // failure listing one type degrades to "0 items from that type this
+  // sweep" rather than failing the whole request — matches the per-record
+  // resilience below (2026-08-06 hotfix).
   const perTypeItems = await Promise.all(
-    objectTypes.map((objectType) =>
-      store
-        .list({ prefix: `objects/${objectType}/by-id/`, directories: false, paginate: true })
-        .then(collectBlobListItems)
-    )
+    objectTypes.map(async (objectType) => {
+      // 2026-08-06 hotfix follow-up: `store.list(..., { paginate: true })` can
+      // return a plain AsyncIterable (not a Promise) rather than resolving to
+      // one — chaining `.then()` directly off its return value throws
+      // SYNCHRONOUSLY ("...list(...).then is not a function") the instant
+      // this runs, before `.catch()` can ever attach, which aborted this
+      // sweep 100% of the time regardless of data (the bug the `.catch()`
+      // above was meant to guard against, but never actually could). `await`
+      // works for both a Promise and a plain value, so awaiting first is
+      // what actually makes the try/catch below effective.
+      try {
+        return await collectBlobListItems(
+          await store.list({ prefix: `objects/${objectType}/by-id/`, directories: false, paginate: true })
+        );
+      } catch (error) {
+        console.warn(`listAllObjectRecords: skipping unlistable object type "${objectType}".`, error);
+        return [];
+      }
+    })
   );
   // Flatten in objectTypes order (unchanged from the old nested loop) so the
   // record order downstream — and any tie-breaking a stable sort over it
   // relies on (audit-feed.ts) — is identical to before; only the per-record
   // loads below run concurrently.
   const items = perTypeItems.flat();
-  const loaded = await mapWithConcurrency(items, STORE_READ_CONCURRENCY, (item) => loadRecord(store, item.key));
+  const loaded = await mapWithConcurrency(items, STORE_READ_CONCURRENCY, (item) =>
+    loadRecordForSweep(store, item.key)
+  );
 
   const records: ObjectRecord[] = [];
   for (const record of loaded) {
@@ -679,6 +788,31 @@ export const listAllObjectRecords = async (
     records.push(record);
   }
   return records;
+};
+
+/**
+ * 2026-08-06 hotfix: `loadRecord` for use inside a bulk sweep
+ * (`listAllObjectRecords`, `inventory`'s list form). A single-object verb
+ * (`get`, `patch`, `checkout`, …) should still let a `loadRecord` failure
+ * propagate — a transient store error there is real and the caller should
+ * see it, not a false 404. But a sweep over every object in the store is a
+ * different contract: it already promises callers ("unreadable/unparseable
+ * keys are skipped, never thrown on" — see `listAllObjectRecords`'s doc
+ * comment) that one bad key degrades that ONE row, not the whole response.
+ * That promise held for JSON.parse failures but not for `store.get` itself
+ * rejecting — and once record loads run with real concurrency
+ * (`STORE_READ_CONCURRENCY`) instead of one at a time, a single transient
+ * Netlify Blobs read failure under the resulting burst load reliably turned
+ * into "Object request could not be processed" for the ENTIRE content
+ * library, every time it fired. This closes that gap for the sweep paths.
+ */
+const loadRecordForSweep = async (store: ObjectVerbStore, key: string): Promise<ObjectRecord | undefined> => {
+  try {
+    return await loadRecord(store, key);
+  } catch (error) {
+    console.warn(`Sweep: skipping unreadable object record at "${key}".`, error);
+    return undefined;
+  }
 };
 
 // ─── the dispatcher ───────────────────────────────────────────────────────────
@@ -740,17 +874,29 @@ export const handleObjectVerb = async (
       };
       const types = request.object_type ? [request.object_type] : objectTypes;
       // The per-type listings are independent — issue them together; final
-      // output order comes from the sort below regardless of load order.
+      // output order comes from the sort below regardless of load order. A
+      // transient failure listing one type degrades to "0 rows from that
+      // type this sweep" rather than failing the whole request — matches the
+      // per-record resilience below (2026-08-06 hotfix).
       const perTypeItems = await Promise.all(
-        types.map((objectType) =>
-          store
-            .list({ prefix: `objects/${objectType}/by-id/`, directories: false, paginate: true })
-            .then(collectBlobListItems)
-        )
+        types.map(async (objectType) => {
+          // 2026-08-06 hotfix follow-up: see listAllObjectRecords above —
+          // chaining `.then()` off `store.list()`'s return value throws
+          // synchronously when that value isn't a real Promise, before
+          // `.catch()` can attach. Await it first instead.
+          try {
+            return await collectBlobListItems(
+              await store.list({ prefix: `objects/${objectType}/by-id/`, directories: false, paginate: true })
+            );
+          } catch (error) {
+            console.warn(`inventory: skipping unlistable object type "${objectType}".`, error);
+            return [];
+          }
+        })
       );
       const inventoryItems = perTypeItems.flat();
       const loadedRecords = await mapWithConcurrency(inventoryItems, STORE_READ_CONCURRENCY, (item) =>
-        loadRecord(store, item.key)
+        loadRecordForSweep(store, item.key)
       );
       const rows: InventoryRow[] = [];
       for (const record of loadedRecords) {
@@ -1439,6 +1585,11 @@ export const handleObjectVerb = async (
           return err(400, { error: 'Could not mint an id for a patch op', detail: error.message });
         throw error;
       }
+      // D3-sharedref: after ids are minted (so upsert_section always has a
+      // section.id to address) but before the engine applies anything —
+      // stamps data.sectionName on any op that creates/touches a shared_ref
+      // section, reading the CURRENT (pre-patch) record for update_section_data.
+      normalizedOps = stampSharedRefSectionNames(normalizedOps, record.body, context);
 
       let appliedRecord: ObjectRecord;
       try {
