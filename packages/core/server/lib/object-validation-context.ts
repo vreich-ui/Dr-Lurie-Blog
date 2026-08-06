@@ -135,18 +135,22 @@ export const buildStoreValidationContext = async (
   // this sweep" rather than failing validation context-build entirely
   // (2026-08-06 hotfix — matches the per-record resilience below).
   const perTypeItems = await Promise.all(
-    objectTypes.map((objectType) =>
-      store
-        .list({ prefix: `objects/${objectType}/by-id/`, directories: false, paginate: true })
-        .then(async (listResult) => ({
-          objectType,
-          items: await collectBlobListItems(listResult),
-        }))
-        .catch((error: unknown) => {
-          console.warn(`buildStoreValidationContext: skipping unlistable object type "${objectType}".`, error);
-          return { objectType, items: [] as BlobListItem[] };
-        })
-    )
+    objectTypes.map(async (objectType) => {
+      // 2026-08-06 hotfix follow-up: chaining `.then()` directly off
+      // `store.list()`'s return value throws SYNCHRONOUSLY when that value
+      // isn't a real Promise (e.g. a plain AsyncIterable, which is what
+      // `{ paginate: true }` can return) — before `.catch()` can ever
+      // attach. That made this sweep fail 100% of the time, for every call,
+      // regardless of data. Awaiting it first (which works for both a
+      // Promise and a plain value) is what makes the try/catch effective.
+      try {
+        const listResult = await store.list({ prefix: `objects/${objectType}/by-id/`, directories: false, paginate: true });
+        return { objectType, items: await collectBlobListItems(listResult) };
+      } catch (error) {
+        console.warn(`buildStoreValidationContext: skipping unlistable object type "${objectType}".`, error);
+        return { objectType, items: [] as BlobListItem[] };
+      }
+    })
   );
   const keyedItems = perTypeItems.flatMap(({ objectType, items }) =>
     items.map((item) => ({ objectType, key: item.key }))

@@ -687,15 +687,25 @@ export const listAllObjectRecords = async (
   // sweep" rather than failing the whole request — matches the per-record
   // resilience below (2026-08-06 hotfix).
   const perTypeItems = await Promise.all(
-    objectTypes.map((objectType) =>
-      store
-        .list({ prefix: `objects/${objectType}/by-id/`, directories: false, paginate: true })
-        .then(collectBlobListItems)
-        .catch((error: unknown) => {
-          console.warn(`listAllObjectRecords: skipping unlistable object type "${objectType}".`, error);
-          return [];
-        })
-    )
+    objectTypes.map(async (objectType) => {
+      // 2026-08-06 hotfix follow-up: `store.list(..., { paginate: true })` can
+      // return a plain AsyncIterable (not a Promise) rather than resolving to
+      // one — chaining `.then()` directly off its return value throws
+      // SYNCHRONOUSLY ("...list(...).then is not a function") the instant
+      // this runs, before `.catch()` can ever attach, which aborted this
+      // sweep 100% of the time regardless of data (the bug the `.catch()`
+      // above was meant to guard against, but never actually could). `await`
+      // works for both a Promise and a plain value, so awaiting first is
+      // what actually makes the try/catch below effective.
+      try {
+        return await collectBlobListItems(
+          await store.list({ prefix: `objects/${objectType}/by-id/`, directories: false, paginate: true })
+        );
+      } catch (error) {
+        console.warn(`listAllObjectRecords: skipping unlistable object type "${objectType}".`, error);
+        return [];
+      }
+    })
   );
   // Flatten in objectTypes order (unchanged from the old nested loop) so the
   // record order downstream — and any tie-breaking a stable sort over it
@@ -779,15 +789,20 @@ export const handleObjectVerb = async (
       // type this sweep" rather than failing the whole request — matches the
       // per-record resilience below (2026-08-06 hotfix).
       const perTypeItems = await Promise.all(
-        types.map((objectType) =>
-          store
-            .list({ prefix: `objects/${objectType}/by-id/`, directories: false, paginate: true })
-            .then(collectBlobListItems)
-            .catch((error: unknown) => {
-              console.warn(`inventory: skipping unlistable object type "${objectType}".`, error);
-              return [];
-            })
-        )
+        types.map(async (objectType) => {
+          // 2026-08-06 hotfix follow-up: see listAllObjectRecords above —
+          // chaining `.then()` off `store.list()`'s return value throws
+          // synchronously when that value isn't a real Promise, before
+          // `.catch()` can attach. Await it first instead.
+          try {
+            return await collectBlobListItems(
+              await store.list({ prefix: `objects/${objectType}/by-id/`, directories: false, paginate: true })
+            );
+          } catch (error) {
+            console.warn(`inventory: skipping unlistable object type "${objectType}".`, error);
+            return [];
+          }
+        })
       );
       const inventoryItems = perTypeItems.flat();
       const loadedRecords = await mapWithConcurrency(inventoryItems, STORE_READ_CONCURRENCY, (item) =>
