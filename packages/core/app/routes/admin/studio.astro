@@ -2,10 +2,17 @@
 // Templates & Themes studio (T9.18) — the visual layer over the W8 recipe
 // family. Owner-tier flows; server-side walls live in admin-object (incl. the
 // verb-level Owner gate on real apply_theme).
+import '@site/config/policy-bindings'; // D2: register the site-identity provider before resolving it below
+import { getSiteIdentity } from '@core/lib/site-identity';
 import AdminLayout from '~/layouts/AdminLayout.astro';
 import StudioApp from '~/admin/Studio';
+
+// D2: resolve identity once, server-side, where process.env is real, and
+// pass it down explicitly — the island must not call getSiteIdentity()
+// itself (the browser has no process.env, so env overrides never reached it).
+const identity = getSiteIdentity();
 ---
 
 <AdminLayout title="Admin — Templates & Themes">
-  <StudioApp client:load />
+  <StudioApp client:load identity={identity} />
 </AdminLayout>
