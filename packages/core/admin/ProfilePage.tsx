@@ -8,6 +8,7 @@
 import { useEffect, useState } from 'react';
 
 import { AdminShell } from './AdminShell';
+import type { SiteIdentity } from '@core/lib/site-identity';
 import { Avatar, Badge, Button, Card, EmptyState, Skeleton, StatusPill } from './primitives';
 import { Input, Select, Switch } from './forms';
 import { useToast } from './overlays';
@@ -160,9 +161,13 @@ function ProfileBody() {
   );
 }
 
-export default function ProfilePage() {
+export interface ProfilePageProps {
+  identity: SiteIdentity;
+}
+
+export default function ProfilePage({ identity }: ProfilePageProps) {
   return (
-    <AdminShell currentPath="/admin/profile" title="Profile">
+    <AdminShell currentPath="/admin/profile" title="Profile" identity={identity}>
       <ProfileBody />
     </AdminShell>
   );

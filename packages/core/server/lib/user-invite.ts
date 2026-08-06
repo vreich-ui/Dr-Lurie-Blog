@@ -16,6 +16,7 @@ import {
   type UserRole,
   type UsersBlobStore,
 } from './users-store.js';
+import { friendlyNameFromEmail } from '../../lib/admin/display-name.js';
 
 export interface GoTrueIdentity {
   url: string;
@@ -59,7 +60,11 @@ export const inviteUser = async (opts: {
     : {
         schema_version: 1,
         email,
-        display_name: email,
+        // D3 (2026-08-06): a friendly default, not the raw email — the
+        // `existing` branch above is taken whenever a record (with whatever
+        // display_name it carries) already exists, so this only ever runs on
+        // a genuinely NEW invite and never overwrites one a user set.
+        display_name: friendlyNameFromEmail(email),
         role: opts.role,
         status: 'invited',
         invited_by: opts.invitedBy,

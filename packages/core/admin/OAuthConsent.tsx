@@ -16,6 +16,7 @@
 import { useEffect, useState } from 'react';
 
 import { AdminShell } from './AdminShell';
+import type { SiteIdentity } from '@core/lib/site-identity';
 import { Button, Card, EmptyState } from './primitives';
 import { IconAlertTriangle } from './icons';
 
@@ -142,9 +143,13 @@ function OAuthConsentBody() {
   );
 }
 
-export default function OAuthConsent() {
+export interface OAuthConsentProps {
+  identity: SiteIdentity;
+}
+
+export default function OAuthConsent({ identity }: OAuthConsentProps) {
   return (
-    <AdminShell currentPath="/admin/authorize" title="Connection request">
+    <AdminShell currentPath="/admin/authorize" title="Connection request" identity={identity}>
       <OAuthConsentBody />
     </AdminShell>
   );
