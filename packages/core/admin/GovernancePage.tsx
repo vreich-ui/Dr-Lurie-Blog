@@ -231,7 +231,7 @@ function GovernanceBody({ identity }: { identity: SiteIdentity }) {
   );
 }
 
-// ─── tracking governance card (W13 T13.12 — the OQ-W13-2 surface) ────────────────────
+// ─── tracking governance card (W13 T13.12 — the OQ-W13-2 surface) ──────────
 
 function TrackingGovernanceCard({
   gov,
@@ -334,7 +334,7 @@ function TrackingGovernanceCard({
   );
 }
 
-// ─── chat tool autonomy table (T9.13 chat_tools override) ────────────────────────────────
+// ─── chat tool autonomy table (T9.13 chat_tools override) ────────────────────────
 
 const AUTONOMY_TONE: Record<ToolAutonomy, 'success' | 'warning' | 'neutral'> = {
   auto: 'success',
