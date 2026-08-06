@@ -152,4 +152,4 @@ export const fetchDiagnostics = async (getToken: GetToken) => {
       artifacts: StoreDiagnostic;
     };
   };
-}
+};
