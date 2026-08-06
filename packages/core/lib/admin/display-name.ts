@@ -33,7 +33,7 @@ export function objectTypeLabel(type: ObjectType): string {
   return OBJECT_TYPE_LABELS[type] ?? titleCase(String(type).replace(/_/g, ' '));
 }
 
-// ─── generic helpers ─────────────────────────────
+// ─── generic helpers ─────────────────────────────────────────────────
 
 type Bag = Record<string, unknown>;
 
@@ -72,7 +72,7 @@ function firstHeadingText(html: string | undefined): string | undefined {
   return text || undefined;
 }
 
-// ─── object display name ───────────────────────────────
+// ─── object display name ──────────────────────────────────────────────
 
 /**
  * A human title for an object, derived from its body. Never returns a raw
@@ -133,7 +133,7 @@ function fallback(record: Pick<ObjectRecord, 'object_type'>): string {
   return `Untitled ${objectTypeLabel(record.object_type).toLowerCase()}`;
 }
 
-// ─── principals + history phrasing ────────────────────────
+// ─── principals + history phrasing ───────────────────────────────────────
 
 // D2(b) (2026-08-06): 'unattributed-agent' is the sentinel object-store.ts /
 // mcp.ts persist when a tool call declares no agent_name (agent_name:
@@ -229,7 +229,7 @@ export const VERB_PHRASES: Record<string, string> = {
   submit_review: 'submitted for review',
   review_decide: 'reviewed',
 
-  // ─── object-patch-ops.ts op names (W15 patch grammar, C§2.0) ─────────
+  // ─── object-patch-ops.ts op names (W15 patch grammar, C§2.0) ───────────
   // Pages / shared sections
   set_page_meta: 'updated page details',
   upsert_section: 'updated a section',
@@ -306,7 +306,7 @@ export function verbToPhrase(entry: Pick<HistoryEntry, 'action' | 'actor' | 'det
   return `${principalName(entry.actor)} ${verb}`;
 }
 
-// ─── id tooltip ────────────────────────────────
+// ─── id tooltip ──────────────────────────────────────────────────────
 
 /** Frames a raw id for a title/tooltip — the only sanctioned place an id shows. */
 export function idTooltip(id: string | undefined): string {
