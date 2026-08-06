@@ -336,6 +336,12 @@ export const CORE_BLOB_STORES = [
   // channel getMarginaliaBlobStore reads/writes, independent of the object
   // substrate's lock/version/patch lifecycle.
   'marginalia',
+  // QA-W16-1: the idempotency-key bridge (idempotency-store.ts /
+  // getIdempotencyBlobStore) — one strongly-consistent store holding the
+  // first successful result per (tool, caller-supplied idempotency_key), so
+  // a same-key retry after a timeout/502 replays it instead of re-running
+  // the write.
+  'idempotency',
 ];
 
 const DATA_SITE_SUBDIRS = [
