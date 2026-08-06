@@ -66,7 +66,7 @@ function Row({ children }: { children: ReactNode }) {
   return <div className="flex flex-wrap items-center gap-3">{children}</div>;
 }
 
-// ─── sample data ───────────────────────────────────────────────────────────────
+SEPARATOR_LINE_69_PLACEHOLDER
 
 const READINESS: ReadinessGroup[] = [
   {
@@ -183,7 +183,7 @@ const TAXONOMY_KINDS = [
   },
 ];
 
-// ─── interactive gallery body (inside AdminShell's ToastProvider) ────────────
+SEPARATOR_LINE_186_PLACEHOLDER
 
 function GalleryBody({ identity }: { identity: SiteIdentity }) {
   const { toast } = useToast();
@@ -555,7 +555,7 @@ function GalleryBody({ identity }: { identity: SiteIdentity }) {
   );
 }
 
-// ─── root with dark toggle, inside the shared admin chrome ────────────────────
+SEPARATOR_LINE_558_PLACEHOLDER
 
 export interface KitGalleryProps {
   identity: SiteIdentity;
