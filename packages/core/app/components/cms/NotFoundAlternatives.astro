@@ -42,7 +42,35 @@ try {
   links = [];
 }
 
-const suggestions = links.filter((link) => link.href && link.text).slice(0, 6);
+// Compare hrefs by normalized path, not string equality: the hardcoded Home
+// link below is built via getHomePermalink() (goes through getPermalink's
+// trailingSlash/BASE_PATHNAME logic), while a flattened `route`-kind NavTarget
+// href is the raw stored string (createNavTargetResolver returns
+// `target.href` verbatim for 'route' — see site-nav-targets.ts) — so "/" and
+// a differently-normalized "/" (or an absolute variant) must still compare
+// equal.
+const stripTrailingSlash = (value: string) => (value.length > 1 && value.endsWith('/') ? value.slice(0, -1) : value);
+const normalizeHref = (href: string): string => {
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(href)) {
+    try {
+      const url = new URL(href);
+      return stripTrailingSlash(url.origin + url.pathname);
+    } catch {
+      return stripTrailingSlash(href);
+    }
+  }
+  return stripTrailingSlash(href);
+};
+const homeHref = normalizeHref(getHomePermalink());
+// A flattened dropdown (e.g. drlurie's titled "Start Here" group, or any
+// site's titleless primary group) commonly surfaces the same "Home" entry
+// the header always carries — see nav_header.json's g_start_here/g_primary
+// i_home item on every site. The hardcoded Home link above already covers
+// that destination, so drop it from the flattened list BEFORE truncating to
+// 6 (truncating first would silently swallow a real 6th suggestion instead).
+const suggestions = links
+  .filter((link) => link.href && link.text && normalizeHref(link.href) !== homeHref)
+  .slice(0, 6);
 ---
 
 <nav class="mt-8 not-prose" aria-label="Suggested pages">
