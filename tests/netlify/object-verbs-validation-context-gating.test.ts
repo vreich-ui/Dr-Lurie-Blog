@@ -46,7 +46,7 @@ const createMemoryStore = () => {
 };
 type Store = ReturnType<typeof createMemoryStore>;
 
-// ═══ (a) the predicate itself ════════════════════════════════════════════════════════════════════
+// ═══ (a) the predicate itself ═════════════════════════════════════════════════════════════
 
 test('verbNeedsValidationContext: false for pure reads and lock-only verbs', () => {
   const noContextNeeded: ObjectVerbAction[] = [
@@ -91,7 +91,7 @@ test('verbNeedsValidationContext: unrecognized future actions fail closed (defau
   assert.equal(verbNeedsValidationContext('some_future_verb' as ObjectVerbAction), true);
 });
 
-// ═══ (b) the write path keeps its teeth ══════════════════════════════════════════════════
+// ═══ (b) the write path keeps its teeth ══════════════════════════════════════════════════════
 
 const validPageBody = () => ({
   route: '/',
@@ -185,4 +185,114 @@ test('an inventory request never needs (and, per the predicate, never gets) a va
   assert.equal(res.status, 200, JSON.stringify(res.body));
   const objects = res.body.objects as { object_id: string }[];
   assert.ok(objects.some((o) => o.object_id === 'page_seed'));
+});
+
+// ═══ (c) D3-sharedref composed with the gating (integration-branch merge, 59ca018 + D3) ═══
+//
+// object-verbs-shared-ref-stamp.test.ts proves resolveSharedSectionName works
+// when handed a real buildStoreValidationContext(...) result directly. It
+// does NOT prove that the *gated* call-site pattern the three HTTP entry
+// points (admin-object.ts / object-store.ts / agent/context.ts) actually use
+// — `if (verbNeedsValidationContext(action)) { validationContext = await
+// buildStoreValidationContext(...) }` — still hands `patch` a context whose
+// `records` map is populated by the time stampSharedRefSectionNames runs.
+// This reproduces that exact call-site shape (not a shortcut straight to
+// buildStoreValidationContext) so a future change to the predicate, or to
+// buildStoreValidationContext's parallel sweep, that silently starves
+// `patch` of a populated context fails THIS test, not just production.
+
+const gatedValidationContextFor = async (
+  store: ObjectVerbStore,
+  action: ObjectVerbAction,
+  self: Parameters<typeof buildStoreValidationContext>[1]
+) => (verbNeedsValidationContext(action) ? await buildStoreValidationContext(store, self) : undefined);
+
+test('patch (upsert_section shared_ref) resolves the target display name through the SAME gated context-build the real HTTP call sites use', async () => {
+  const store = createMemoryStore() as unknown as ObjectVerbStore;
+  const typedStore = store as unknown as Store;
+
+  const page = {
+    object_id: 'page_gate_test',
+    object_type: 'page' as const,
+    schema_version: 'page.v1',
+    site: 'site_drlurie',
+    created_at: '2026-07-20T00:00:00.000Z',
+    updated_at: '2026-07-20T00:00:00.000Z',
+    status: 'active' as const,
+    body: {
+      route: '/gate-test',
+      pageType: 'standard',
+      title: 'Gate test',
+      seo: { description: 'x' },
+      sections: [{ id: 's_hero', type: 'hero', data: { heading: 'Hi', actions: [] } }],
+    },
+    publication: { published_time: null },
+    history: [],
+    version: 1,
+    content_revision: 1,
+    lock: {
+      token: 'lock-gate-test',
+      owner_id: 'u1',
+      owner_label: 'editor@example.com',
+      acquired_at: '2026-07-20T12:00:00.000Z',
+      expires_at: '2026-07-20T12:30:00.000Z',
+    },
+  };
+  const target = {
+    object_id: 'sec_gate_target',
+    object_type: 'section' as const,
+    schema_version: 'section.v1',
+    site: 'site_drlurie',
+    created_at: '2026-07-20T00:00:00.000Z',
+    updated_at: '2026-07-20T00:00:00.000Z',
+    status: 'active' as const,
+    body: {
+      section: { id: 's_gate_target', type: 'prose', data: { body: '<h2>Gated Sweep Target</h2>' } },
+    },
+    publication: { published_time: null },
+    history: [],
+    version: 1,
+    content_revision: 1,
+  };
+  typedStore.blobs.set('objects/page/by-id/page_gate_test.json', JSON.stringify(page));
+  typedStore.blobs.set('objects/section/by-id/sec_gate_target.json', JSON.stringify(target));
+
+  // verbNeedsValidationContext('patch') must be true, and this call is the
+  // production call-site shape, not a direct buildStoreValidationContext call.
+  assert.equal(verbNeedsValidationContext('patch'), true);
+  const validationContext = await gatedValidationContextFor(store, 'patch', {
+    selfObjectId: page.object_id,
+    selfObjectType: 'page',
+  });
+  assert.ok(validationContext, 'patch must receive a built context, not undefined, from the gated call site');
+
+  const res = await handleObjectVerb(
+    store,
+    {
+      action: 'patch',
+      object_type: 'page',
+      object_id: page.object_id,
+      lock_token: 'lock-gate-test',
+      expected_record_version: page.version,
+      ops: [
+        {
+          op: 'upsert_section',
+          section: { id: 's_sharedgate', type: 'shared_ref', data: { section: target.object_id } },
+        },
+      ],
+    },
+    AGENT,
+    { nowMs: NOW, validationContext }
+  );
+
+  assert.equal(res.status, 200, JSON.stringify(res.body));
+  const stored = JSON.parse(typedStore.blobs.get('objects/page/by-id/page_gate_test.json')!);
+  const shared = stored.body.sections.find((s: { id: string }) => s.id === 's_sharedgate');
+  assert.ok(shared, 'the shared_ref section was written');
+  assert.equal(
+    shared.data.sectionName,
+    'Gated Sweep Target',
+    'the gated call-site context (verbNeedsValidationContext + buildStoreValidationContext) must still populate ' +
+      "records so resolveSharedSectionName resolves the target's real display name, not degrade to unresolved"
+  );
 });

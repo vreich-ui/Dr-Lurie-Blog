@@ -19,12 +19,13 @@
  */
 import { readArtifactReference, type ArtifactIndexStore } from './artifact-index.js';
 import { MAJOR_KEY_ARTIFACT_REF_RE, PUBLIC_ARTIFACT_PATH_RE, rawArtifactRefForPublicPath } from './artifact-trust.js';
-import { collectBlobListItems, mapWithConcurrency, STORE_READ_CONCURRENCY } from './blob-list.js';
+import { collectBlobListItems, mapWithConcurrency, STORE_READ_CONCURRENCY, type BlobListItem } from './blob-list.js';
 import { loadContentItemIds } from './content-item-index.js';
 import type { ArtifactRefResolution, ObjectValidationContext, PageTypeConstraint } from './object-validate.js';
 import type { ObjectVerbStore } from './object-verbs.js';
 import { getPageTypeDefinition } from '../../lib/registry/page-types.js';
 import { isRegisteredSectionType } from '../../lib/registry/components/registered-types.js';
+import { objectDisplayName } from '../../lib/admin/display-name.js';
 import { objectTypes, type ObjectRecord, type ObjectType } from '../../schema/object-record-v1.js';
 import type { SectionType } from '../../schema/bodies/section-v1.js';
 
@@ -131,21 +132,43 @@ export const buildStoreValidationContext = async (
   // one at a time; then load every listed record with bounded concurrency
   // instead of one `get` at a time. `records` is a Map keyed by
   // `${objectType}:${object_id}`, so load order never affects its contents.
+  // A transient failure listing one type degrades to "0 items from that type
+  // this sweep" rather than failing validation context-build entirely
+  // (2026-08-06 hotfix — matches the per-record resilience below).
   const perTypeItems = await Promise.all(
-    objectTypes.map((objectType) =>
-      store
-        .list({ prefix: `objects/${objectType}/by-id/`, directories: false, paginate: true })
-        .then(async (listResult) => ({
-          objectType,
-          items: await collectBlobListItems(listResult),
-        }))
-    )
+    objectTypes.map(async (objectType) => {
+      // 2026-08-06 hotfix follow-up: chaining `.then()` directly off
+      // `store.list()`'s return value throws SYNCHRONOUSLY when that value
+      // isn't a real Promise (e.g. a plain AsyncIterable, which is what
+      // `{ paginate: true }` can return) — before `.catch()` can ever
+      // attach. That made this sweep fail 100% of the time, for every call,
+      // regardless of data. Awaiting it first (which works for both a
+      // Promise and a plain value) is what makes the try/catch effective.
+      try {
+        const listResult = await store.list({ prefix: `objects/${objectType}/by-id/`, directories: false, paginate: true });
+        return { objectType, items: await collectBlobListItems(listResult) };
+      } catch (error) {
+        console.warn(`buildStoreValidationContext: skipping unlistable object type "${objectType}".`, error);
+        return { objectType, items: [] as BlobListItem[] };
+      }
+    })
   );
   const keyedItems = perTypeItems.flatMap(({ objectType, items }) =>
     items.map((item) => ({ objectType, key: item.key }))
   );
   await mapWithConcurrency(keyedItems, STORE_READ_CONCURRENCY, async ({ objectType, key }) => {
-    const raw = await store.get(key);
+    // 2026-08-06 hotfix: a `store.get` here used to run one-at-a-time; now it
+    // runs with real concurrency (STORE_READ_CONCURRENCY), so a single
+    // transient Netlify Blobs read failure under that burst load must not
+    // abort context-building for every other object — same contract this
+    // block already gives a corrupt/unparseable record below.
+    let raw: string | null;
+    try {
+      raw = await store.get(key);
+    } catch (error) {
+      console.warn(`buildStoreValidationContext: skipping unreadable object record at "${key}".`, error);
+      return;
+    }
     if (!raw) return;
     try {
       const record = JSON.parse(raw) as ObjectRecord;
@@ -178,6 +201,21 @@ export const buildStoreValidationContext = async (
     const body = records.get(`section:${objectId}`)?.body;
     if (!isRecord(body) || !isRecord(body.section) || typeof body.section.type !== 'string') return undefined;
     return body.section.type as SectionType;
+  };
+
+  // D3-sharedref: the resolveSharedSectionType sibling for display names —
+  // reuses the SAME preloaded `records` snapshot (no extra store read), and
+  // the SAME derivation (`objectDisplayName`) the admin object list already
+  // uses to title a shared 'section' object, so the stamped name matches what
+  // that object is called everywhere else in the admin. `objectDisplayName`
+  // always returns a string (its own "Untitled section" fallback for a
+  // nameless target), so a `records` miss (dangling ref — target deleted) is
+  // the only `undefined` case here; the write path leaves `sectionName`
+  // unset rather than stamping a `null` sentinel (see object-verbs.ts's
+  // stampSharedRefSectionNames for why null specifically can't be used).
+  const resolveSharedSectionName: ObjectValidationContext['resolveSharedSectionName'] = (objectId) => {
+    const record = records.get(`section:${objectId}`);
+    return record ? objectDisplayName(record) : undefined;
   };
 
   // The resolveSharedSectionType sibling for template slot blueprintRefs
@@ -277,6 +315,7 @@ export const buildStoreValidationContext = async (
   return {
     resolveObject,
     resolveSharedSectionType,
+    resolveSharedSectionName,
     resolveSectionTemplateType,
     isRouteTaken,
     isSlugTaken,
