@@ -409,6 +409,7 @@ const searchTitle = searchBrand ? `Search ${searchBrand}` : 'Search';
 
     dropdowns.forEach((dropdown) => {
       const menu = dropdown.querySelector<HTMLElement>('.dropdown-menu');
+      const trigger = dropdown.querySelector<HTMLButtonElement>('[data-mobile-accordion-trigger]');
 
       dropdown.addEventListener('mouseenter', () => openDropdown(dropdown), { signal: controller.signal });
       dropdown.addEventListener('mouseleave', () => scheduleClose(dropdown), { signal: controller.signal });
@@ -421,6 +422,34 @@ const searchTitle = searchBrand ? `Search ${searchBrand}` : 'Search';
           if (nextFocusedElement instanceof Node && dropdown.contains(nextFocusedElement)) return;
 
           scheduleClose(dropdown);
+        },
+        { signal: controller.signal }
+      );
+
+      // Bug fix: hover/focus alone only ever OPENS a dropdown (openDropdown
+      // is the only thing focusin calls), so re-clicking an already-open
+      // trigger was a silent no-op — the one interaction a mouse user expects
+      // to close it did nothing. `pointerdown` captures whether the dropdown
+      // was open BEFORE this interaction's own focus event can open it;
+      // `click` (which fires after focus) only closes when it truly was
+      // already open, and blurs the trigger so focusin doesn't immediately
+      // reopen it.
+      let pointerDownWasOpen = false;
+      trigger?.addEventListener(
+        'pointerdown',
+        () => {
+          pointerDownWasOpen = dropdown.classList.contains('dropdown-open');
+        },
+        { signal: controller.signal }
+      );
+      trigger?.addEventListener(
+        'click',
+        () => {
+          if (!headerDropdownDesktopQuery.matches) return;
+          if (pointerDownWasOpen) {
+            closeDropdown(dropdown);
+            trigger.blur();
+          }
         },
         { signal: controller.signal }
       );
