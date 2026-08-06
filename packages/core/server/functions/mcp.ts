@@ -31,7 +31,7 @@
  * silent fallback to another tenant's handlers is the one outcome worse than
  * a crash.
  */
-import { randomUUID, timingSafeEqual } from 'node:crypto';
+import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
 
 /**
  * A Netlify function handler, as invoked in-process by the tool bodies.
@@ -401,6 +401,60 @@ const mcpRequestOrigin = (event: LambdaEvent): string =>
   });
 
 /**
+ * perf/drop-verify-hop-cache-scope, Change 3: an uncached governance-blob read
+ * on EVERY single request, even though the same bearer token is presented
+ * over and over by the same long-lived MCP client. A tiny module-scope memo —
+ * 60s TTL, keyed by a SHA-256 hash of the token (never the raw token itself,
+ * so a leaked heap snapshot/log of this map never carries a usable
+ * credential) — removes that read for the common repeat-caller case.
+ *
+ * Only a POSITIVE resolution is ever memoized. An unknown, malformed,
+ * expired, or REVOKED token is never written to the map — every such request
+ * re-checks the store live, every time, so a revocation (or an attacker
+ * guessing tokens) is never masked by a stale cache entry. The memo therefore
+ * only ever makes an ALREADY-valid caller's repeat calls cheaper; it never
+ * makes an invalid caller's calls succeed, or fail slower.
+ *
+ * DELIBERATELY NOT applied to resolveOAuthPrincipalForRequest below: this
+ * repo already has a hard, tested guarantee that an OAuth token revocation
+ * "must take effect on the next request, with no cache to wait out" (see
+ * mcp-oauth.test.ts's "a revoked access token stops working immediately").
+ * A 60s positive memo on that path would let a revoked-but-still-cached OAuth
+ * token keep authorizing requests for up to a minute after /oauth/revoke
+ * returns 200 — a real regression the spec's own "never cache a NEGATIVE
+ * result" instruction does not by itself prevent, since the revoked check
+ * only ever runs again on a cache MISS. Only the per-agent bearer-token path
+ * (getAgentKeysDoc via resolveVerifiedAgentNameForRequest) is memoized: it
+ * carries no equivalent immediate-revocation contract today.
+ */
+const AUTH_MEMO_TTL_MS = 60_000;
+
+type AuthMemoEntry<T> = { value: T; expiresAtMs: number };
+
+const verifiedAgentNameMemo = new Map<string, AuthMemoEntry<string>>();
+
+/** Test-only: clears the auth memo so one test's cached token can't leak into the next. */
+export const resetAuthMemoForTesting = (): void => {
+  verifiedAgentNameMemo.clear();
+};
+
+const hashAuthToken = (token: string): string => createHash('sha256').update(token, 'utf8').digest('hex');
+
+const readAuthMemo = <T>(memo: Map<string, AuthMemoEntry<T>>, key: string, nowMs: number): T | undefined => {
+  const entry = memo.get(key);
+  if (!entry) return undefined;
+  if (entry.expiresAtMs <= nowMs) {
+    memo.delete(key);
+    return undefined;
+  }
+  return entry.value;
+};
+
+const writeAuthMemo = <T>(memo: Map<string, AuthMemoEntry<T>>, key: string, value: T, nowMs: number): void => {
+  memo.set(key, { value, expiresAtMs: nowMs + AUTH_MEMO_TTL_MS });
+};
+
+/**
  * W14 F10: the OAuth resource-server check. A bearer token that resolves to a
  * live, unexpired, correctly-audienced access token in THIS site's store
  * satisfies the gate on its own — that is the whole point of the authorization
@@ -411,6 +465,9 @@ const mcpRequestOrigin = (event: LambdaEvent): string =>
  * secret gate below and, absent that, to a 401. The alternative — 500ing —
  * would turn a blob hiccup into an outage for shared-key callers who never
  * needed OAuth at all.
+ *
+ * NOT memoized — see the Change-3 comment above the auth memo for why this
+ * one path keeps its per-request store read.
  */
 const resolveOAuthPrincipalForRequest = async (
   event: LambdaEvent,
@@ -439,10 +496,17 @@ const resolveOAuthPrincipalForRequest = async (
  * `resolveRolesForPrincipalAsync` already uses for the users-store read.
  */
 const resolveVerifiedAgentNameForRequest = async (event: LambdaEvent, token: string): Promise<string | undefined> => {
+  const nowMs = Date.now();
+  const tokenKey = hashAuthToken(token);
+  const cached = readAuthMemo(verifiedAgentNameMemo, tokenKey, nowMs);
+  if (cached !== undefined) return cached;
+
   try {
     const store = await getGovernanceBlobStore(event);
     const doc = await getAgentKeysDoc(store as unknown as AgentKeysBlobStore);
-    return resolveVerifiedAgentName(token, getSiteIdentity().siteId, doc) ?? undefined;
+    const resolved = resolveVerifiedAgentName(token, getSiteIdentity().siteId, doc) ?? undefined;
+    if (resolved) writeAuthMemo(verifiedAgentNameMemo, tokenKey, resolved, nowMs);
+    return resolved;
   } catch {
     return undefined;
   }
@@ -654,9 +718,7 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
       // forceBuild.
       return withIdempotentToolCall(event, name, input.idempotency_key, () => callReleaseToProduction(event, input));
     case 'create_agent_artifact_job':
-      return withIdempotentToolCall(event, name, input.idempotency_key, () =>
-        callCreateAgentArtifactJob(event, input)
-      );
+      return withIdempotentToolCall(event, name, input.idempotency_key, () => callCreateAgentArtifactJob(event, input));
     case 'get_agent_artifact_job_status':
       return callGetAgentArtifactJobStatus(event, input);
     case 'get_agent_artifact_by_slot':
@@ -1159,6 +1221,12 @@ export const visibleToolDefinitions = (): ToolDefinition[] =>
 export const _mcpInternal = {
   getArtifactIndexBlobStore,
   objectStoreHandler,
+  resetAuthMemoForTesting,
+  readAuthMemo,
+  writeAuthMemo,
+  hashAuthToken,
+  verifiedAgentNameMemo,
+  AUTH_MEMO_TTL_MS,
   resolveReleaseWaitBudgetSeconds,
 };
 

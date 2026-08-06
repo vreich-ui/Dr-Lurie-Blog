@@ -71,8 +71,7 @@ const isNonEmptyString = (value: unknown): value is string => typeof value === '
 /** Bound the key so a caller can't use this as an unbounded-size blob store. */
 const MAX_IDEMPOTENCY_KEY_LENGTH = 200;
 
-const idempotencyBlobKey = (toolName: string, idempotencyKey: string) =>
-  `idem:${toolName}:${idempotencyKey}`;
+const idempotencyBlobKey = (toolName: string, idempotencyKey: string) => `idem:${toolName}:${idempotencyKey}`;
 
 /**
  * Testable core: run `run()` under an idempotency key scoped to `toolName`,
@@ -163,4 +162,59 @@ export const withIdempotentToolCall = async (
 
   const store = await getIdempotencyBlobStore(event);
   return withIdempotencyStore(store, toolName, idempotencyKeyInput, run);
+};
+
+/**
+ * A second, smaller job this same strongly-consistent store is well-suited
+ * for: a plain TTL'd value cache, namespaced so it can never collide with the
+ * `idem:{tool}:{key}` records above. First consumer: mcp-tool-handlers.ts
+ * caches a per-jobId artifact-bridge scope resolution here (perf/drop-verify-
+ * hop-cache-scope) so a poll loop stops re-running the whole object-store
+ * ownership check on every single request. Unlike the idempotency records
+ * above, entries here are safe to overwrite unconditionally — this is a
+ * cache, not a once-only write ledger — and a corrupt/expired/missing entry
+ * is always just a miss, never an error the caller has to handle.
+ */
+type CachedValueEnvelope<T> = { value: T; expiresAtMs: number };
+
+const cachedValueBlobKey = (namespace: string, key: string) => `cache:${namespace}:${key}`;
+
+export const getCachedValue = async <T>(
+  store: IdempotencyBlobStore,
+  namespace: string,
+  key: string,
+  nowMs: number = Date.now()
+): Promise<T | undefined> => {
+  let raw: string | null;
+  try {
+    raw = await store.get(cachedValueBlobKey(namespace, key));
+  } catch {
+    return undefined; // a store read failure is always a cache MISS, never a hard failure
+  }
+  if (!raw) return undefined;
+
+  try {
+    const parsed = JSON.parse(raw) as CachedValueEnvelope<T>;
+    if (typeof parsed.expiresAtMs !== 'number' || parsed.expiresAtMs <= nowMs) return undefined;
+    return parsed.value;
+  } catch {
+    return undefined;
+  }
+};
+
+export const setCachedValue = async <T>(
+  store: IdempotencyBlobStore,
+  namespace: string,
+  key: string,
+  value: T,
+  ttlMs: number,
+  nowMs: number = Date.now()
+): Promise<void> => {
+  const envelope: CachedValueEnvelope<T> = { value, expiresAtMs: nowMs + ttlMs };
+  try {
+    await store.setJSON(cachedValueBlobKey(namespace, key), envelope);
+  } catch {
+    // Best-effort: a cache WRITE failure must never fail the caller's request —
+    // the next call simply falls through to a live resolve again.
+  }
 };
