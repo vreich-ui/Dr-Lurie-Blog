@@ -19,7 +19,7 @@
  */
 import { readArtifactReference, type ArtifactIndexStore } from './artifact-index.js';
 import { MAJOR_KEY_ARTIFACT_REF_RE, PUBLIC_ARTIFACT_PATH_RE, rawArtifactRefForPublicPath } from './artifact-trust.js';
-import { collectBlobListItems } from './blob-list.js';
+import { collectBlobListItems, mapWithConcurrency, STORE_READ_CONCURRENCY } from './blob-list.js';
 import { loadContentItemIds } from './content-item-index.js';
 import type { ArtifactRefResolution, ObjectValidationContext, PageTypeConstraint } from './object-validate.js';
 import type { ObjectVerbStore } from './object-verbs.js';
@@ -127,19 +127,33 @@ export const buildStoreValidationContext = async (
   // posts additionally resolve via the content-item index below (trap 4) —
   // both families answer content_item references and share the slug space.
   const records = new Map<string, ObjectRecord>();
-  for (const objectType of objectTypes) {
-    const listResult = await store.list({ prefix: `objects/${objectType}/by-id/`, directories: false, paginate: true });
-    for (const item of await collectBlobListItems(listResult)) {
-      const raw = await store.get(item.key);
-      if (!raw) continue;
-      try {
-        const record = JSON.parse(raw) as ObjectRecord;
-        records.set(`${objectType}:${record.object_id}`, record);
-      } catch {
-        // A corrupt record shouldn't crash validation; treat it as absent.
-      }
+  // The 13 per-type listings are independent — issue them together instead of
+  // one at a time; then load every listed record with bounded concurrency
+  // instead of one `get` at a time. `records` is a Map keyed by
+  // `${objectType}:${object_id}`, so load order never affects its contents.
+  const perTypeItems = await Promise.all(
+    objectTypes.map((objectType) =>
+      store
+        .list({ prefix: `objects/${objectType}/by-id/`, directories: false, paginate: true })
+        .then(async (listResult) => ({
+          objectType,
+          items: await collectBlobListItems(listResult),
+        }))
+    )
+  );
+  const keyedItems = perTypeItems.flatMap(({ objectType, items }) =>
+    items.map((item) => ({ objectType, key: item.key }))
+  );
+  await mapWithConcurrency(keyedItems, STORE_READ_CONCURRENCY, async ({ objectType, key }) => {
+    const raw = await store.get(key);
+    if (!raw) return;
+    try {
+      const record = JSON.parse(raw) as ObjectRecord;
+      records.set(`${objectType}:${record.object_id}`, record);
+    } catch {
+      // A corrupt record shouldn't crash validation; treat it as absent.
     }
-  }
+  });
 
   // Committed article ids (filenames under src/data/post, via the GitHub
   // contents API — the W3 source of truth). `undefined` when the lookup is

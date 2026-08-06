@@ -28,6 +28,7 @@ import { getGovernanceBlobStore, resolveActivePolicies } from '../lib/governance
 import {
   handleObjectVerb,
   objectVerbRequestSchema,
+  verbNeedsValidationContext,
   type AgentLearningWriteStore,
   type ObjectVerbStore,
 } from '../lib/object-verbs.js';
@@ -88,17 +89,26 @@ const buildHandlerImpl = (binding: SiteBinding) => async (event: LambdaEvent, co
     // instantiate_section (W8.2) validates the TARGET page under its own id —
     // without the self ref, route uniqueness would flag the page's own route.
     const targetPageId = requestData.target?.kind === 'page' ? requestData.target.page_id : undefined;
-    // Artifact existence checks — same wiring as object-store.ts; an
-    // unavailable index store degrades to "existence not verified".
-    const artifactIndexStore = (await getArtifactIndexBlobStore(event).catch(() => undefined)) as unknown as
-      | ArtifactIndexStore
-      | undefined;
-    const validationContext = await buildStoreValidationContext(store, {
-      selfObjectId: requestData.object_id ?? targetPageId,
-      selfObjectType: requestData.object_type ?? (targetPageId ? 'page' : undefined),
-      ...(artifactIndexStore ? { artifactIndexStore } : {}),
-      artifactRefSources: [parsed.value],
-    });
+    // Perf: a validation context costs a full sweep of every object across all
+    // 13 types (plus a GitHub content-item lookup) — skip building one (and
+    // skip opening the artifact-index store that only feeds it) for verbs that
+    // never read it (pure reads, lock verbs — see verbNeedsValidationContext).
+    // Every mutating/body-validating verb still gets the identical live context
+    // as before.
+    let validationContext: Awaited<ReturnType<typeof buildStoreValidationContext>> | undefined;
+    if (verbNeedsValidationContext(request.data.action)) {
+      // Artifact existence checks — same wiring as object-store.ts; an
+      // unavailable index store degrades to "existence not verified".
+      const artifactIndexStore = (await getArtifactIndexBlobStore(event).catch(() => undefined)) as unknown as
+        | ArtifactIndexStore
+        | undefined;
+      validationContext = await buildStoreValidationContext(store, {
+        selfObjectId: requestData.object_id ?? targetPageId,
+        selfObjectType: requestData.object_type ?? (targetPageId ? 'page' : undefined),
+        ...(artifactIndexStore ? { artifactIndexStore } : {}),
+        artifactRefSources: [parsed.value],
+      });
+    }
     // T9.4/S1: the acting human's roles server-side, so owner-only verb
     // options (checkin{force}) are gated by the real tier, not client claims —
     // reuse what resolveAdminAccessFromEvent already resolved above instead of

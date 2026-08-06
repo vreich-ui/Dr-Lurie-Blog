@@ -27,7 +27,7 @@
  */
 import { z } from 'zod';
 
-import { collectBlobListItems, type BlobListResponse } from './blob-list.js';
+import { collectBlobListItems, mapWithConcurrency, STORE_READ_CONCURRENCY, type BlobListResponse } from './blob-list.js';
 import {
   checkinObjectLock,
   checkoutObjectLock,
@@ -364,6 +364,50 @@ export const objectVerbRequestSchema = z.discriminatedUnion('action', [
 export type ObjectVerbRequest = z.infer<typeof objectVerbRequestSchema>;
 export type ObjectVerbAction = ObjectVerbRequest['action'];
 
+/**
+ * Whether `action` needs a fully-built `ObjectValidationContext` to behave
+ * correctly. Building one (`buildStoreValidationContext`) means a full sweep
+ * of every object across all types — expensive, and pointless for an action
+ * that never reads `context`. Checked against every `case` in the switch
+ * below: only branches that call `validateObject` / `validateCandidatePatch`
+ * — directly, via a `dry_run` preview, or by recursing into `create`/`patch`
+ * — actually consult it.
+ *
+ * Pure reads (`get`/`list`/`inventory`) and the lock-only verbs
+ * (`checkout`/`refresh_lock`/`checkin`) obviously never validate a body.
+ * Less obviously, `submit_review`/`review_decide`/`discard` (review-state.ts),
+ * `retire` (object-retire.ts), `purge_archived` (object-purge.ts), and the
+ * four `marginalia_*` actions (marginalia-store.ts) ALSO never read a
+ * validation context today — confirmed by reading each callee, not assumed.
+ *
+ * Any action not explicitly matched here defaults to `true`: an unrecognized
+ * future verb fails closed (slow-but-correct), never unsafe-but-fast.
+ */
+export const verbNeedsValidationContext = (action: ObjectVerbRequest['action']): boolean => {
+  switch (action) {
+    case 'get':
+    case 'list':
+    case 'inventory':
+    case 'checkout':
+    case 'refresh_lock':
+    case 'checkin':
+    case 'submit_review':
+    case 'review_decide':
+    case 'discard':
+    case 'purge_archived':
+    case 'retire':
+    case 'marginalia_create':
+    case 'marginalia_reply':
+    case 'marginalia_list':
+    case 'marginalia_resolve':
+      return false;
+    default:
+      // create, create_variant, instantiate, instantiate_section,
+      // apply_theme, patch, validate, publish_by_time — and anything future.
+      return true;
+  }
+};
+
 export type ObjectVerbResult = { status: number; body: Record<string, unknown> };
 
 export type HandleObjectVerbOptions = {
@@ -612,20 +656,27 @@ export const listAllObjectRecords = async (
   store: ObjectVerbStore,
   options: { status?: 'active' | 'archived' } = {}
 ): Promise<ObjectRecord[]> => {
+  // The 13 per-type listings are independent — issue them together instead of
+  // one at a time (no ordering constraint on `list` itself).
+  const perTypeItems = await Promise.all(
+    objectTypes.map((objectType) =>
+      store
+        .list({ prefix: `objects/${objectType}/by-id/`, directories: false, paginate: true })
+        .then(collectBlobListItems)
+    )
+  );
+  // Flatten in objectTypes order (unchanged from the old nested loop) so the
+  // record order downstream — and any tie-breaking a stable sort over it
+  // relies on (audit-feed.ts) — is identical to before; only the per-record
+  // loads below run concurrently.
+  const items = perTypeItems.flat();
+  const loaded = await mapWithConcurrency(items, STORE_READ_CONCURRENCY, (item) => loadRecord(store, item.key));
+
   const records: ObjectRecord[] = [];
-  for (const objectType of objectTypes) {
-    const listResult = await store.list({
-      prefix: `objects/${objectType}/by-id/`,
-      directories: false,
-      paginate: true,
-    });
-    const items = await collectBlobListItems(listResult);
-    for (const item of items) {
-      const record = await loadRecord(store, item.key);
-      if (!record) continue;
-      if (options.status && record.status !== options.status) continue;
-      records.push(record);
-    }
+  for (const record of loaded) {
+    if (!record) continue;
+    if (options.status && record.status !== options.status) continue;
+    records.push(record);
   }
   return records;
 };
@@ -688,20 +739,24 @@ export const handleObjectVerb = async (
         pending_changes: request.pending_changes,
       };
       const types = request.object_type ? [request.object_type] : objectTypes;
+      // The per-type listings are independent — issue them together; final
+      // output order comes from the sort below regardless of load order.
+      const perTypeItems = await Promise.all(
+        types.map((objectType) =>
+          store
+            .list({ prefix: `objects/${objectType}/by-id/`, directories: false, paginate: true })
+            .then(collectBlobListItems)
+        )
+      );
+      const inventoryItems = perTypeItems.flat();
+      const loadedRecords = await mapWithConcurrency(inventoryItems, STORE_READ_CONCURRENCY, (item) =>
+        loadRecord(store, item.key)
+      );
       const rows: InventoryRow[] = [];
-      for (const objectType of types) {
-        const listResult = await store.list({
-          prefix: `objects/${objectType}/by-id/`,
-          directories: false,
-          paginate: true,
-        });
-        const items = await collectBlobListItems(listResult);
-        for (const item of items) {
-          const record = await loadRecord(store, item.key);
-          if (!record) continue;
-          const row = inventoryRowFromRecord(record, ts, options.approvalPolicy);
-          if (matchesInventoryFilters(row, filters)) rows.push(row);
-        }
+      for (const record of loadedRecords) {
+        if (!record) continue;
+        const row = inventoryRowFromRecord(record, ts, options.approvalPolicy);
+        if (matchesInventoryFilters(row, filters)) rows.push(row);
       }
       rows.sort(compareInventoryRows(objectTypes));
       return ok({ objects: rows, generated_at: timestamp });

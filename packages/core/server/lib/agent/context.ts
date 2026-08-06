@@ -9,7 +9,12 @@
 import type { ArtifactIndexStore } from '../artifact-index.js';
 import { listArtifactReferencesForRequest } from '../artifact-index.js';
 import { resolveActivePolicies, type GovernanceBlobStore } from '../governance-store.js';
-import { handleObjectVerb, objectVerbRequestSchema, type ObjectVerbStore } from '../object-verbs.js';
+import {
+  handleObjectVerb,
+  objectVerbRequestSchema,
+  verbNeedsValidationContext,
+  type ObjectVerbStore,
+} from '../object-verbs.js';
 import { buildStoreValidationContext } from '../object-validation-context.js';
 import { summarizeValidation, validateObject } from '../object-validate.js';
 import type { Role } from '../roles.js';
@@ -64,7 +69,14 @@ export const buildToolContext = (deps: ToolContextDeps): ToolContext => {
         return { status: 400, body: { error: 'Invalid verb request.', issues: parsed.error.issues } };
       }
       const { approval, creation } = await policies();
-      const validationContext = await validationContextFor(request);
+      // Perf: this ToolContext dispatches EVERY verb the chat/agent tool
+      // surface can call, including the pure reads (get/list/inventory) and
+      // lock verbs — building a validation context (a full store sweep) for
+      // those is pure overhead. See verbNeedsValidationContext for exactly
+      // which actions read it.
+      const validationContext = verbNeedsValidationContext(parsed.data.action)
+        ? await validationContextFor(request)
+        : undefined;
       return handleObjectVerb(deps.objectStore, parsed.data, deps.principal, {
         ...(deps.nowMs ? { nowMs: deps.nowMs() } : {}),
         validationContext,

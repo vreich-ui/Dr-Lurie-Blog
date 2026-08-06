@@ -20,7 +20,12 @@ import { PLATFORM_ENV_NAMES, readBoundEnv, type SiteBinding } from '../lib/site-
 import { getHeader } from '../lib/admin-auth.js';
 import type { ArtifactIndexStore } from '../lib/artifact-index.js';
 import { getArtifactIndexBlobStore, getMarginaliaBlobStore, getSiteObjectsBlobStore } from '../lib/blob-store.js';
-import { handleObjectVerb, objectVerbRequestSchema, type ObjectVerbStore } from '../lib/object-verbs.js';
+import {
+  handleObjectVerb,
+  objectVerbRequestSchema,
+  verbNeedsValidationContext,
+  type ObjectVerbStore,
+} from '../lib/object-verbs.js';
 import type { MarginaliaStore } from '../lib/marginalia-store.js';
 import { buildStoreValidationContext } from '../lib/object-validation-context.js';
 import type { ObjectType } from '../../schema/object-record-v1.js';
@@ -101,18 +106,27 @@ const buildHandlerImpl = (binding: SiteBinding) => async (event: LambdaEvent) =>
     // instantiate_section (W8.2) validates the TARGET page under its own id —
     // without the self ref, route uniqueness would flag the page's own route.
     const targetPageId = requestData.target?.kind === 'page' ? requestData.target.page_id : undefined;
-    // Artifact existence checks (Fix: asset refs were shape-only in production).
-    // An unavailable index store degrades to "existence not verified", never a
-    // failed write.
-    const artifactIndexStore = (await getArtifactIndexBlobStore(event).catch(() => undefined)) as unknown as
-      | ArtifactIndexStore
-      | undefined;
-    const validationContext = await buildStoreValidationContext(store, {
-      selfObjectId: requestData.object_id ?? targetPageId,
-      selfObjectType: requestData.object_type ?? (targetPageId ? 'page' : undefined),
-      ...(artifactIndexStore ? { artifactIndexStore } : {}),
-      artifactRefSources: [parsed.value],
-    });
+    // Perf: a validation context costs a full sweep of every object across all
+    // 13 types (plus a GitHub content-item lookup) — skip building one (and
+    // skip opening the artifact-index store that only feeds it) for verbs that
+    // never read it (pure reads, lock verbs — see verbNeedsValidationContext).
+    // Every mutating/body-validating verb still gets the identical live context
+    // as before.
+    let validationContext: Awaited<ReturnType<typeof buildStoreValidationContext>> | undefined;
+    if (verbNeedsValidationContext(request.data.action)) {
+      // Artifact existence checks (Fix: asset refs were shape-only in production).
+      // An unavailable index store degrades to "existence not verified", never a
+      // failed write.
+      const artifactIndexStore = (await getArtifactIndexBlobStore(event).catch(() => undefined)) as unknown as
+        | ArtifactIndexStore
+        | undefined;
+      validationContext = await buildStoreValidationContext(store, {
+        selfObjectId: requestData.object_id ?? targetPageId,
+        selfObjectType: requestData.object_type ?? (targetPageId ? 'page' : undefined),
+        ...(artifactIndexStore ? { artifactIndexStore } : {}),
+        artifactRefSources: [parsed.value],
+      });
+    }
     // W15 S4 (MVP): the same threading pattern object-store.ts already uses
     // for the site-objects/artifact-index stores above — agents reach the
     // four marginalia_* actions over the publish key exactly like every
