@@ -1,0 +1,43 @@
+{
+  "__generated": {
+    "at": "2026-08-06T08:15:08.199Z",
+    "from": "objects/theme/by-id/thm_platform_anthropic.json",
+    "record_version": 2
+  },
+  "description": "A documentation theme inspired by Anthropic's site: warm ivory page, near-black ink text, a clay/terracotta accent, an editorial serif for headings paired with a clean grotesque sans for body/UI. NOTE: the theme font slots (sans/serif/heading) cannot set a separate monospace font for code — code styling lives in the renderer, and custom webfonts (Styrene/Tiempos, JetBrains Mono, etc.) cannot load through token values (no url()/@import allowed), so only system/web-safe family stacks are used here.",
+  "name": "Anthropic-style docs",
+  "scope": "evergreen",
+  "tokens": {
+    "colors": {
+      "accent": "rgb(204 120 92)",
+      "bg-page": "rgb(250 249 245)",
+      "bg-page-dark": "rgb(24 22 20)",
+      "bg-surface": "rgb(244 242 236)",
+      "gold": "rgb(191 155 48)",
+      "primary": "rgb(204 120 92)",
+      "secondary": "rgb(45 42 38)",
+      "text-default": "rgb(45 42 38)",
+      "text-heading": "rgb(30 27 24)",
+      "text-muted": "rgb(90 84 76 / 80%)"
+    },
+    "fonts": {
+      "heading": "\"Iowan Old Style\", \"Palatino Linotype\", Palatino, Georgia, serif",
+      "sans": "ui-sans-serif, system-ui, -apple-system, \"Segoe UI\", Helvetica, Arial, sans-serif",
+      "serif": "\"Iowan Old Style\", \"Palatino Linotype\", Palatino, Georgia, serif"
+    },
+    "layout": {
+      "containerWidth": "default",
+      "sectionRhythm": "airy"
+    },
+    "shape": {
+      "buttonShape": "soft",
+      "radius": "soft",
+      "shadow": "soft"
+    },
+    "type": {
+      "headingWeight": "medium",
+      "scale": "editorial"
+    }
+  },
+  "whenToUse": "Apply to give the Platform manual an Anthropic-like editorial-but-technical feel: warm neutral surfaces, serif headings, readable width. Pick this over Platform documentation when you want the warmer palette and serif display type."
+}
