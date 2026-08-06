@@ -14,7 +14,7 @@ import { Badge, Button, Card, EmptyState, Skeleton } from './primitives';
 import { Input } from './forms';
 import { Dialog, ConfirmDialog, useToast } from './overlays';
 import { IconAlertTriangle, IconPalette, IconSparkles } from './icons';
-import type { ObjectRecord, ObjectType } from '@core/schema/object-record-v1';
+import type { ObjectRecord } from '@core/schema/object-record-v1';
 // NOTE: this component hydrates client:load, so getSiteIdentity() here only
 // ever sees the COMMITTED config (src/config/site-identity.ts) — browsers
 // have no process.env, so SITE_OBJECT_ID and other env overrides do not
@@ -25,6 +25,10 @@ import type { ObjectRecord, ObjectType } from '@core/schema/object-record-v1';
 // addressed here since bridging server config into client bundles is new
 // infrastructure beyond this dehardcode pass.
 import { getSiteIdentity } from '@core/lib/site-identity';
+// A pure, side-effect-free sync accessor (no network, no bundling cost worth
+// deferring) — safe to import statically so the very first render can read
+// whatever was cached, instead of racing a dynamic import against paint.
+import { peekCachedStudioData, STUDIO_PERSISTED_MAX_AGE_MS } from '@core/lib/admin/studio-client';
 
 async function getToken(): Promise<string> {
   const m = await import('@core/lib/admin/goTrueClient');
@@ -32,11 +36,17 @@ async function getToken(): Promise<string> {
 }
 
 // instantiate/instantiate_section/apply_theme all mint or change objects the
-// content library lists — invalidate so the library and Cmd-K palette don't
-// show a stale view after one of these succeeds.
+// content library lists (and, for the recipe types themselves, the Studio
+// galleries below) — invalidate both caches so neither the library, the
+// Cmd-K palette, nor Studio's own galleries show a stale view after one of
+// these succeeds.
 async function invalidateLibraryCache(): Promise<void> {
-  const { invalidateInventoryCache } = await import('@core/lib/admin/library-client');
+  const [{ invalidateInventoryCache }, { invalidateStudioCache }] = await Promise.all([
+    import('@core/lib/admin/library-client'),
+    import('@core/lib/admin/studio-client'),
+  ]);
   invalidateInventoryCache();
+  invalidateStudioCache();
 }
 
 type Rec = ObjectRecord<Record<string, unknown>>;
@@ -67,17 +77,6 @@ const missingTrio = (record: Rec): boolean => {
 async function verb(request: Record<string, unknown>): Promise<{ status: number; body: Record<string, unknown> }> {
   const { callObjectVerb } = await import('@core/lib/edit-mode/verbs-client');
   return callObjectVerb(getToken, request) as Promise<{ status: number; body: Record<string, unknown> }>;
-}
-
-async function loadType(type: ObjectType): Promise<Rec[]> {
-  const listed = await verb({ action: 'list', object_type: type });
-  const ids = ((listed.body.objects as { object_id: string }[] | undefined) ?? []).map((row) => row.object_id);
-  const records: Rec[] = [];
-  for (const id of ids) {
-    const res = await verb({ action: 'get', object_type: type, object_id: id });
-    if (res.status === 200 && res.body.record) records.push(res.body.record as Rec);
-  }
-  return records;
 }
 
 function MetaLines({ record }: { record: Rec }) {
@@ -488,35 +487,68 @@ function ThemeGallery({ themes, owner }: { themes: Rec[]; owner: boolean }) {
 
 // ─── the studio page ─────────────────────────────────────────────────────────
 
+// Synchronous, no-network read of the last known Studio data — used as the
+// initial render state so a repeat visit (e.g. switching Studio tabs away
+// and back) paints immediately instead of the full blocking skeleton, the
+// same stale-while-revalidate pattern ContentLibrary already uses for the
+// content library.
+function initialCachedStudioData(): { templates: Rec[]; sections: Rec[]; themes: Rec[] } | null {
+  if (typeof window === 'undefined') return null;
+  const cached = peekCachedStudioData();
+  if (!cached) return null;
+  if (Date.now() - cached.fetchedAt > STUDIO_PERSISTED_MAX_AGE_MS) return null;
+  return cached.data;
+}
+
 function StudioBody() {
-  const [templates, setTemplates] = useState<Rec[] | null>(null);
-  const [sections, setSections] = useState<Rec[] | null>(null);
-  const [themes, setThemes] = useState<Rec[] | null>(null);
+  const [initialData] = useState(initialCachedStudioData);
+  const [templates, setTemplates] = useState<Rec[] | null>(initialData?.templates ?? null);
+  const [sections, setSections] = useState<Rec[] | null>(initialData?.sections ?? null);
+  const [themes, setThemes] = useState<Rec[] | null>(initialData?.themes ?? null);
+  // A background refetch always runs, even when cached data painted
+  // immediately — this just controls the small inline "refreshing…"
+  // indicator instead of the big per-gallery skeletons.
+  const [refreshing, setRefreshing] = useState(initialData !== null);
   const [owner, setOwner] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    let alive = true;
     (async () => {
       try {
         const { fetchMe } = await import('@core/lib/admin/users-client');
         const me = await fetchMe(getToken);
-        setOwner(me.roles.includes('owner'));
+        if (alive) setOwner(me.roles.includes('owner'));
       } catch {
         /* ignore */
       }
       try {
-        const [tpl, stpl, thm] = await Promise.all([
-          loadType('template'),
-          loadType('section_template'),
-          loadType('theme'),
-        ]);
-        setTemplates(tpl);
-        setSections(stpl);
-        setThemes(thm);
+        const { fetchStudioData } = await import('@core/lib/admin/studio-client');
+        // Never force here — a fresh in-memory/TTL cache (e.g. populated by
+        // this very call a moment ago on a fast tab-switch remount) is
+        // reused instead of firing a second full network sweep.
+        const data = await fetchStudioData(getToken);
+        if (alive) {
+          setTemplates(data.templates);
+          setSections(data.sections);
+          setThemes(data.themes);
+          setRefreshing(false);
+        }
       } catch (loadError) {
-        setError(loadError instanceof Error ? loadError.message : 'Could not load the recipe family.');
+        if (alive) {
+          // If we already have cached data on screen, a failed background
+          // refresh shouldn't blow away a working view — just stop spinning.
+          if (initialData !== null) {
+            setRefreshing(false);
+          } else {
+            setError(loadError instanceof Error ? loadError.message : 'Could not load the recipe family.');
+          }
+        }
       }
     })();
+    return () => {
+      alive = false;
+    };
   }, []);
 
   if (error) {
@@ -527,6 +559,15 @@ function StudioBody() {
 
   return (
     <div className="flex flex-col gap-6">
+      {refreshing ? (
+        <p
+          className="flex items-center gap-1.5 text-[length:var(--adm-text-xs)] text-[var(--adm-text-muted)]"
+          role="status"
+          aria-live="polite"
+        >
+          <span className="inline-block animate-pulse">●</span> Refreshing…
+        </p>
+      ) : null}
       <section>
         <h2 className="mb-3 text-[length:var(--adm-text-lg)] font-semibold text-[var(--adm-text-heading)]">
           Page templates
