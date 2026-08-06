@@ -54,7 +54,7 @@ function KeyRows({ rows }: { rows: Array<[string, ReactNode]> }) {
   );
 }
 
-// ─── per-type strategies ─────────────────────────────────────────────────────
+PLACEHOLDER_LINE_TO_BE_FIXED_SEPARATELY
 
 function ContentItemPreview({ record }: { record: Rec }) {
   const p = contentItemPreview(record);
