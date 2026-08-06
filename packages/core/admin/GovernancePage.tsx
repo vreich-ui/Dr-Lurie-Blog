@@ -9,7 +9,7 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import { AdminShell } from './AdminShell';
-import { getSiteIdentity } from '@core/lib/site-identity';
+import type { SiteIdentity } from '@core/lib/site-identity';
 import { Badge, Button, Card, EmptyState, Skeleton } from './primitives';
 import { Select } from './forms';
 import { useToast } from './overlays';
@@ -42,7 +42,7 @@ async function getToken(): Promise<string> {
 
 const sameConfig = (a: ApprovalConfig, b: ApprovalConfig) => JSON.stringify(a) === JSON.stringify(b);
 
-function GovernanceBody() {
+function GovernanceBody({ identity }: { identity: SiteIdentity }) {
   const { toast } = useToast();
   const [gov, setGov] = useState<GovernanceState | null>(null);
   const [owner, setOwner] = useState(false);
@@ -126,7 +126,7 @@ function GovernanceBody() {
 
   return (
     <div className="flex max-w-3xl flex-col gap-6">
-      <TrackingGovernanceCard gov={gov} owner={owner} onSaved={refresh} />
+      <TrackingGovernanceCard gov={gov} owner={owner} onSaved={refresh} identity={identity} />
 
       <Card
         kicker="Approval policy"
@@ -231,16 +231,18 @@ function GovernanceBody() {
   );
 }
 
-// ─── tracking governance card (W13 T13.12 — the OQ-W13-2 surface) ──────────
+// ─── tracking governance card (W13 T13.12 — the OQ-W13-2 surface) ────────────────────
 
 function TrackingGovernanceCard({
   gov,
   owner,
   onSaved,
+  identity,
 }: {
   gov: GovernanceState;
   owner: boolean;
   onSaved: () => Promise<void>;
+  identity: SiteIdentity;
 }) {
   const { toast } = useToast();
   const [saving, setSaving] = useState(false);
@@ -280,7 +282,7 @@ function TrackingGovernanceCard({
       }
     >
       <p className="mb-4 text-[length:var(--adm-text-sm)] text-[var(--adm-text-muted)]">
-        Publishing <code>{getSiteIdentity().trackingProjectId}</code> changes which third-party scripts run on every
+        Publishing <code>{identity.trackingProjectId}</code> changes which third-party scripts run on every
         page. This card answers &ldquo;who may publish it right now?&rdquo; and flips the posture;{' '}
         <strong>Product</strong> is shown beside it as the other pinned type. The full per-type matrix sits below.
       </p>
@@ -332,7 +334,7 @@ function TrackingGovernanceCard({
   );
 }
 
-// ─── chat tool autonomy table (T9.13 chat_tools override) ────────────────────────
+// ─── chat tool autonomy table (T9.13 chat_tools override) ────────────────────────────────
 
 const AUTONOMY_TONE: Record<ToolAutonomy, 'success' | 'warning' | 'neutral'> = {
   auto: 'success',
@@ -513,10 +515,14 @@ function ChatToolAutonomyCard({
   );
 }
 
-export default function GovernancePage() {
+export interface GovernancePageProps {
+  identity: SiteIdentity;
+}
+
+export default function GovernancePage({ identity }: GovernancePageProps) {
   return (
-    <AdminShell currentPath="/admin/settings/guardrails" title="Guardrails">
-      <GovernanceBody />
+    <AdminShell currentPath="/admin/settings/guardrails" title="Guardrails" identity={identity}>
+      <GovernanceBody identity={identity} />
     </AdminShell>
   );
 }

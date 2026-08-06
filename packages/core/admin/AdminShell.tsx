@@ -9,7 +9,11 @@
  * The "Legacy" group (publish/drafts/agent-admin/library/blobs) retired in
  * W9.g (T9.24) — every capability now lives on the surfaces below.
  */
-import { getSiteIdentity } from '../lib/site-identity.js';
+// D2: identity is resolved server-side (Astro frontmatter, where
+// process.env is real) and threaded down as a prop — see the admin route
+// .astro files and page components. getSiteIdentity() must never be called
+// from this client:load island; that would silently drop any env override.
+import type { SiteIdentity } from '../lib/site-identity.js';
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 
@@ -18,6 +22,7 @@ import { Avatar, IconButton } from './primitives';
 import { CommandPalette, type CommandItem } from './menus';
 import { ToastProvider } from './overlays';
 import { Drawer } from './overlays';
+import { AdminErrorBoundary } from './ErrorBoundary';
 import {
   IconHome,
   IconLibrary,
@@ -144,10 +149,12 @@ function NavList({ currentPath, onNavigate }: { currentPath: string; onNavigate?
 export interface AdminShellProps {
   currentPath: string;
   title?: string;
+  /** Server-resolved site identity (D2) — every page component must pass this through. */
+  identity: SiteIdentity;
   children: ReactNode;
 }
 
-export function AdminShell({ currentPath, title, children }: AdminShellProps) {
+export function AdminShell({ currentPath, title, identity, children }: AdminShellProps) {
   const [email, setEmail] = useState<string | null>(null);
   const [mobileNav, setMobileNav] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -254,7 +261,7 @@ export function AdminShell({ currentPath, title, children }: AdminShellProps) {
               L
             </span>
             <span className="text-[length:var(--adm-text-sm)] font-semibold text-[var(--adm-text-heading)]">
-              {getSiteIdentity().adminLabel}
+              {identity.adminLabel}
             </span>
           </a>
           <NavList currentPath={currentPath} />
@@ -292,11 +299,23 @@ export function AdminShell({ currentPath, title, children }: AdminShellProps) {
             ) : null}
           </header>
 
-          <main className="mx-auto w-full max-w-6xl flex-1 p-4 sm:p-6">{children}</main>
+          <main className="mx-auto w-full max-w-6xl flex-1 p-4 sm:p-6">
+            {/*
+              Every admin page mounts AdminShell as the root of its own
+              client:load island (see MaintenancePage.tsx et al.), so this is
+              the one place a boundary sits inside every page's real React
+              tree — an Astro-level wrapper around the island's <slot />
+              cannot see a React throw in a separate hydration root (see
+              ErrorBoundary.tsx). Scoped to `children` only, so a crash in
+              the page body degrades to a fallback without taking the
+              sidebar/topbar chrome (and its sign-out / nav) down with it.
+            */}
+            <AdminErrorBoundary surface={title ?? 'Workspace'}>{children}</AdminErrorBoundary>
+          </main>
         </div>
 
         {/* Sidebar (mobile drawer) */}
-        <Drawer open={mobileNav} onClose={() => setMobileNav(false)} title={getSiteIdentity().adminLabel} side="left" width={280}>
+        <Drawer open={mobileNav} onClose={() => setMobileNav(false)} title={identity.adminLabel} side="left" width={280}>
           <NavList currentPath={currentPath} onNavigate={() => setMobileNav(false)} />
         </Drawer>
 

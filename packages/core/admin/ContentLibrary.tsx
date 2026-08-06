@@ -10,6 +10,7 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import { AdminShell } from './AdminShell';
+import type { SiteIdentity } from '@core/lib/site-identity';
 import { cn } from './utils';
 import { Badge, StatusPill, Skeleton, EmptyState, Card } from './primitives';
 import { Input } from './forms';
@@ -267,9 +268,13 @@ function ContentLibraryBody() {
   );
 }
 
-export default function ContentLibrary() {
+export interface ContentLibraryProps {
+  identity: SiteIdentity;
+}
+
+export default function ContentLibrary({ identity }: ContentLibraryProps) {
   return (
-    <AdminShell currentPath="/admin/content" title="Content library">
+    <AdminShell currentPath="/admin/content" title="Content library" identity={identity}>
       <ContentLibraryBody />
     </AdminShell>
   );
