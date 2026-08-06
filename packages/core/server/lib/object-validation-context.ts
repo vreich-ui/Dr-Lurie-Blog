@@ -25,6 +25,7 @@ import type { ArtifactRefResolution, ObjectValidationContext, PageTypeConstraint
 import type { ObjectVerbStore } from './object-verbs.js';
 import { getPageTypeDefinition } from '../../lib/registry/page-types.js';
 import { isRegisteredSectionType } from '../../lib/registry/components/registered-types.js';
+import { objectDisplayName } from '../../lib/admin/display-name.js';
 import { objectTypes, type ObjectRecord, type ObjectType } from '../../schema/object-record-v1.js';
 import type { SectionType } from '../../schema/bodies/section-v1.js';
 
@@ -202,6 +203,21 @@ export const buildStoreValidationContext = async (
     return body.section.type as SectionType;
   };
 
+  // D3-sharedref: the resolveSharedSectionType sibling for display names —
+  // reuses the SAME preloaded `records` snapshot (no extra store read), and
+  // the SAME derivation (`objectDisplayName`) the admin object list already
+  // uses to title a shared 'section' object, so the stamped name matches what
+  // that object is called everywhere else in the admin. `objectDisplayName`
+  // always returns a string (its own "Untitled section" fallback for a
+  // nameless target), so a `records` miss (dangling ref — target deleted) is
+  // the only `undefined` case here; the write path leaves `sectionName`
+  // unset rather than stamping a `null` sentinel (see object-verbs.ts's
+  // stampSharedRefSectionNames for why null specifically can't be used).
+  const resolveSharedSectionName: ObjectValidationContext['resolveSharedSectionName'] = (objectId) => {
+    const record = records.get(`section:${objectId}`);
+    return record ? objectDisplayName(record) : undefined;
+  };
+
   // The resolveSharedSectionType sibling for template slot blueprintRefs
   // (W8.2): the blueprint type of a section_template record.
   const resolveSectionTemplateType: ObjectValidationContext['resolveSectionTemplateType'] = (objectId) => {
@@ -299,6 +315,7 @@ export const buildStoreValidationContext = async (
   return {
     resolveObject,
     resolveSharedSectionType,
+    resolveSharedSectionName,
     resolveSectionTemplateType,
     isRouteTaken,
     isSlugTaken,
