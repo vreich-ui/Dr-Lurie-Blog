@@ -7,6 +7,7 @@
 import { useEffect, useState } from 'react';
 
 import { AdminShell } from './AdminShell';
+import type { SiteIdentity } from '@core/lib/site-identity';
 import { Avatar, Badge, Button, Card, EmptyState, IconButton, Skeleton, StatusPill } from './primitives';
 import { Input, Select } from './forms';
 import { Dialog, ConfirmDialog, Drawer, useToast } from './overlays';
@@ -342,9 +343,13 @@ function AdminUsersBody() {
   );
 }
 
-export default function AdminUsers() {
+export interface AdminUsersProps {
+  identity: SiteIdentity;
+}
+
+export default function AdminUsers({ identity }: AdminUsersProps) {
   return (
-    <AdminShell currentPath="/admin/settings/admins" title="Admins">
+    <AdminShell currentPath="/admin/settings/admins" title="Admins" identity={identity}>
       <AdminUsersBody />
     </AdminShell>
   );

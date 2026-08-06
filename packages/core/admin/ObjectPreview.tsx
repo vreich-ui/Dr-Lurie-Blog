@@ -19,7 +19,7 @@ import type { ReactNode } from 'react';
 import { EmptyState, Badge } from './primitives';
 import { IconInfo, IconExternalLink } from './icons';
 import { objectTypeLabel } from '@core/lib/admin/display-name';
-import { contentItemPreview, productPreview, tokenSwatches, tokenFonts } from '@core/lib/admin/preview-logic';
+import { contentItemPreview, productPreview, tokenSwatches, tokenFonts, pageSectionLabel } from '@core/lib/admin/preview-logic';
 import type { ObjectRecord } from '@core/schema/object-record-v1';
 
 type Rec = ObjectRecord<Record<string, unknown>>;
@@ -115,9 +115,7 @@ function PagePreview({ record }: { record: Rec }) {
           </p>
           <ol className="flex flex-col gap-1">
             {sections.map((raw, i) => {
-              const s = asBag(raw);
-              const inner = asBag(s.section);
-              const label = str(s.type) ?? str(inner.type) ?? str(s.ref) ?? `Section ${i + 1}`;
+              const label = pageSectionLabel(raw, i);
               return (
                 <li
                   key={i}

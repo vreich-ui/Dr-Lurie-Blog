@@ -16,6 +16,7 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import { AdminShell } from './AdminShell';
+import type { SiteIdentity } from '@core/lib/site-identity';
 import { Badge, Button, Card, EmptyState, Skeleton } from './primitives';
 import { Input, Select, Textarea } from './forms';
 import { ConfirmDialog, Drawer, useToast } from './overlays';
@@ -31,6 +32,7 @@ import {
   getBlob,
   listBlobs,
   listStores,
+  normalizeSiteIdDiagnostic,
   renameBlob,
   setBlob,
   wipeAll,
@@ -82,20 +84,29 @@ function DiagnosticsCard() {
 
   return (
     <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-      {Object.entries(diagnostics).map(([name, diag]) => (
-        <div
-          key={name}
-          className="rounded-[var(--adm-radius-md)] border border-[var(--adm-border)] bg-[var(--adm-surface-sunken)] p-3"
-        >
-          <p className="text-[length:var(--adm-text-xs)] font-semibold uppercase tracking-wide text-[var(--adm-text-muted)]">
-            {diag.storeName}
-          </p>
-          <p className="mt-1 text-[length:var(--adm-text-sm)] text-[var(--adm-text)]">{diag.source}</p>
-          <p className="mt-0.5 text-[length:var(--adm-text-xs)] text-[var(--adm-text-muted)]">
-            site: {diag.siteId || '(none)'}
-          </p>
-        </div>
-      ))}
+      {Object.entries(diagnostics).map(([name, diag]) => {
+        // `siteId` is a structured diagnostic ({envVar, present, redacted}),
+        // not a string — normalize before rendering any of its fields so an
+        // older server build (or a stale cached response) that still sends a
+        // plain string renders too, instead of crashing (see
+        // normalizeSiteIdDiagnostic's doc comment for the incident this
+        // guards against).
+        const siteId = normalizeSiteIdDiagnostic(diag.siteId);
+        return (
+          <div
+            key={name}
+            className="rounded-[var(--adm-radius-md)] border border-[var(--adm-border)] bg-[var(--adm-surface-sunken)] p-3"
+          >
+            <p className="text-[length:var(--adm-text-xs)] font-semibold uppercase tracking-wide text-[var(--adm-text-muted)]">
+              {diag.storeName}
+            </p>
+            <p className="mt-1 text-[length:var(--adm-text-sm)] text-[var(--adm-text)]">{diag.source}</p>
+            <p className="mt-0.5 text-[length:var(--adm-text-xs)] text-[var(--adm-text-muted)]">
+              site id ({siteId.envVar ?? 'unset'}): {siteId.present ? siteId.redacted || '(redacted)' : 'not set'}
+            </p>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -642,9 +653,13 @@ interface BlobDetailMeta {
   truncated: boolean;
 }
 
-export default function MaintenancePage() {
+export interface MaintenancePageProps {
+  identity: SiteIdentity;
+}
+
+export default function MaintenancePage({ identity }: MaintenancePageProps) {
   return (
-    <AdminShell currentPath="/admin/maintenance" title="Maintenance">
+    <AdminShell currentPath="/admin/maintenance" title="Maintenance" identity={identity}>
       <MaintenanceBody />
     </AdminShell>
   );

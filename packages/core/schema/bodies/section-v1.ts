@@ -546,9 +546,29 @@ export const sectionInstanceSchema = z.discriminatedUnion('type', [
     link: linkActionSchema.optional(),
   }),
   // Reference to a shared 'section' object — no shadow copy of the target's
-  // type/data (D§3.5).
+  // type/data (D§3.5). `sectionName` (D3-sharedref, 2026-08-06) is the ONE
+  // deliberate exception: a denormalized copy of the target's display name
+  // (lib/admin/display-name.ts's `objectDisplayName`, the same derivation the
+  // admin object list already uses for a shared 'section' object), stamped by
+  // the write path (server/lib/object-verbs.ts) whenever this section is
+  // created/updated — never computed at render/preview time, so admin reads
+  // stay free and synchronous like every other display-name derivation
+  // instead of paying an N+1 store read per shared_ref on every page load.
+  // Tradeoff: it goes stale if the target is renamed and this ref isn't
+  // re-written afterward — accepted (see the write-path comment for why no
+  // refresh-on-target-write mechanism exists to fix that). Absent means
+  // either the section was written before this field existed, OR the write
+  // path couldn't resolve a name for the target at write time (a dangling
+  // ref) — both degrade to the same `ref`/index fallback in ObjectPreview,
+  // never to the raw "shared_ref" type-tag literal. (There is deliberately no
+  // `null` state here: object-patch-apply.ts's engine reserves `null` as its
+  // fields-unset marker and refuses it outright inside a whole-value
+  // `upsert_section` payload — so "couldn't resolve" is represented the same
+  // way "never attempted" already is, by omitting the key, not by a
+  // null-vs-undefined distinction the engine can't carry.)
   sectionVariant('shared_ref', {
     section: z.string().min(1),
+    sectionName: z.string().min(1).optional(),
   }),
 ]);
 export type SectionInstance = z.infer<typeof sectionInstanceSchema>;

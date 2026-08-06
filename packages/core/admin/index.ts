@@ -13,3 +13,5 @@ export * from './menus';
 export * from './data';
 export { AdminShell } from './AdminShell';
 export type { AdminShellProps } from './AdminShell';
+export { AdminErrorBoundary } from './ErrorBoundary';
+export type { AdminErrorBoundaryProps } from './ErrorBoundary';

@@ -3,10 +3,17 @@
 // signed-in-admin experience is the AdminHome island (attention-first layout,
 // working Release card, quick actions). The auth gate and signed-out/forbidden
 // states live in AdminLayout; the server wall is unchanged.
+import '@site/config/policy-bindings'; // D2: register the site-identity provider before resolving it below
+import { getSiteIdentity } from '@core/lib/site-identity';
 import AdminLayout from '~/layouts/AdminLayout.astro';
 import AdminHome from '~/admin/AdminHome';
+
+// D2: resolve identity once, server-side, where process.env is real, and
+// pass it down explicitly — the island must not call getSiteIdentity()
+// itself (the browser has no process.env, so env overrides never reached it).
+const identity = getSiteIdentity();
 ---
 
 <AdminLayout title="Admin — Workspace">
-  <AdminHome client:load />
+  <AdminHome client:load identity={identity} />
 </AdminLayout>

@@ -26,6 +26,7 @@ import {
 import { MAJOR_KEY_ARTIFACT_REF_RE } from '../lib/artifact-trust.js';
 import { inviteUser, activateOnLogin, type GoTrueIdentity } from '../lib/user-invite.js';
 import type { Principal } from '../../schema/object-record-v1.js';
+import { friendlyNameFromEmail } from '../../lib/admin/display-name.js';
 
 /** An avatar must be an uploaded IMAGE artifact reference, not a URL/data URI. */
 export const isTrustedAvatarRef = (ref: string): boolean =>
@@ -76,7 +77,11 @@ const synthesizedRecord = (email: string, owner: boolean): UserRecord => {
   return {
     schema_version: 1,
     email,
-    display_name: email,
+    // D3 (2026-08-06): a friendly default, not the raw email — this only
+    // ever runs when NO record exists yet (first login before any
+    // update_me), so it can never clobber a display name a user set
+    // (getUserRecord/`existing` short-circuits this call once one exists).
+    display_name: friendlyNameFromEmail(email),
     role: owner ? 'owner' : 'admin',
     status: 'active',
     invited_by: 'bootstrap',

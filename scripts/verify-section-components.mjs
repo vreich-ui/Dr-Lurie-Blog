@@ -58,12 +58,21 @@ const audienceResolved = {
   ),
 };
 // The start grid's query source resolves exactly as PageObjectRenderer does:
-// published posts, newest first, capped at limit.
+// published posts, newest first, capped at limit, each carrying the same
+// href toCard() (section-resolve-deps.ts) computes — the query cards are
+// clickable now (2026-08-06 relaxed the T3.6 byte-identical-cutover gate),
+// so the fixture must reproduce the real href or this gate would fail on a
+// fixture/homepage mismatch that isn't actually a regression.
 const posts = await fetchPosts();
 const startGridResolved = {
   cards: posts
     .slice(0, homeStartGridData.limit)
-    .map((post) => ({ id: post.id, title: post.title, description: post.excerpt })),
+    .map((post) => ({
+      id: post.id,
+      title: post.title,
+      description: post.excerpt,
+      href: getPermalink(post.permalink, 'post'),
+    })),
 };
 ---
 

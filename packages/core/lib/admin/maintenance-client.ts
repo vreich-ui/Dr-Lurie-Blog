@@ -30,12 +30,58 @@ export interface BlobDetail {
   content: string;
 }
 
+/**
+ * Shape of `getBlobStoreSourceDiagnostics`'s `siteId` field (server:
+ * packages/core/server/lib/blob-store.ts). It is NOT a string — it names the
+ * env var the site id was read from, whether one was present, and a
+ * last-4-chars redacted preview safe to show an operator. Named so it isn't
+ * re-inlined (and re-mistyped as `string`) at another call site.
+ */
+export interface SiteIdDiagnostic {
+  envVar: 'NETLIFY_SITE_ID' | 'SITE_ID' | undefined;
+  present: boolean;
+  redacted: string;
+}
+
 export interface StoreDiagnostic {
   storeName: string;
   source: string;
   explicitApiConfigUsed: boolean;
   lambdaBlobContextUsed: boolean;
-  siteId: string;
+  /**
+   * Was `siteId: string` — the actual server response
+   * (getBlobStoreSourceDiagnostics, blob-store.ts) has always sent the
+   * structured SiteIdDiagnostic below. The old type let TypeScript wave
+   * through `diag.siteId || '(none)'` in MaintenancePage, which rendered the
+   * raw object as a React child and crashed with error #31 the instant
+   * diagnostics loaded (QA P0). Fixed to match the real runtime shape;
+   * `normalizeSiteIdDiagnostic` below narrows a plain string too, so an
+   * older server build (or a stale cached response) still renders instead
+   * of crashing.
+   */
+  siteId: SiteIdDiagnostic;
+}
+
+/**
+ * Narrow a `siteId` diagnostic field to a renderable shape, regardless of
+ * whether it arrived as the current structured object or (from an older
+ * server build, or a stale cached response) a plain string. Never throws —
+ * used directly as a React child input, so a render error here would
+ * reproduce the exact crash this type fixes.
+ */
+export function normalizeSiteIdDiagnostic(value: unknown): SiteIdDiagnostic {
+  if (typeof value === 'string') {
+    return { envVar: undefined, present: value.length > 0, redacted: value };
+  }
+  if (value && typeof value === 'object') {
+    const candidate = value as Partial<SiteIdDiagnostic>;
+    return {
+      envVar: candidate.envVar === 'NETLIFY_SITE_ID' || candidate.envVar === 'SITE_ID' ? candidate.envVar : undefined,
+      present: Boolean(candidate.present),
+      redacted: typeof candidate.redacted === 'string' ? candidate.redacted : '',
+    };
+  }
+  return { envVar: undefined, present: false, redacted: '' };
 }
 
 async function callManager<T>(getToken: GetToken, action: string, payload: Record<string, unknown> = {}) {
