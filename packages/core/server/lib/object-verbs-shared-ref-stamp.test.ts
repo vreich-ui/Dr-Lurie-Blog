@@ -19,7 +19,7 @@ import { objectRecordKey } from './object-store-keys.js';
 import type { ObjectRecord, Principal } from '../../schema/object-record-v1.js';
 
 // ─── injected-store pattern (migrate-site.test.ts's createMemoryStore, reused
-//     verbatim from agent-learning-patch.test.ts) ────────────────────────
+//     verbatim from agent-learning-patch.test.ts) ────────────────────────────
 
 const makeStore = (seeds: ObjectRecord[]) => {
   const blobs = new Map<string, string>();
@@ -176,16 +176,16 @@ describe('D3-sharedref write path — stampSharedRefSectionNames (via handleObje
     const page = makePageRecord();
     // No 'section' object seeded at all for 'sec_does_not_exist' — a target
     // deleted since, or a typo'd id an agent supplied. `resolveSharedSectionName`
-    // is wired (so we're exercising the SAME "can't answer → undefined" contract
-    // buildStoreValidationContext's version implements — a records miss) in
-    // isolation from reference-integrity enforcement (a separate, pre-existing
-    // hard-block check in object-validate.ts's requireObject — not this step's
-    // concern, and not what's under test here: this test is specifically about
-    // the STAMP not throwing/blocking on its own). Note it can't stamp `null`
-    // even if it wanted to: object-patch-apply.ts's engine refuses ANY null
-    // inside a whole-value upsert_section payload (null is reserved as its
-    // fields-unset marker) — see object-verbs.ts's stampSharedRefSectionNames
-    // comment.
+    // is wired (so we're exercising the SAME "can't answer → undefined"
+    // contract buildStoreValidationContext's version implements — a records
+    // miss) in isolation from reference-integrity enforcement (a separate,
+    // pre-existing hard-block check in object-validate.ts's requireObject —
+    // not this step's concern, and not what's under test here: this test is
+    // specifically about the STAMP not throwing/blocking on its own). Note
+    // it can't stamp `null` even if it wanted to: object-patch-apply.ts's
+    // engine refuses ANY null inside a whole-value upsert_section payload
+    // (null is reserved as its fields-unset marker) — see object-verbs.ts's
+    // stampSharedRefSectionNames comment.
     const store = makeStore([page]);
     const context: ObjectValidationContext = {
       resolveSharedSectionName: () => undefined, // "cannot resolve a name for this id"
