@@ -1,0 +1,101 @@
+{
+  "__generated": {
+    "at": "2026-08-06T07:36:47.436Z",
+    "from": "objects/content_item/by-id/req_agent_qa_artifact_stress_test_20260806_01.json",
+    "record_version": 8
+  },
+  "deck": "A tester's pass at every corner of the pdf-tool bridge on this platform: ten-plus PDFs, ten-plus images, deliberate size-limit violations, bad ids, and every renderer this site has never tried.",
+  "description": "A live QA pass exercising create_pdf_template, publish_pdf_template, and create_agent_artifact_job across all four renderers and both artifact kinds, with a running log of what broke and what needs finishing.",
+  "nodes": [
+    {
+      "id": "n_intro",
+      "kind": "content",
+      "private": {
+        "intent": "educate",
+        "strategy": "hook"
+      },
+      "public": {
+        "body": "This article is the record of a deliberate stress test of this site's own artifact pipeline: how many kinds of PDF and image this platform can actually produce, where the documented limits (like the 150KB image budget) really hold, and what breaks when a tester stops being polite about it.",
+        "title": "Why This Run Exists"
+      }
+    },
+    {
+      "id": "n_findingswrites",
+      "kind": "content",
+      "private": {
+        "intent": "educate",
+        "strategy": "proof"
+      },
+      "public": {
+        "body": "Across this run, object_create, create_pdf_template, and create_agent_artifact_job each returned a client-facing 60-second timeout or a Cloudflare 502 at least once, yet the underlying write had already landed server-side every time it was checked afterward. That is a dangerous combination for any caller that treats a timeout as ‘nothing happened’ and retries with the same idempotency key or a freshly minted one: a retry against a fixed id correctly hits a conflict, but a retry that mints a new id (the default for object_create) would silently create a duplicate. Reads intermittently returned the same 502s with no side effect, which is the benign version of the same underlying instability.",
+        "title": "Writes That Time Out Anyway Succeed"
+      }
+    },
+    {
+      "id": "n_findingstemplates",
+      "kind": "content",
+      "private": {
+        "intent": "educate",
+        "strategy": "proof"
+      },
+      "public": {
+        "body": "pdfme templates work end to end: draft, render, and publish (warn-only gate) all succeeded repeatedly. typst accepted a template body on the first correctly-guessed schema ({source: ‘...’}) but publishing it, and a chromium template, both refuse with a hard gate pointing at validate_pdf_template and get_pdf_template_validation — neither tool is exposed on this connector, Dr_Lurie_Skincare, or Fernwell, so no agent using only these bridges can ever publish a typst or chromium template. react-pdf's template_json schema could not be discovered by informed guessing (a JSX tree, a raw JSX string) in four attempts; the only feedback was the unhelpful ‘Invalid templateJson’, with no field-level detail. Effectively, pdfme is the only renderer an autonomous agent can fully use today.",
+        "title": "Two Renderers Are Reachable, Two Are Not"
+      }
+    },
+    {
+      "id": "n_findingsimages",
+      "kind": "content",
+      "private": {
+        "intent": "educate",
+        "strategy": "proof"
+      },
+      "public": {
+        "body": "object_contract(‘content_item’).media_policy documents over_budget as ‘warn’: an oversize image should be stored and flagged, not rejected. In practice, create_agent_artifact_job hard-fails any image job whose actual output exceeds 153,600 bytes — a 1536x1024 PNG that came in at 156,814 bytes (about 2% over) was rejected outright with no artifact produced at all, and there is no accepted way to raise or bypass that cap from the caller side: passing a top-level requirements.maxBytes override was itself rejected as invalid input. Separately, image size strings are validated against an undocumented allow-list — 1024x1024 and 1536x1024 both work, 256x256 and 512x512 are both rejected as ‘Invalid artifact job input’ with no hint about which sizes are valid. On the positive side, PDF-side requirements.maxBytes is enforced cleanly with a specific, correct error (PDF_REQ_MAX_BYTES, expected vs. actual bytes named explicitly) — that is the error-message quality the image path and the template path should both match.",
+        "title": "The 150KB Image Budget Is Softer in Docs Than in Practice"
+      }
+    },
+    {
+      "id": "n_findingsadmin",
+      "kind": "content",
+      "private": {
+        "intent": "educate",
+        "strategy": "proof"
+      },
+      "public": {
+        "body": "list_artifacts_by_kind, search_artifacts, and list_artifacts_by_request — all explicitly documented as admin-only — failed every single call in this session with ‘Authentication token could not be verified,’ including on retries spaced minutes apart. Meanwhile get_artifact_metadata and list_artifacts_for_request, which are not gated as admin-only, worked correctly every time with the exact same credentials. This reads as a scoping or token-audience bug specific to the admin tier, not a general outage.",
+        "title": "Admin Artifact Browsing Is Broken"
+      }
+    },
+    {
+      "id": "n_downloadfieldguide",
+      "kind": "action",
+      "private": {
+        "intent": "navigate",
+        "strategy": "resolution"
+      },
+      "public": {
+        "body": "A five-section reference card summarizing this run's findings, rendered from a fresh pdfme template.",
+        "ctaLink": "/pdf/req_agent_qa_artifact_stress_test_20260806_01/28135adad7d0dc045073f87fe90eaad88bd81bba8af087a121832b7b567ac511.pdf",
+        "ctaText": "Download the field guide PDF",
+        "title": "Download: QA Field Guide (pdfme, text-only, 1 page)"
+      }
+    },
+    {
+      "id": "n_downloadphoto",
+      "kind": "action",
+      "private": {
+        "intent": "navigate",
+        "strategy": "resolution"
+      },
+      "public": {
+        "body": "The successful control case: a locally-generated JPEG passed as a base64 data URI, proving the heroImage field works — the failure mode was specifically remote-URL images, not the image field itself.",
+        "ctaLink": "/pdf/req_agent_qa_artifact_stress_test_20260806_01/cf2511423857908be90676e6859d5317893fed49fd19786ed397ed72e4ea0036.pdf",
+        "ctaText": "Download the photo one-pager PDF",
+        "title": "Download: One-Pager With an Embedded Photo (base64 control)"
+      }
+    }
+  ],
+  "slug": "qa-stress-test-pdf-image-artifact-pipeline",
+  "title": "QA Stress Test: The PDF & Image Artifact Pipeline, Pushed on Purpose"
+}
