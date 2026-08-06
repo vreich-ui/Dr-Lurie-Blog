@@ -2,10 +2,17 @@
 // CMS Agents hub (T9.17) — cross-object conversations with the §4 creation
 // starters. Static shell + client island; the wall is server-side in
 // admin-agent-chat (identity + admin allowlist).
+import '@site/config/policy-bindings'; // D2: register the site-identity provider before resolving it below
+import { getSiteIdentity } from '@core/lib/site-identity';
 import AdminLayout from '~/layouts/AdminLayout.astro';
 import AgentsHub from '~/admin/AgentsHub';
+
+// D2: resolve identity once, server-side, where process.env is real, and
+// pass it down explicitly — the island must not call getSiteIdentity()
+// itself (the browser has no process.env, so env overrides never reached it).
+const identity = getSiteIdentity();
 ---
 
 <AdminLayout title="Admin — CMS Agents">
-  <AgentsHub client:load />
+  <AgentsHub client:load identity={identity} />
 </AdminLayout>

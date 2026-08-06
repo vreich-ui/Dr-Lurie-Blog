@@ -3,10 +3,17 @@
 // connection request. It lives inside /admin so the Identity login and the
 // admin gate are the ones the workspace already has; the real authority check
 // runs server-side in the /oauth/consent endpoint.
+import '@site/config/policy-bindings'; // D2: register the site-identity provider before resolving it below
+import { getSiteIdentity } from '@core/lib/site-identity';
 import AdminLayout from '~/layouts/AdminLayout.astro';
 import OAuthConsent from '~/admin/OAuthConsent';
+
+// D2: resolve identity once, server-side, where process.env is real, and
+// pass it down explicitly — the island must not call getSiteIdentity()
+// itself (the browser has no process.env, so env overrides never reached it).
+const identity = getSiteIdentity();
 ---
 
 <AdminLayout title="Admin — Connection request">
-  <OAuthConsent client:load />
+  <OAuthConsent client:load identity={identity} />
 </AdminLayout>
