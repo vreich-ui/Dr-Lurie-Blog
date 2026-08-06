@@ -69,7 +69,7 @@ export function contentItemPreview(
   };
 }
 
-// ─── theme / site token swatches (public brand tokens only) ────────────────────────────────
+// ─── theme / site token swatches (public brand tokens only) ────────────────────
 
 export interface Swatch {
   name: string;
@@ -92,7 +92,7 @@ export function tokenFonts(tokens: unknown): Swatch[] {
     .map(([name, value]) => ({ name, value: value as string }));
 }
 
-// ─── product commerce summary (display fields only) ────────────────────────────────
+// ─── product commerce summary (display fields only) ────────────────────────────
 
 export interface ProductPreview {
   title: string;
@@ -139,7 +139,7 @@ export function productPreview(record: Pick<ObjectRecord, 'object_id' | 'object_
   };
 }
 
-// ─── page "Section order" label (D3-sharedref) ──────────────────────────────────────
+// ─── page "Section order" label (D3-sharedref) ──────────────────────────────
 
 /**
  * Label for one entry in a page body's `sections[]` list, as shown in the
