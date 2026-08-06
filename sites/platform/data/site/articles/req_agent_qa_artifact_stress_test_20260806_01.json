@@ -1,10 +1,10 @@
 {
   "__generated": {
-    "at": "2026-08-06T08:16:22.046Z",
+    "at": "2026-08-06T08:59:43.065Z",
     "from": "objects/content_item/by-id/req_agent_qa_artifact_stress_test_20260806_01.json",
-    "record_version": 14
+    "record_version": 19
   },
-  "deck": "A tester's pass at every corner of the pdf-tool bridge on this platform: ten-plus PDFs, ten-plus images, deliberate size-limit violations, bad ids, and every renderer this site has never tried.",
+  "deck": "A tester's pass at every corner of the pdf-tool bridge on this platform: thirteen PDFs — including a fully branded, two-page knowledge-base document with navy/gold color panels, accent bars, and a bordered callout box — ten-plus images, deliberate size-limit violations, bad ids, and every renderer this site has never tried.",
   "description": "A live QA pass exercising create_pdf_template, publish_pdf_template, and create_agent_artifact_job across all four renderers and both artifact kinds, with a running log of what broke and what needs finishing.",
   "nodes": [
     {
@@ -17,6 +17,20 @@
       "public": {
         "body": "This article is the record of a deliberate stress test of this site's own artifact pipeline: how many kinds of PDF and image this platform can actually produce, where the documented limits (like the 150KB image budget) really hold, and what breaks when a tester stops being polite about it.",
         "title": "Why This Run Exists"
+      }
+    },
+    {
+      "id": "n_downloadbranded",
+      "kind": "action",
+      "private": {
+        "intent": "navigate",
+        "strategy": "resolution"
+      },
+      "public": {
+        "body": "A branded, two-page pdfme document built to match the design bar set by a reference guide: full-bleed navy color panels, a gold accent bar, a bordered callout box, and a manually constructed data grid (the native table plugin never rendered correctly after four attempts — see the findings below for why). This is the ceiling of what this platform's only publishable renderer can do, not the floor.",
+        "ctaLink": "/pdf/req_agent_qa_artifact_stress_test_20260806_01/8440e0e5f09d69019b9c9446775a201bdba9e9fbc4ab1bc3b1a287df45d20c75.pdf",
+        "ctaText": "Download the branded knowledge-base PDF",
+        "title": "Download: Branded Knowledge-Base PDF (2-page, navy/gold, manual grid + callout)"
       }
     },
     {
