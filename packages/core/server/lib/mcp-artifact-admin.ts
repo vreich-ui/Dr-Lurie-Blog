@@ -273,13 +273,76 @@ const listArtifactsFromPointerPrefixes = async (
 const getAdminToolState = async (event: LambdaEvent) => {
   const adminState = await getAdminStateFromEvent(event);
 
-  if (!adminState.authenticated) return toolError(adminState.error || 'A valid admin session token is required.');
-  if (!adminState.isAdmin) return toolError('This user is not authorized to browse artifacts.');
+  if (!adminState.authenticated) {
+    return toolError(
+      adminState.error || 'A valid admin session token is required.',
+      { error_code: 'admin_required' }
+    );
+  }
+  if (!adminState.isAdmin) {
+    return toolError('This user is not authorized to browse artifacts.', { error_code: 'admin_required' });
+  }
 
   return adminState;
 };
 
+/**
+ * Gate for the genuinely destructive/migration admin tools
+ * (soft_delete_artifact, restore_artifact, migrate_artifact_indexes,
+ * reconcile_artifact_indexes — all hidden from MCP discovery via
+ * INTERNAL_ONLY_TOOLS in mcp.ts). Deliberately UNCHANGED by QA-W16-3 below:
+ * these stay restricted to the server publish secret or a real Netlify
+ * Identity admin session, exactly as before. Broadening this gate to any
+ * MCP-authenticated caller (the QA-W16-3 fix applied to the three read-only
+ * browse tools) would hand every ordinary agent connector destructive/
+ * migration access it never had — out of scope for the QA-W16-3 finding,
+ * which is specifically about the three tools below that have no legitimate
+ * caller other than MCP agents in the first place.
+ */
 const requireAdminToolAccess = async (event: LambdaEvent) => {
+  if (hasValidNetlifyPublishSecret(event)) return undefined;
+
+  const adminState = await getAdminToolState(event);
+
+  return 'isError' in adminState ? adminState : undefined;
+};
+
+/**
+ * QA-W16-3 (live QA, 2026-08-06): `list_artifacts_by_kind`,
+ * `list_artifacts_by_request`, and `search_artifacts` are documented
+ * "admin-only" and ARE listed in MCP tool discovery (unlike their
+ * destructive/migration siblings above, which are deliberately hidden via
+ * INTERNAL_ONLY_TOOLS) — but until this fix, calling any of them failed
+ * EVERY time with "Authentication token could not be verified.", 100%
+ * reproducible, while sibling tools get_artifact_metadata and
+ * list_artifacts_for_request worked fine with the identical MCP credentials.
+ *
+ * Root cause: nothing in this codebase ever calls these three functions from
+ * a browser request carrying a real Netlify Identity session — they are
+ * dispatched EXCLUSIVELY through mcp.ts's callTool. `getAdminToolState`
+ * (used via requireAdminToolAccess above) unconditionally tries to verify
+ * the caller's Authorization bearer token as a Netlify Identity/GoTrue
+ * session token. Every MCP caller's bearer token is the shared
+ * MCP_HTTP_AUTH_TOKEN or a verified per-agent token — never a GoTrue token —
+ * so that verification call to `${IDENTITY_URL}/user` failed 100% of the
+ * time, and the caller saw a generic broken-token message indistinguishable
+ * from an actually-invalid credential.
+ *
+ * Fix, scoped to exactly these three tools: a request that reached this
+ * function has ALREADY cleared the platform's own MCP authentication gate
+ * (`event.mcpGateAuthenticated`, set once per request in mcp.ts's handler
+ * right after `getAuthResult` succeeds) — the same guarantee their working
+ * siblings already rely on with no extra check at all. That is accepted
+ * here too. A real Netlify Identity admin session remains a second valid
+ * path (unchanged). There is no separate agent-tier "admin" role in this
+ * bridge today — if one is wanted later, this is the seam to add it; until
+ * then, a request that somehow reaches these three tools without having
+ * cleared the MCP gate AND without a Netlify Identity admin session gets an
+ * explicit, correctly-labeled 403 (error_code: admin_required), never the
+ * misleading identity-verification failure.
+ */
+const requireArtifactBrowseAccess = async (event: LambdaEvent) => {
+  if (event.mcpGateAuthenticated) return undefined;
   if (hasValidNetlifyPublishSecret(event)) return undefined;
 
   const adminState = await getAdminToolState(event);
@@ -389,7 +452,7 @@ export const getArtifactMetadata = async (event: LambdaEvent, requestId: unknown
 };
 
 export const listArtifactsByKind = async (event: LambdaEvent, input: Record<string, unknown>) => {
-  const unauthorized = await requireAdminToolAccess(event);
+  const unauthorized = await requireArtifactBrowseAccess(event);
   if (unauthorized) return unauthorized;
 
   const artifactKind = normalizeArtifactKindInput(input.artifactKind, true);
@@ -402,7 +465,7 @@ export const listArtifactsByKind = async (event: LambdaEvent, input: Record<stri
 };
 
 export const listArtifactsByRequest = async (event: LambdaEvent, input: Record<string, unknown>) => {
-  const unauthorized = await requireAdminToolAccess(event);
+  const unauthorized = await requireArtifactBrowseAccess(event);
   if (unauthorized) return unauthorized;
 
   const requestId = toNonEmptyString(input.requestId);
@@ -422,7 +485,7 @@ export const listArtifactsByRequest = async (event: LambdaEvent, input: Record<s
 };
 
 export const searchArtifacts = async (event: LambdaEvent, input: Record<string, unknown>) => {
-  const unauthorized = await requireAdminToolAccess(event);
+  const unauthorized = await requireArtifactBrowseAccess(event);
   if (unauthorized) return unauthorized;
 
   const options = normalizeArtifactBrowseOptions(input);
