@@ -190,6 +190,7 @@ import {
   callReleaseToProduction,
   callTriggerNetlifyBuild,
   callVerifyArticleImages,
+  resolveArtifactJobInlineWaitBudgetMs,
   resolveReleaseWaitBudgetSeconds,
 } from '../lib/mcp-tool-handlers.js';
 
@@ -654,9 +655,7 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
       // forceBuild.
       return withIdempotentToolCall(event, name, input.idempotency_key, () => callReleaseToProduction(event, input));
     case 'create_agent_artifact_job':
-      return withIdempotentToolCall(event, name, input.idempotency_key, () =>
-        callCreateAgentArtifactJob(event, input)
-      );
+      return withIdempotentToolCall(event, name, input.idempotency_key, () => callCreateAgentArtifactJob(event, input));
     case 'get_agent_artifact_job_status':
       return callGetAgentArtifactJobStatus(event, input);
     case 'get_agent_artifact_by_slot':
@@ -1159,6 +1158,7 @@ export const visibleToolDefinitions = (): ToolDefinition[] =>
 export const _mcpInternal = {
   getArtifactIndexBlobStore,
   objectStoreHandler,
+  resolveArtifactJobInlineWaitBudgetMs,
   resolveReleaseWaitBudgetSeconds,
 };
 
