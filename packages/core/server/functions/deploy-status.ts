@@ -11,6 +11,7 @@ import {
   isNetlifyDeployLookupConfigured,
   type DeployReceipt,
 } from '../lib/netlify-deploys.js';
+import { isCommitAncestorOrEqual } from '../lib/production-release.js';
 
 type LambdaEvent = {
   body?: string | null;
@@ -130,12 +131,41 @@ const handlerImpl = async (event: LambdaEvent) => {
     // Publishing. Absent fields (site lookup unavailable) mean "unknown",
     // never "not live".
     const publishedDeploy = await getPublishedProductionDeploy();
-    const productionConfirmed = publishedDeploy
+    let productionConfirmed = publishedDeploy
       ? Boolean((commit && publishedDeploy.commit === commit) || (deployId && publishedDeploy.deployId === deployId))
       : undefined;
 
+    // QA-W16-4: object exports accumulate on main behind [skip netlify] and
+    // one release deploys every accumulated commit at once, so the
+    // PUBLISHED deploy's commit is very often ahead of `commit` rather than
+    // equal to it — even though `commit`'s changes are already live. Before
+    // this reconciliation, that case reported deployStatus:"queued" /
+    // productionConfirmed:false forever, contradicting the live site. Ask
+    // GitHub whether `commit` is an ancestor of (or equal to) what is
+    // actually published; if so, treat it as confirmed and reflect that in
+    // the deployStatus returned to the caller too, not just the boolean.
+    let reconciledReceipt: Partial<DeployReceipt> | undefined;
+    if (commit && publishedDeploy?.commit && !productionConfirmed) {
+      const targetIsAncestor = await isCommitAncestorOrEqual(commit, publishedDeploy.commit);
+      if (targetIsAncestor) {
+        productionConfirmed = true;
+        reconciledReceipt = {
+          ...(receipt ?? {}),
+          commit,
+          deployStatus: 'ready',
+          errorMessage: '',
+        };
+      }
+    }
+
     return jsonResponse(200, {
-      ...(receipt ?? getQueuedReceipt({ commit, deployId })),
+      ...(reconciledReceipt ?? receipt ?? getQueuedReceipt({ commit, deployId })),
+      ...(reconciledReceipt
+        ? {
+            reconciled: true,
+            reconciliationNote: `commit ${commit} is already included in the published deploy (${publishedDeploy?.commit}) via ancestry check — reported ready/confirmed instead of the raw by-commit lookup result.`,
+          }
+        : {}),
       ...(publishedDeploy ? { publishedDeploy, productionConfirmed } : {}),
     });
   } catch (error) {
