@@ -106,3 +106,110 @@ fix.
 Either option is a legitimate call; this file exists so the choice doesn't
 get lost. Whoever makes it should update this entry with the decision and
 the PR that implements it.
+
+## 3. Admin-content perf follow-up: unbounded `history[]` makes every store sweep heavier over time
+
+**Status:** open, deferred pending measurement. **Related fix already
+landed:** PRs #527/#528/#530 cut `/admin/content`'s read path from ~166
+serial blob round trips to ~26 parallel batches, skip the validation-context
+build entirely for reads/lock verbs, cache+dedupe the client's inventory
+fetch, and warm `admin-object`/`admin-audit` on the existing `/mcp` keepalive
+schedule. That fixes the *request-count* and *cold-start* cost. It does
+nothing about the *per-record payload* cost below, which grows
+monotonically with usage and will eventually erode the win.
+
+**The problem:** `ObjectRecord.history` (`packages/core/schema/object-record-v1.ts`)
+is append-only with no cap. Patch entries embed a `{before, after}` content
+snapshot per op (`packages/core/lib/object-patch-apply.ts`); checkout,
+checkin, refresh_lock, and publish all append their own entries too
+(`packages/core/server/lib/object-lock.ts`, `object-publish.ts`). Every full
+sweep — `inventory`, `listAllObjectRecords` (the audit feed), and
+`buildStoreValidationContext` when it does run — downloads and JSON-parses
+the *entire* record, including all of `history[]`, then uses none of it (row
+derivation in `packages/core/server/lib/object-inventory.ts` only touches a
+handful of top-level fields).
+
+On the live Dr-Lurie store, measured 2026-08-06: `page_home` is at
+`version: 117`, `history_length: 117` for a body that exports to 5.5 KB;
+`nav_header` is at version 96. Neither number trends down — it is pure
+audit-log growth, and it will keep raising the byte cost of every sweep
+regardless of how parallel or well-cached the request pattern is.
+
+**What still needs doing:**
+- **Measure first**, against the real store, before committing to a design —
+  a one-off script under `scripts/` that reports, per object: body bytes,
+  history entry count, history bytes, total record bytes. Quantify the win
+  before assuming one is needed at the current object count (~70); this
+  matters more as the fleet's per-site object counts grow.
+- If the numbers justify it: cap live `history[]` at N most-recent entries
+  (50 is a reasonable starting point) and spill the older tail to a sidecar
+  blob (e.g. `objects/<type>/history/<object_id>.json`), written on the same
+  op as the record write. Add a key helper beside `objectRecordKey` in
+  `packages/core/server/lib/object-store-keys.ts`.
+- Anything that needs the *full* history must keep working without a
+  behavior change: the audit feed (`packages/core/server/lib/audit-feed.ts`),
+  `inventory` detail's `history_length` (must report the TRUE total — live +
+  spilled — so store a running counter on the record rather than deriving it
+  from `history.length` after capping), and the discard/inverse-op path
+  (confirm it never needs an entry old enough to have been spilled; if it
+  can, either exempt those entries from spilling or teach that path to read
+  the sidecar).
+- Ship the cap as an idempotent migration script runnable against an
+  existing store, with tests, not as a schema change that silently breaks
+  old records.
+
+**Why it was left unfixed:** it's a schema/data-model change (spilling
+history out of the live record) rather than a pure query-path fix, it needs
+production data to size correctly, and #527/#528/#530 already deliver most
+of the near-term latency win — this is follow-up work, not a blocker.
+
+## 4. Admin-content perf follow-up: inventory sweep could become a maintained index instead of a live sweep
+
+**Status:** open, deferred — try this only if #527/#528/#530 (and #3 above,
+if it lands) turn out not to be enough. **Related fix already landed:** see
+#3 above; this is the next tier up if the read path is still too slow after
+those.
+
+**The idea:** `inventory`'s list form
+(`packages/core/server/lib/object-verbs.ts`, `case 'inventory'`) still does a
+live sweep of every record even after #527/#528/#530 (it's now parallel and
+skips the validation-context duplicate work, but it still touches every
+object). Every field an inventory *row* needs
+(`inventoryRowFromRecord` in `packages/core/server/lib/object-inventory.ts`
+— object_id, object_type, display_name, updated_at, status,
+requires_approval, version, content_revision, review_state, lock,
+published_time, published_content_revision, unpublished_changes, the recipe
+summary) is cheap to compute at write time. A maintained index blob
+(`objects/_index/inventory.json`, written on every mutating verb alongside
+the record write, following the existing `objectStatusIndexKey` precedent in
+`object-store-keys.ts`) would turn list-form `inventory` into one blob read
+instead of an N-record sweep.
+
+**Why it was left undone:** it's real complexity for a win that may not be
+needed once #527/#528/#530 land — validate the live impact of those first.
+It also has sharp edges that need explicit design, not a quick patch:
+- Must be rebuildable from scratch (`rebuildInventoryIndex()` + a `scripts/`
+  entry point) with a safe fallback to the current full-sweep path if the
+  index is missing or its schema version doesn't match — never serve a
+  silently-stale index.
+- Per the consistency note already in
+  `packages/core/server/lib/blob-store.ts`, the site-objects store's
+  requested `'strong'` consistency is silently EVENTUAL on the Lambda
+  name-lookup path (no blobs-scoped token configured). The index write must
+  happen on the exact same code path as the record write, and a
+  read-after-write in the admin UI must not show a stale row — if that can't
+  be guaranteed, the write path should return the updated row to the client
+  directly instead of relying on a re-read of the index.
+- `requires_approval` depends on the runtime governance policy
+  (`packages/core/lib/approval-policy.ts`), which can change with no object
+  write at all. The index must either recompute that field at read time from
+  the live policy, or be invalidated whenever the policy changes — a stored,
+  never-recomputed value would silently drift from the truth.
+- Single-object `inventory` detail (with `object_id`) should keep reading the
+  record directly, not the index — it needs review decisions, the publish
+  receipt, and history length, none of which belong in a lightweight list
+  index.
+
+Whoever picks this up should re-measure `/admin/content` load time against
+production after #527/#528/#530 (and #3, if done) are live, and only build
+this if the sweep is still the bottleneck.
