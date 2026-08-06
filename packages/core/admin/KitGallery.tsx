@@ -66,7 +66,7 @@ function Row({ children }: { children: ReactNode }) {
   return <div className="flex flex-wrap items-center gap-3">{children}</div>;
 }
 
-// ─── sample data ──────────────────────────────────────────────────
+// ─── sample data ────────────────────────────────────────────────────────────
 
 const READINESS: ReadinessGroup[] = [
   {
@@ -555,7 +555,7 @@ function GalleryBody({ identity }: { identity: SiteIdentity }) {
   );
 }
 
-// ─── root with dark toggle, inside the shared admin chrome ────────────────────────
+// ─── root with dark toggle, inside the shared admin chrome ────────────────────
 
 export interface KitGalleryProps {
   identity: SiteIdentity;
