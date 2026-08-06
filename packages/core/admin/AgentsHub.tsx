@@ -9,6 +9,7 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import { AdminShell } from './AdminShell';
+import type { SiteIdentity } from '@core/lib/site-identity';
 import { Avatar, Badge, Button, Card, EmptyState, Skeleton, StatusPill } from './primitives';
 import { Input, Select, Textarea } from './forms';
 import { Dialog, useToast } from './overlays';
@@ -512,9 +513,13 @@ function HubBody() {
   );
 }
 
-export default function AgentsHub() {
+export interface AgentsHubProps {
+  identity: SiteIdentity;
+}
+
+export default function AgentsHub({ identity }: AgentsHubProps) {
   return (
-    <AdminShell currentPath="/admin/agents" title="CMS Agents">
+    <AdminShell currentPath="/admin/agents" title="CMS Agents" identity={identity}>
       <HubBody />
     </AdminShell>
   );
