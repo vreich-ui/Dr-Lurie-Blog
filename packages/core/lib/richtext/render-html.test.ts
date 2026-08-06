@@ -37,6 +37,11 @@ describe('renderRichTextV1Html', () => {
     );
   });
 
+  it('renders the code mark as <code>, not styled prose', () => {
+    const html = renderRichTextV1Html(doc(paragraph(text('run '), text('npm test', [{ type: 'code' }]))));
+    assert.equal(html, '<p>run <code>npm test</code></p>');
+  });
+
   it('renders hyperlinks', () => {
     const html = renderRichTextV1Html(
       doc(paragraph({ nodeType: 'hyperlink', data: { uri: '/start-here' }, content: [text('go')] }))

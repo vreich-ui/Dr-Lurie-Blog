@@ -41,7 +41,8 @@ import { getSiteObject } from '~/utils/site-object';
 const site = getSiteObject();
 const tokens = site?.brandTokens;
 
-const font = (key: string): string => tokens?.fonts[key as 'sans' | 'serif' | 'heading'] ?? FALLBACK_FONTS[key];
+const font = (key: string): string =>
+  tokens?.fonts[key as 'sans' | 'serif' | 'heading' | 'mono'] ?? FALLBACK_FONTS[key];
 const color = (key: string): string => tokens?.colors[key] ?? FALLBACK_COLORS[key];
 const darkColor = (key: string): string =>
   tokens?.colors[`dark:${key}`] ?? tokens?.colors[key] ?? FALLBACK_COLORS[`dark:${key}`] ?? FALLBACK_COLORS[key];
@@ -60,6 +61,7 @@ const css = `
 ${axisCss}    --aw-font-sans: ${font('sans')};
     --aw-font-serif: ${font('serif')};
     --aw-font-heading: ${font('heading')};
+    --aw-font-mono: ${font('mono')};
 
     --aw-color-primary: ${color('primary')};
     --aw-color-secondary: ${color('secondary')};
@@ -83,6 +85,7 @@ ${axisCss}    --aw-font-sans: ${font('sans')};
     --aw-font-sans: ${font('sans')};
     --aw-font-serif: ${font('serif')};
     --aw-font-heading: ${font('heading')};
+    --aw-font-mono: ${font('mono')};
 
     --aw-color-primary: ${darkColor('primary')};
     --aw-color-secondary: ${darkColor('secondary')};

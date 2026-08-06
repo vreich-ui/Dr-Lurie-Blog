@@ -117,16 +117,29 @@ describe('sanitizer strips out-of-grammar ProseMirror structure', () => {
     assert.ok(JSON.stringify(rt).includes('https://ok.example'));
   });
 
-  it('drops out-of-grammar marks (strike/code) but keeps the text', () => {
+  it('drops an out-of-grammar mark (strike) but keeps the text', () => {
     const pasted: ProseMirrorNode = {
       type: 'doc',
-      content: [
-        { type: 'paragraph', content: [{ type: 'text', text: 'kept', marks: [{ type: 'strike' }, { type: 'code' }] }] },
-      ],
+      content: [{ type: 'paragraph', content: [{ type: 'text', text: 'kept', marks: [{ type: 'strike' }] }] }],
     };
     const rt = serializeToRichTextV1(sanitizeProseMirrorDoc(pasted));
     assert.ok(JSON.stringify(rt).includes('kept'));
-    assert.ok(!GRAMMAR_MARKS.has('strike') && !GRAMMAR_MARKS.has('code'), 'strike/code are not grammar marks');
+    assert.ok(!JSON.stringify(rt).includes('strike'), 'strike is stripped');
+    assert.ok(!GRAMMAR_MARKS.has('strike'), 'strike is not a grammar mark');
+  });
+
+  it('keeps the code mark (inline code display, widened alongside rich-text-v1.ts)', () => {
+    const pasted: ProseMirrorNode = {
+      type: 'doc',
+      content: [{ type: 'paragraph', content: [{ type: 'text', text: 'const x', marks: [{ type: 'code' }] }] }],
+    };
+    const rt = serializeToRichTextV1(sanitizeProseMirrorDoc(pasted));
+    assert.deepEqual(rt.content[0], {
+      nodeType: BLOCKS.PARAGRAPH,
+      data: {},
+      content: [rtText('const x', [{ type: MARKS.CODE }])],
+    });
+    assert.ok(GRAMMAR_MARKS.has('code'), 'code is a grammar mark');
   });
 
   it('demotes h1/h4 to paragraphs and unwraps blockquote', () => {

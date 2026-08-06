@@ -36,6 +36,10 @@ export const brandTokensSchema = z
         sans: z.string(),
         serif: z.string(),
         heading: z.string(),
+        // Additive-optional (code/typewriter display): an absent value falls
+        // back to the theme-tokens registry's Preflight-matching literal, so
+        // no existing theme/site record needs migration.
+        mono: z.string().optional(),
       })
       .strict(),
     layout: z

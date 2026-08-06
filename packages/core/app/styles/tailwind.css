@@ -327,6 +327,26 @@
     @apply border border-gray-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-white;
     border-radius: var(--dl-radius-control, 0.375rem);
   }
+  /* Theme font token (mono): the fallback is Tailwind Preflight's own
+     code/kbd/samp/pre stack, so an unset token renders byte-identically to
+     today — this only makes the stack agent-themeable, same pattern as
+     --aw-font-sans/serif/heading. */
+  code,
+  kbd,
+  samp,
+  pre {
+    font-family: var(
+      --aw-font-mono,
+      ui-monospace,
+      SFMono-Regular,
+      Menlo,
+      Monaco,
+      Consolas,
+      'Liberation Mono',
+      'Courier New',
+      monospace
+    );
+  }
 }
 
 @layer components {
@@ -408,6 +428,20 @@
      (utilities layer) still override — the axis drives the default weight. */
   .editorial-prose :where(h1, h2, h3, h4, h5, h6) {
     font-weight: var(--dl-heading-weight, 700);
+  }
+  /* Inline code: a quiet badge instead of the typography plugin's default
+     backtick markers — reads as code without fighting editorial copy. */
+  .editorial-prose :where(code)::before,
+  .editorial-prose :where(code)::after {
+    content: none;
+  }
+  .editorial-prose :where(code),
+  .dl-reading :where(code) {
+    background-color: var(--aw-color-bg-surface);
+    border-radius: 0.25rem;
+    padding: 0.15em 0.4em;
+    font-size: 0.875em;
+    font-weight: 500;
   }
   .dl-card {
     /* T10.1: shape.radius (card tier) + shape.shadow axes — fallbacks are the

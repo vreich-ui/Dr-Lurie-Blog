@@ -26,7 +26,7 @@ import { BLOCKS, INLINES, MARKS } from '@contentful/rich-text-types';
 
 // ---------- the restricted vocabulary ----------
 
-export const RICH_TEXT_V1_MARKS = [MARKS.BOLD, MARKS.ITALIC] as const;
+export const RICH_TEXT_V1_MARKS = [MARKS.BOLD, MARKS.ITALIC, MARKS.CODE] as const;
 export type RichTextV1Mark = (typeof RICH_TEXT_V1_MARKS)[number];
 
 export const RICH_TEXT_V1_INLINES = [INLINES.HYPERLINK] as const;
@@ -47,7 +47,7 @@ export const RICH_TEXT_V1_BLOCKS = [
 
 const dataBagSchema = z.record(z.string(), z.unknown());
 
-const markSchema = z.object({ type: z.enum([MARKS.BOLD, MARKS.ITALIC]) }).strict();
+const markSchema = z.object({ type: z.enum([MARKS.BOLD, MARKS.ITALIC, MARKS.CODE]) }).strict();
 
 export const textNodeSchema = z
   .object({
@@ -206,7 +206,7 @@ export type RichTextGrammar = {
 /** The p-only fields (hero/lede/bio/… bodies — today's splitRichTextParagraphs). */
 export const INLINE_COPY_GRAMMAR: RichTextGrammar = {
   enabledNodeTypes: [BLOCKS.PARAGRAPH, INLINES.HYPERLINK],
-  enabledMarks: [MARKS.BOLD, MARKS.ITALIC],
+  enabledMarks: [MARKS.BOLD, MARKS.ITALIC, MARKS.CODE],
 };
 
 /** Full-page text sections (prose.body — today's splitRichTextBlocks). */
@@ -220,7 +220,7 @@ export const PROSE_GRAMMAR: RichTextGrammar = {
     BLOCKS.LIST_ITEM,
     INLINES.HYPERLINK,
   ],
-  enabledMarks: [MARKS.BOLD, MARKS.ITALIC],
+  enabledMarks: [MARKS.BOLD, MARKS.ITALIC, MARKS.CODE],
 };
 
 /** Article content-node bodies (W7.3+): prose plus quotes and embeds. */
@@ -237,7 +237,7 @@ export const ARTICLE_BODY_GRAMMAR: RichTextGrammar = {
     BLOCKS.EMBEDDED_ASSET,
     INLINES.HYPERLINK,
   ],
-  enabledMarks: [MARKS.BOLD, MARKS.ITALIC],
+  enabledMarks: [MARKS.BOLD, MARKS.ITALIC, MARKS.CODE],
 };
 
 type AnyNode = { nodeType: string; content?: AnyNode[]; marks?: Array<{ type: string }> };
