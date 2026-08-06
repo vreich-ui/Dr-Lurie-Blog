@@ -579,6 +579,96 @@ const mintOpsIds = (rawOps: readonly unknown[]): { ops: unknown[]; minted: Minte
   return { ops, minted };
 };
 
+// ─── D3-sharedref: denormalize a shared_ref's target display name ─────────────
+
+type JsonRecord = Record<string, unknown>;
+
+const isSharedRefSection = (section: unknown): section is JsonRecord & { data: JsonRecord } =>
+  isRecord(section) && section.type === 'shared_ref' && isRecord(section.data);
+
+/**
+ * Stamp `data.sectionName` on any `upsert_section` / `update_section_data` op
+ * that creates or touches a `shared_ref`-typed section, resolving the
+ * target's current display name through `context.resolveSharedSectionName`
+ * (object-validate.ts). That resolver is backed by the SAME preloaded object
+ * snapshot validation itself already builds for this write
+ * (object-validation-context.ts) — so this adds no extra store read, it
+ * piggybacks on one that has to happen anyway to check the ref resolves at
+ * all. ObjectPreview.tsx then renders the stamped copy directly, so reads
+ * stay free and synchronous instead of dereferencing the target at
+ * render/preview time (see section-v1.ts's shared_ref field comment for the
+ * staleness tradeoff this denormalization accepts — the stamped name is only
+ * as fresh as the last write that touched THIS ref; renaming the target does
+ * not retroactively update every page that shared_refs it, and nothing in
+ * this codebase does that for any other denormalized display field either,
+ * e.g. object-impact.ts recomputes "what points at this" on demand rather
+ * than maintaining a live back-index).
+ *
+ * A target that doesn't resolve — a dangling ref (the target section was
+ * deleted, or never existed) or simply no resolver being wired for this call
+ * (e.g. a harness with no validationContext) — leaves `sectionName` UNSET
+ * rather than throwing (and rather than stamping `null`: object-patch-
+ * apply.ts's engine reserves `null` as its fields-unset marker and refuses
+ * it outright inside a whole-value `upsert_section` payload — see section-
+ * v1.ts's shared_ref field comment for why "couldn't resolve" and "never
+ * attempted" are consequently the SAME absent-key state, not a null-vs-
+ * undefined distinction). Reference-integrity enforcement (does this id
+ * resolve at all?) is validateObject's job (object-validate.ts's
+ * requireObject), not this step's; this step only ever adds a display
+ * label, never blocks a write.
+ *
+ * `update_section_data` merges `fields` into an existing section's `data`
+ * and never touches `type`, so whether an op is "about" a shared_ref has to
+ * be read off the CURRENT record — the section `section_id` addresses,
+ * before this patch applies. The effective target id is `fields.section`
+ * when the op is changing it, else the section's existing target (an
+ * `update_section_data` on a shared_ref that omits `section` from `fields`
+ * is re-affirming the same target, e.g. touching `visibility` via a
+ * different op in the same batch — still worth re-stamping in case the
+ * target was renamed since the ref was last written). When the target can't
+ * be resolved, `fields.sectionName` is likewise left unset — NOT set to
+ * `null`, which under this op's merge semantics would actively DELETE any
+ * name already stamped there; an unresolved re-stamp attempt should leave a
+ * previously-good name in place rather than blanking it.
+ */
+const stampSharedRefSectionNames = (
+  ops: readonly unknown[],
+  currentBody: unknown,
+  context: ObjectValidationContext
+): unknown[] => {
+  const currentSections: unknown[] =
+    isRecord(currentBody) && Array.isArray(currentBody.sections) ? currentBody.sections : [];
+  const nameFor = (targetId: string): string | undefined => context.resolveSharedSectionName?.(targetId);
+
+  return ops.map((raw) => {
+    if (!isRecord(raw) || typeof raw.op !== 'string') return raw; // malformed → let the engine reject it
+
+    if (raw.op === 'upsert_section' && isSharedRefSection(raw.section) && typeof raw.section.data.section === 'string') {
+      const name = nameFor(raw.section.data.section);
+      if (name === undefined) return raw; // unresolved — leave the payload exactly as sent
+      const op = deepClone(raw) as JsonRecord;
+      const data = (op.section as JsonRecord).data as JsonRecord;
+      data.sectionName = name;
+      return op;
+    }
+
+    if (raw.op === 'update_section_data' && typeof raw.section_id === 'string' && isRecord(raw.fields)) {
+      const current = currentSections.find((section) => isRecord(section) && section.id === raw.section_id);
+      if (isSharedRefSection(current)) {
+        const targetId = typeof raw.fields.section === 'string' ? raw.fields.section : current.data.section;
+        const name = typeof targetId === 'string' ? nameFor(targetId) : undefined;
+        if (name !== undefined) {
+          const op = deepClone(raw) as JsonRecord;
+          (op.fields as JsonRecord).sectionName = name;
+          return op;
+        }
+      }
+    }
+
+    return raw;
+  });
+};
+
 /** `learning/<yyyy-mm-dd>/<compact-ts>-<object_type>-<object_id>.json` — the commerce-events date-directory idiom. */
 const agentLearningRecordKey = (objectType: ObjectType, objectId: string, at: string): string => {
   const date = at.slice(0, 10);
@@ -1495,6 +1585,11 @@ export const handleObjectVerb = async (
           return err(400, { error: 'Could not mint an id for a patch op', detail: error.message });
         throw error;
       }
+      // D3-sharedref: after ids are minted (so upsert_section always has a
+      // section.id to address) but before the engine applies anything —
+      // stamps data.sectionName on any op that creates/touches a shared_ref
+      // section, reading the CURRENT (pre-patch) record for update_section_data.
+      normalizedOps = stampSharedRefSectionNames(normalizedOps, record.body, context);
 
       let appliedRecord: ObjectRecord;
       try {
