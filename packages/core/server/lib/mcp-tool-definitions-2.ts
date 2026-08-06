@@ -7,6 +7,7 @@ import { pageTypeIds } from '../../schema/bodies/page-v1.js';
 import {
   anyObjectSchema,
   arraySchema,
+  idempotencyKeyJsonSchema,
   intSchema,
   nullableStringSchema,
   objectSchema,
@@ -50,7 +51,7 @@ export const TOOL_DEFINITIONS_PART2: ToolDefinition[] = [
   {
     name: 'object_create',
     description:
-      'Create a CMS object from object_type, site, and the per-type body. requested_id is optional — omit it to have a valid id minted server-side. For recipe types (template / section_template / theme): REUSE FIRST — object_inventory lists existing recipes with self-describing summaries; create only when none fits, and include description/whenToUse/scope (required to publish). Creation may be restricted per type by the committed creation policy — check object_contract(<type>).creation_policy; a denial is a 403 with code creation_restricted. content_item (articles) is creatable since W7.3: the body is the annotated node list (per-node private.strategy/intent — hook/agitation/resolution etc. — plus commercial/rendering/chat metadata) with plain-text or rich_text.v1 node bodies; read object_contract("content_item") first. Committed legacy posts stay on the old article tools. tracking_config (W13) is the per-site tracker-registry SINGLETON: creation is human/seed-only and a second active registry is refused (409) — read object_contract("tracking_config") and edit the existing trk_* object instead.',
+      'Create a CMS object from object_type, site, and the per-type body. requested_id is optional — omit it to have a valid id minted server-side. For recipe types (template / section_template / theme): REUSE FIRST — object_inventory lists existing recipes with self-describing summaries; create only when none fits, and include description/whenToUse/scope (required to publish). Creation may be restricted per type by the committed creation policy — check object_contract(<type>).creation_policy; a denial is a 403 with code creation_restricted. content_item (articles) is creatable since W7.3: the body is the annotated node list (per-node private.strategy/intent — hook/agitation/resolution etc. — plus commercial/rendering/chat metadata) with plain-text or rich_text.v1 node bodies; read object_contract("content_item") first. Committed legacy posts stay on the old article tools. tracking_config (W13) is the per-site tracker-registry SINGLETON: creation is human/seed-only and a second active registry is refused (409) — read object_contract("tracking_config") and edit the existing trk_* object instead. If this call itself times out or 502s (ambiguous whether the object was created), retry with the SAME idempotency_key to get back the original created object instead of creating a duplicate — this matters most when requested_id is omitted, since a fresh id is minted on every genuinely new call.',
     inputSchema: objectSchema(
       {
         object_type: objectTypeEnumSchema(),
@@ -58,6 +59,7 @@ export const TOOL_DEFINITIONS_PART2: ToolDefinition[] = [
         body: anyObjectSchema('The per-type object body; validated server-side against the T0.2 schema.'),
         requested_id: stringSchema('Optional explicit object id; a valid id is minted from the body when omitted.'),
         agent_name: stringSchema('Optional self-declared agent name recorded on history (attribution only).'),
+        idempotency_key: idempotencyKeyJsonSchema,
       },
       ['object_type', 'site', 'body']
     ),
@@ -386,7 +388,7 @@ export const TOOL_DEFINITIONS_PART2: ToolDefinition[] = [
   {
     name: 'object_publish',
     description:
-      'Publish a CMS object (any of the nine governed types) through the generic publish operation: run the approval-policy publish gate, then validate → materialize → commit the export to git → stamp the record, in that order (the record is never stamped before the export commits). Requires a held lock_token. Omit published_time to publish now; null (unpublish) and future timestamps are rejected in this phase. The gate is identical to the admin UI: autonomous object types publish directly with no human; approval-gated types require a current human approval pinned (M-6) to the exact action being attempted. content_item (article objects) publishes here too since W7.3 — Tier 1 stays autonomous under the committed policy. The export commit carries [skip netlify], so a successful publish does NOT deploy — the change commits to main and goes live only on an explicit release (release_to_production); the response "production" block spells this out. Publish deliberately KEEPS your lock (it re-stamps under the live lease so concurrent body drift is caught, not silently overwritten) — it is NOT terminal for the lock. Call object_checkin when you are done, or the object stays locked to everyone else for the rest of the 15-minute lease.',
+      'Publish a CMS object (any of the nine governed types) through the generic publish operation: run the approval-policy publish gate, then validate → materialize → commit the export to git → stamp the record, in that order (the record is never stamped before the export commits). Requires a held lock_token. Omit published_time to publish now; null (unpublish) and future timestamps are rejected in this phase. The gate is identical to the admin UI: autonomous object types publish directly with no human; approval-gated types require a current human approval pinned (M-6) to the exact action being attempted. content_item (article objects) publishes here too since W7.3 — Tier 1 stays autonomous under the committed policy. The export commit carries [skip netlify], so a successful publish does NOT deploy — the change commits to main and goes live only on an explicit release (release_to_production); the response "production" block spells this out. Publish deliberately KEEPS your lock (it re-stamps under the live lease so concurrent body drift is caught, not silently overwritten) — it is NOT terminal for the lock. Call object_checkin when you are done, or the object stays locked to everyone else for the rest of the 15-minute lease. If this call itself times out or 502s (ambiguous whether the publish landed), retry with the SAME idempotency_key to get back the original publish receipt instead of re-running the commit/stamp.',
     inputSchema: objectSchema(
       {
         object_type: objectTypeEnumSchema(),
@@ -407,6 +409,7 @@ export const TOOL_DEFINITIONS_PART2: ToolDefinition[] = [
           description:
             'Optional. The release/build behavior this publish uses, so an approval that pins release_build can be satisfied. Object publishes always defer the deploy (release is the separate release_to_production step); this declares the approved intent for the gate.',
         },
+        idempotency_key: idempotencyKeyJsonSchema,
       },
       ['object_type', 'object_id', 'lock_token']
     ),

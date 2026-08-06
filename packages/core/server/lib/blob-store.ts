@@ -223,6 +223,18 @@ export const getOptInBlobStore = async (event: unknown, binding?: SiteBinding): 
   return getNetlifyBlobStore('opt-ins', event, binding);
 };
 
+/**
+ * QA-W16-1: one strongly-consistent store for the idempotency-key bridge
+ * (idempotency-store.ts). Keyed `idem:{tool}:{key}`, one record per
+ * (tool, caller-supplied key) holding the FIRST successful result — a
+ * same-key retry after a client-visible timeout/502 replays it instead of
+ * re-running the write, even when the underlying write had already landed
+ * server-side before the response could get back to the caller.
+ */
+export const getIdempotencyBlobStore = async (event: unknown, binding?: SiteBinding): Promise<BlobStore> => {
+  return getNetlifyBlobStore({ name: 'idempotency', consistency: 'strong' }, event, binding);
+};
+
 export const getSiteObjectsBlobStore = async (event: unknown, binding?: SiteBinding): Promise<BlobStore> => {
   return getNetlifyBlobStore({ name: 'site-objects', consistency: 'strong' }, event, binding);
 };

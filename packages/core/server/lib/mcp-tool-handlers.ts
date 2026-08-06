@@ -32,8 +32,10 @@ import {
   getPlatformArtifactBySlot,
   getPlatformArtifactJobStatus,
   getPlatformPdfTemplate,
+  getPlatformPdfTemplateValidation,
   listPlatformPdfTemplates,
   publishPlatformPdfTemplate,
+  validatePlatformPdfTemplate,
   verifyPlatformArtifact,
   type PlatformArtifactJobInput,
   type PlatformCreateTemplateInput,
@@ -774,6 +776,53 @@ export const callPublishPdfTemplate = async (event: LambdaEvent, input: Record<s
   const published = await publishPlatformPdfTemplate(built.grant, { templateId, ...(version ? { version } : {}) });
   if (!published.ok) return pdfToolBridgeError(published);
   return toolResult({ ...published.body, siteId: scoped.siteId });
+};
+
+/**
+ * QA-W16-2: the missing half of the create -> validate -> publish sequence
+ * for react-pdf/typst/chromium templates. Same trusted-bridge pattern as
+ * every other pdf-tool template call in this file: resolve+check site scope,
+ * mint a fresh storage grant server-side, forward it, never return it.
+ */
+export const callValidatePdfTemplate = async (event: LambdaEvent, input: Record<string, unknown>) => {
+  const scoped = resolveTemplateBridgeScope(input);
+  if (!scoped.ok) return scoped.result;
+  const templateId = toNonEmptyString(input.template_id);
+  if (!templateId) return toolError('template_id is required.');
+  const built = buildArtifactBridgeGrant();
+  if (!built.ok) return built.result;
+
+  const version = typeof input.version === 'number' && Number.isFinite(input.version) ? input.version : undefined;
+  const validated = await validatePlatformPdfTemplate(built.grant, { templateId, ...(version ? { version } : {}) });
+  if (!validated.ok) return pdfToolBridgeError(validated);
+
+  event.log?.({
+    event: 'template_bridge_validation_requested',
+    siteId: scoped.siteId,
+    projectId: built.grant.projectId,
+    templateId,
+    version: version ?? null,
+  });
+  return toolResult({ ...validated.body, siteId: scoped.siteId });
+};
+
+export const callGetPdfTemplateValidation = async (event: LambdaEvent, input: Record<string, unknown>) => {
+  const scoped = resolveTemplateBridgeScope(input);
+  if (!scoped.ok) return scoped.result;
+  const templateId = toNonEmptyString(input.template_id);
+  if (!templateId) return toolError('template_id is required.');
+  const built = buildArtifactBridgeGrant();
+  if (!built.ok) return built.result;
+
+  const version = typeof input.version === 'number' && Number.isFinite(input.version) ? input.version : undefined;
+  const validationId = toNonEmptyString(input.validation_id);
+  const status = await getPlatformPdfTemplateValidation(built.grant, {
+    templateId,
+    ...(version ? { version } : {}),
+    ...(validationId ? { validationId } : {}),
+  });
+  if (!status.ok) return pdfToolBridgeError(status);
+  return toolResult({ ...status.body, siteId: scoped.siteId });
 };
 
 export const callDeletePdfTemplate = async (event: LambdaEvent, input: Record<string, unknown>) => {

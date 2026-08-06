@@ -59,6 +59,69 @@ export const arraySchema = (items: Record<string, unknown>, description?: string
   ...(description ? { description } : {}),
 });
 
+/**
+ * QA-W16-1: shared idempotency-key schema for every write tool that can mint
+ * a fresh id/slot or trigger a fresh build on each call. Pass the SAME value
+ * on a retry (after a timeout, a Cloudflare 502, or any ambiguous response)
+ * to get back the ORIGINAL result instead of a duplicate — e.g. a second
+ * content_item, a second rendered artifact, or a second production build.
+ * Example: idempotency_key: "create-hero-article-2026-08-06-01" reused
+ * verbatim on retry. Omit it and every call runs the write fresh, as before.
+ */
+export const idempotencyKeyJsonSchema = stringSchema(
+  'Optional client-supplied key for safe retries. Pass the SAME value on a retry of this exact call (e.g. after a timeout or 502) to get back the ORIGINAL result instead of causing a duplicate write. Example: pass "publish-article-42-attempt" on both the first call and any retry. Omit to run the write fresh every time (previous behavior).'
+);
+
+/**
+ * QA-W16 hardening: the artifact/pdf-template bridge's error catalog, kept in
+ * one place for the same reason object_contract's patch_error_codes is —
+ * an agent hitting error_code should be able to look up what it means and
+ * what to do, not have to guess from raw pass-through text. Referenced from
+ * the tool descriptions below rather than exposed as its own tool, since
+ * (unlike CMS object types) there is no per-object object_contract() call
+ * these errors are scoped to.
+ */
+export const ARTIFACT_TEMPLATE_ERROR_CODES: Record<string, { http: number; meaning: string }> = {
+  pdf_tool_bridge_not_configured: {
+    http: 503,
+    meaning: "This site's PDF_TOOL_BASE_URL/PDF_TOOL_AGENT_RUN_TOKEN are not configured — an operator setup gap, not a caller mistake.",
+  },
+  pdf_tool_bridge_request_failed: {
+    http: 0,
+    meaning:
+      'pdf-tool rejected or could not be reached for the request; the real HTTP status is in this error\'s own statusCode field and any pdf-tool-specific code (e.g. TEMPLATE_VALIDATION_REQUIRED) is spread in verbatim alongside it.',
+  },
+  template_scope_required: { http: 400, meaning: 'site_id is required for every pdf-template bridge call.' },
+  template_site_mismatch: {
+    http: 403,
+    meaning: 'The supplied site_id names a different site than this deployment owns — use that site\'s own connector.',
+  },
+  artifact_scope_required: { http: 400, meaning: 'site_id and request_id are both required for the artifact bridge.' },
+  artifact_site_mismatch: { http: 403, meaning: 'site_id does not match this deployment.' },
+  artifact_request_not_found: { http: 404, meaning: 'No content_item exists for the given request_id.' },
+  artifact_request_scope_mismatch: {
+    http: 403,
+    meaning: 'The request_id exists but is not owned by the supplied site_id.',
+  },
+  artifact_job_scope_mismatch: {
+    http: 403,
+    meaning: 'The job_id being polled was not created under this site_id/request_id pair.',
+  },
+  pdf_tool_invalid_response: {
+    http: 502,
+    meaning: 'pdf-tool returned 2xx but the body was missing a field this bridge requires (e.g. jobId) — retry, then escalate if it repeats.',
+  },
+  artifact_materialization_unverified: {
+    http: 502,
+    meaning: "pdf-tool reported the job complete but this bridge's own server-side verification of the resulting bytes failed — do not trust the artifact reference; re-run the job.",
+  },
+  TEMPLATE_VALIDATION_REQUIRED: {
+    http: 409,
+    meaning:
+      'publish_pdf_template refused a react-pdf/typst/chromium version with no PASSED validate_pdf_template report on file for that exact template_id/version. Call validate_pdf_template, poll get_pdf_template_validation to a terminal PASSED, then retry publish.',
+  },
+};
+
 const metadataBagSchema = (description: string) => ({
   type: 'object',
   description,
@@ -214,7 +277,7 @@ export const TOOL_DEFINITIONS_PART1: ToolDefinition[] = [
   {
     name: 'deploy_status',
     description:
-      'Read-only Netlify deploy receipt lookup by commit or deploy id. Besides the receipt, the response carries publishedDeploy (the deploy production is actually serving) and productionConfirmed (whether that published deploy matches the commit/deployId you asked about) whenever the site lookup is available. A deploy can be deployStatus:"ready" without being what production serves (locked Auto Publishing) — treat a release as live only when deployStatus is "ready" AND productionConfirmed is true. Absent publishedDeploy/productionConfirmed fields mean the published-deploy signal was unavailable (unknown), not "not live".',
+      'Read-only Netlify deploy receipt lookup by commit or deploy id. Besides the receipt, the response carries publishedDeploy (the deploy production is actually serving) and productionConfirmed (whether that published deploy matches the commit/deployId you asked about) whenever the site lookup is available. A deploy can be deployStatus:"ready" without being what production serves (locked Auto Publishing) — treat a release as live only when deployStatus is "ready" AND productionConfirmed is true. Absent publishedDeploy/productionConfirmed fields mean the published-deploy signal was unavailable (unknown), not "not live". Object exports accumulate on main behind [skip netlify] and one release deploys every accumulated commit at once, so the currently published deploy is very often AHEAD of the commit you are checking rather than exactly equal to it, even though that commit\'s content is already live. When looked up by commit, this tool reconciles that case against GitHub (ancestry check) and returns deployStatus:"ready"/productionConfirmed:true plus reconciled:true + reconciliationNote instead of a stale-looking "queued" for a commit production is demonstrably already serving.',
     inputSchema: objectSchema({
       commit: stringSchema('Commit SHA to look up in saved Netlify deploy receipts.'),
       deployId: stringSchema('Netlify deploy id to look up in saved Netlify deploy receipts.'),
@@ -266,7 +329,7 @@ export const TOOL_DEFINITIONS_PART1: ToolDefinition[] = [
   {
     name: 'release_to_production',
     description:
-      'Release accumulated CMS object exports to production. Object publishes commit to main with [skip netlify], so they do NOT deploy on their own — this is the explicit release that makes them live, and the ONLY thing that fires a production build for them. Steps: resolve the target commit (defaults to the content-branch HEAD, which includes every accumulated skipped export commit), POST the server-side production build hook ONCE (the same hook trigger_netlify_build uses; the only allowed production-build trigger), then poll Netlify deploy receipts until the deploy for that commit is terminal, and report whether production actually reflects it. Returns released:true only when the site\'s PUBLISHED deploy (what production actually serves) reflects the target commit — confirmed as productionConfirmed:true; released:false with status build_not_confirmed_live means the build did not finish within the wait budget (re-check deploy_status). status build_ready_not_published means the build IS ready but production still serves an older commit — Netlify "Auto Publishing" is likely locked; unlock it or publish the deploy manually, then re-check deploy_status. When the published-deploy lookup is unavailable, the tool degrades to ready-by-commit with productionConfirmed:false — treat that as "not independently proven live". WAIT BUDGET: the in-call wait is capped to this serverless function\'s remaining invocation time (seconds, not the full build duration), so a normal 30-120s production build usually returns build_not_confirmed_live on the first call — that is the expected flow, not an error. Do not retry release_to_production; poll deploy_status with the returned targetCommit until deployStatus is "ready" AND productionConfirmed is true. One release deploys every skipped commit at once, so batch publishes and release once — it consumes real build minutes.',
+      'Release accumulated CMS object exports to production. Object publishes commit to main with [skip netlify], so they do NOT deploy on their own — this is the explicit release that makes them live, and the ONLY thing that fires a production build for them. Steps: resolve the target commit (defaults to the content-branch HEAD, which includes every accumulated skipped export commit), POST the server-side production build hook ONCE (the same hook trigger_netlify_build uses; the only allowed production-build trigger), then poll Netlify deploy receipts until the deploy for that commit is terminal, and report whether production actually reflects it. Returns released:true only when the site\'s PUBLISHED deploy (what production actually serves) reflects the target commit — confirmed as productionConfirmed:true; released:false with status build_not_confirmed_live means the build did not finish within the wait budget (re-check deploy_status). status build_ready_not_published means the build IS ready but production still serves an older commit — Netlify "Auto Publishing" is likely locked; unlock it or publish the deploy manually, then re-check deploy_status. When the published-deploy lookup is unavailable, the tool degrades to ready-by-commit with productionConfirmed:false — treat that as "not independently proven live". WAIT BUDGET: the in-call wait is capped to this serverless function\'s remaining invocation time (seconds, not the full build duration), so a normal 30-120s production build usually returns build_not_confirmed_live on the first call — that is the expected flow, not an error. Prefer polling deploy_status with the returned targetCommit until deployStatus is "ready" AND productionConfirmed is true over calling this again; if you DO call it again for the same release attempt (e.g. after a client-side timeout or 502), pass the SAME idempotency_key so a build that already fired is not fired a second time. One release deploys every skipped commit at once, so batch publishes and release once — it consumes real build minutes.',
     inputSchema: objectSchema({
       commit: stringSchema(
         'Optional commit SHA the live production deploy must reflect. Defaults to the current content branch HEAD.'
@@ -282,12 +345,13 @@ export const TOOL_DEFINITIONS_PART1: ToolDefinition[] = [
         description:
           'Optional maximum seconds to wait for the deploy to reach a terminal state before reporting back. Always additionally capped to the remaining serverless invocation budget so the call returns a structured receipt instead of being killed by the platform timeout.',
       },
+      idempotency_key: idempotencyKeyJsonSchema,
     }),
   },
   {
     name: 'create_agent_artifact_job',
     description:
-      "Create a pdf-tool artifact job through THIS site's trusted Platform bridge. Pass the owning site_id and content-item request_id; Platform resolves the canonical pdf-tool project, verifies request ownership, mints and forwards a fresh short-lived storage grant server-side, and never returns the grant. Do not call pdf-tool directly or guess projectId. The job is asynchronous: poll get_agent_artifact_job_status with the returned jobId; do not recreate it. For template-driven PDFs pass template_id + data (+ optional assets) instead of a prompt.",
+      "Create a pdf-tool artifact job through THIS site's trusted Platform bridge. Pass the owning site_id and content-item request_id; Platform resolves the canonical pdf-tool project, verifies request ownership, mints and forwards a fresh short-lived storage grant server-side, and never returns the grant — never attempt to supply your own grant/storage/token argument, it is always minted for you. Do not call pdf-tool directly or guess projectId. The job is asynchronous: poll get_agent_artifact_job_status with the returned jobId; do not recreate it. For template-driven PDFs pass template_id + data (+ optional assets) instead of a prompt. If this call itself times out or 502s (ambiguous whether the job was created), retry with the SAME idempotency_key to get back the original jobId instead of creating a second job. Error codes (error_code field) this bridge and pdf-tool can return: artifact_scope_required, artifact_site_mismatch, artifact_request_not_found, artifact_request_scope_mismatch, pdf_tool_bridge_not_configured, pdf_tool_bridge_request_failed, pdf_tool_invalid_response — see this platform's docs for the full artifact/template error catalog (meaning + what to do for each).",
     inputSchema: objectSchema(
       {
         site_id: stringSchema('Owning site object id, e.g. site_acme. Must match this deployment.'),
@@ -304,6 +368,7 @@ export const TOOL_DEFINITIONS_PART1: ToolDefinition[] = [
         template_id: stringSchema('A published pdf_template id to render from, in place of prompt.'),
         data: anyObjectSchema('Template data payload for a template_id-driven PDF render.'),
         assets: anyObjectSchema('Optional supporting assets (e.g. {images: [...]}) for a template_id-driven PDF render.'),
+        idempotency_key: idempotencyKeyJsonSchema,
       },
       ['site_id', 'request_id', 'artifact_kind', 'filename']
     ),
@@ -337,7 +402,7 @@ export const TOOL_DEFINITIONS_PART1: ToolDefinition[] = [
   {
     name: 'create_pdf_template',
     description:
-      "Create or version a pdf-tool PDF template for THIS site through the trusted Platform bridge. Platform resolves the canonical project and mints/forwards a short-lived storage grant server-side; never call pdf-tool directly or pass a grant. Draft only — call publish_pdf_template to activate. renderer is pinned for the template's life; pdfme publishes immediately, react-pdf/typst/chromium require a passed validation render first.",
+      "Create or version a pdf-tool PDF template for THIS site through the trusted Platform bridge. Platform resolves the canonical project and mints/forwards a short-lived storage grant server-side; never call pdf-tool directly or pass a grant yourself — this bridge is the ONLY place the grant is minted, and it is never returned to you. Draft only — call publish_pdf_template to activate. renderer is pinned for the template's life. Required call sequence by renderer: pdfme creates then publishes immediately (warn-only on any lint issues). react-pdf/typst/chromium MUST go create_pdf_template -> validate_pdf_template -> poll get_pdf_template_validation until the report is terminal -> publish_pdf_template, which refuses (HTTP 409 TEMPLATE_VALIDATION_REQUIRED) without a PASSED report for that exact version. If this call itself times out or 502s (ambiguous whether the template/version was created), retry with the SAME idempotency_key to get back the original template/version instead of creating a duplicate. Error codes: template_scope_required, template_site_mismatch, pdf_tool_bridge_not_configured, pdf_tool_bridge_request_failed — see the platform's artifact/template error catalog for meaning + remedy.",
     inputSchema: objectSchema(
       {
         site_id: stringSchema('Owning site object id, e.g. site_acme. Must match this deployment.'),
@@ -350,6 +415,7 @@ export const TOOL_DEFINITIONS_PART1: ToolDefinition[] = [
         template_id: stringSchema('Optional existing template id to version instead of creating a new template.'),
         label: stringSchema('Optional human-readable label.'),
         tags: arraySchema({ type: 'string', minLength: 1 }, 'Optional list of tags.'),
+        idempotency_key: idempotencyKeyJsonSchema,
       },
       ['site_id', 'template_json']
     ),
@@ -381,9 +447,36 @@ export const TOOL_DEFINITIONS_PART1: ToolDefinition[] = [
     ),
   },
   {
+    name: 'validate_pdf_template',
+    description:
+      "Run a validation render for a pdf-tool PDF template version through THIS site's trusted Platform bridge — the REQUIRED step between create_pdf_template and publish_pdf_template for react-pdf/typst/chromium templates (pdfme does not need this; it publishes immediately, warn-only on lint issues). Platform resolves the canonical project and mints/forwards a short-lived storage grant server-side exactly like create_pdf_template; never call pdf-tool directly or supply a grant yourself — this bridge is the only place that grant is ever minted for you. Starts (or restarts) validation for the given template_id/version and returns a validationId plus status; poll get_pdf_template_validation with that id until the report is terminal (PASSED/FAILED). publish_pdf_template will refuse react-pdf/typst/chromium versions with no PASSED report on file (HTTP 409 TEMPLATE_VALIDATION_REQUIRED).",
+    inputSchema: objectSchema(
+      {
+        site_id: stringSchema('Owning site object id; must match this deployment.'),
+        template_id: stringSchema('The template object id to validate.'),
+        version: intSchema('Optional specific version to validate; omit for the latest draft version.'),
+      },
+      ['site_id', 'template_id']
+    ),
+  },
+  {
+    name: 'get_pdf_template_validation',
+    description:
+      "Poll the status/report of a validation started with validate_pdf_template, through THIS site's trusted Platform bridge. Site ownership, canonical project, and storage grant are resolved server-side exactly like validate_pdf_template — never call pdf-tool directly. Returns the same terminal states pdf-tool defines (e.g. PASSED/FAILED/pending); publish_pdf_template for react-pdf/typst/chromium requires a PASSED report for the exact template_id/version being published.",
+    inputSchema: objectSchema(
+      {
+        site_id: stringSchema('Owning site object id; must match this deployment.'),
+        template_id: stringSchema('The template object id.'),
+        version: intSchema('Optional specific version; omit for the latest/active version.'),
+        validation_id: stringSchema('Optional specific validationId from validate_pdf_template; omit for the latest.'),
+      },
+      ['site_id', 'template_id']
+    ),
+  },
+  {
     name: 'publish_pdf_template',
     description:
-      'Publish (activate) a pdf-tool PDF template version for THIS site through the trusted Platform bridge. react-pdf/typst/chromium templates require a passed validation report first (surfaced verbatim as HTTP 409 TEMPLATE_VALIDATION_REQUIRED otherwise); pdfme publishes immediately.',
+      'Publish (activate) a pdf-tool PDF template version for THIS site through the trusted Platform bridge. Required sequence by renderer: pdfme creates then publishes immediately (warn-only on lint issues, matching pdfme\'s existing behavior). react-pdf/typst/chromium MUST go create_pdf_template -> validate_pdf_template -> poll get_pdf_template_validation to a terminal report -> publish_pdf_template; with no PASSED report on file for the exact version, this call refuses verbatim as HTTP 409 TEMPLATE_VALIDATION_REQUIRED (it does not run validation for you).',
     inputSchema: objectSchema(
       {
         site_id: stringSchema('Owning site object id; must match this deployment.'),

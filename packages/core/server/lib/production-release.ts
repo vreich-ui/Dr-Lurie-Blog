@@ -119,6 +119,64 @@ export const resolveBranchHeadCommit = async (fetchImpl: typeof fetch = fetch): 
   }
 };
 
+/**
+ * QA-W16-4: object exports accumulate on main behind `[skip netlify]` (see
+ * object-publish.ts's header) and a SINGLE release build deploys every
+ * accumulated commit at once. That means the deploy production actually
+ * publishes is very often AHEAD of any one individual export's commit, not
+ * equal to it — the export's content is live (it's an ancestor of what got
+ * built), but a strict `deploy.commit === targetCommit` check reports
+ * "queued"/"not confirmed" forever for that older commit even while
+ * production visibly serves its content. That is exactly what the QA
+ * session hit: 5+ polls of deploy_status reporting `queued` /
+ * `productionConfirmed:false` with `publishedDeploy` pointing at a LATER
+ * commit than the one being checked, while the live article URL proved the
+ * checked commit's content was already being served.
+ *
+ * Fix: when the exact-match check fails but a published deploy exists,
+ * ask GitHub directly (the same repo/token/branch triple
+ * resolveBranchHeadCommit already uses) whether `targetCommit` is an
+ * ancestor of (or equal to) `publishedCommit` via the compare API. `base`
+ * behind `head` (or identical) means target's changes are already included
+ * in what is live — reconcile the result to "confirmed" rather than
+ * "queued". Returns undefined (unknown, never "not live") when GitHub is not
+ * configured or the compare call fails, so a caller degrades exactly like
+ * the existing "lookup unavailable" paths already do.
+ */
+export const isCommitAncestorOrEqual = async (
+  targetCommit: string,
+  publishedCommit: string,
+  fetchImpl: typeof fetch = fetch
+): Promise<boolean | undefined> => {
+  if (!targetCommit || !publishedCommit) return undefined;
+  if (targetCommit === publishedCommit) return true;
+
+  const { token, repo } = resolveGitHubConfig();
+  if (!token || !repo) return undefined;
+
+  try {
+    const response = await fetchImpl(
+      `${GITHUB_API_ROOT}/repos/${repo}/compare/${encodeURIComponent(targetCommit)}...${encodeURIComponent(publishedCommit)}`,
+      {
+        headers: {
+          Accept: 'application/vnd.github+json',
+          Authorization: `Bearer ${token}`,
+          'User-Agent': USER_AGENT,
+          'X-GitHub-Api-Version': '2022-11-28',
+        },
+      }
+    );
+    if (!response.ok) return undefined;
+    const body = (await response.json()) as { status?: unknown };
+    // 'ahead': publishedCommit is a descendant of targetCommit (targetCommit's
+    // changes are included). 'identical': same commit (already handled above,
+    // but GitHub can also report it this way for annotated/merge edge cases).
+    return body.status === 'ahead' || body.status === 'identical';
+  } catch {
+    return undefined;
+  }
+};
+
 export const releaseToProduction = async (
   options: ReleaseToProductionOptions = {}
 ): Promise<ReleaseToProductionResult> => {
@@ -209,6 +267,25 @@ export const releaseToProduction = async (
       productionConfirmed: true,
       ...shared,
     };
+  }
+
+  // QA-W16-4: exports accumulate behind [skip netlify] and one release
+  // deploys every accumulated commit at once, so the site's published
+  // deploy is very often AHEAD of targetCommit rather than equal to it, even
+  // though targetCommit's changes are already live. Reconcile via ancestry
+  // before reporting "not confirmed" for a commit production has already
+  // moved past.
+  if (publishedDeploy && publishedDeploy.commit) {
+    const targetIsAncestor = await isCommitAncestorOrEqual(targetCommit, publishedDeploy.commit, fetchImpl);
+    if (targetIsAncestor) {
+      return {
+        released: true,
+        status: 'released',
+        reason: `Production is live on commit ${publishedDeploy.commit}, which already includes commit ${targetCommit} (published deploy ${publishedDeploy.deployId || 'unknown'}).`,
+        productionConfirmed: true,
+        ...shared,
+      };
+    }
   }
 
   if (publishedDeploy && productionReflectsCommit) {

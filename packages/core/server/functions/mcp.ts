@@ -144,6 +144,7 @@ import {
   type ArtifactKind,
 } from '../lib/artifacts.js';
 import { saveArtifactFromUrl } from '../lib/artifact-url-ingest.js';
+import { withIdempotentToolCall } from '../lib/idempotency-store.js';
 import { getSiteIdentity } from '../../lib/site-identity.js';
 import {
   listPageTypeDefinitions,
@@ -183,7 +184,9 @@ import {
   callListPdfTemplates,
   callObjectAction,
   callObjectPublish,
+  callGetPdfTemplateValidation,
   callPublishPdfTemplate,
+  callValidatePdfTemplate,
   callReleaseToProduction,
   callTriggerNetlifyBuild,
   callVerifyArticleImages,
@@ -214,6 +217,18 @@ export type LambdaEvent = {
   slug?: string | null;
   /** W11 T11.10: set once per request when the Authorization bearer token resolves to a VERIFIED per-agent credential. */
   verifiedAgentName?: string;
+  /**
+   * QA-W16-3: set once per request, right after `getAuthResult` succeeds —
+   * i.e. this request already cleared the platform's own MCP gate (the
+   * shared MCP_HTTP_AUTH_TOKEN, a verified per-agent token, or an OAuth
+   * principal). A tool handler reached via callTool can always rely on this
+   * being true; it exists so a handler that ALSO needs to distinguish an
+   * MCP-authenticated caller from an unauthenticated one (e.g. the
+   * admin-artifact-browsing tools, which used to re-check an unrelated
+   * Netlify-Identity session and failed 100% of the time for every agent)
+   * doesn't have to re-derive that from scratch or reach for the wrong check.
+   */
+  mcpGateAuthenticated?: boolean;
 };
 
 type JsonRpcRequest = {
@@ -633,19 +648,29 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
     case 'trigger_netlify_build':
       return callTriggerNetlifyBuild(event, input);
     case 'release_to_production':
-      return callReleaseToProduction(event, input);
+      // QA-W16-1: a 502/timeout on this call does NOT mean the release did
+      // not happen — it very often already has. idempotency_key makes a
+      // same-key retry replay the first result instead of firing a second
+      // forceBuild.
+      return withIdempotentToolCall(event, name, input.idempotency_key, () => callReleaseToProduction(event, input));
     case 'create_agent_artifact_job':
-      return callCreateAgentArtifactJob(event, input);
+      return withIdempotentToolCall(event, name, input.idempotency_key, () =>
+        callCreateAgentArtifactJob(event, input)
+      );
     case 'get_agent_artifact_job_status':
       return callGetAgentArtifactJobStatus(event, input);
     case 'get_agent_artifact_by_slot':
       return callGetAgentArtifactBySlot(event, input);
     case 'create_pdf_template':
-      return callCreatePdfTemplate(event, input);
+      return withIdempotentToolCall(event, name, input.idempotency_key, () => callCreatePdfTemplate(event, input));
     case 'list_pdf_templates':
       return callListPdfTemplates(event, input);
     case 'get_pdf_template':
       return callGetPdfTemplate(event, input);
+    case 'validate_pdf_template':
+      return callValidatePdfTemplate(event, input);
+    case 'get_pdf_template_validation':
+      return callGetPdfTemplateValidation(event, input);
     case 'publish_pdf_template':
       return callPublishPdfTemplate(event, input);
     case 'delete_pdf_template':
@@ -768,14 +793,20 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
     case 'object_list':
       return callObjectAction(event, { action: 'list', object_type: input.object_type, status: input.status });
     case 'object_create':
-      return callObjectAction(event, {
-        action: 'create',
-        object_type: input.object_type,
-        site: input.site,
-        body: input.body,
-        requested_id: input.requested_id,
-        agent_name: input.agent_name,
-      });
+      // QA-W16-1: object_create mints a fresh object_id by default, so a
+      // naive retry after a timeout/502 creates a second object even though
+      // the first write landed. idempotency_key makes a same-key retry
+      // replay the original created object instead.
+      return withIdempotentToolCall(event, name, input.idempotency_key, () =>
+        callObjectAction(event, {
+          action: 'create',
+          object_type: input.object_type,
+          site: input.site,
+          body: input.body,
+          requested_id: input.requested_id,
+          agent_name: input.agent_name,
+        })
+      );
     case 'object_create_variant':
       return callObjectAction(event, {
         action: 'create_variant',
@@ -944,15 +975,23 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
         ...(input.reason !== undefined ? { reason: input.reason } : {}),
       });
     case 'object_publish':
-      return callObjectPublish(event, {
-        action: 'publish_by_time',
-        object_type: input.object_type,
-        object_id: input.object_id,
-        lock_token: input.lock_token,
-        published_time: input.published_time,
-        artifact_set: input.artifact_set,
-        release_build: input.release_build,
-      });
+      // QA-W16-1: publish is largely self-idempotent already (D§5.6: a retry
+      // with the same published_time re-materializes byte-identical output
+      // and the committer no-ops) EXCEPT the final stamp, which still bumps
+      // `version` and appends a fresh `history` entry on every call. A
+      // same-key retry after a timeout/502 replays the original receipt
+      // instead of stacking a redundant stamp/history entry.
+      return withIdempotentToolCall(event, name, input.idempotency_key, () =>
+        callObjectPublish(event, {
+          action: 'publish_by_time',
+          object_type: input.object_type,
+          object_id: input.object_id,
+          lock_token: input.lock_token,
+          published_time: input.published_time,
+          artifact_set: input.artifact_set,
+          release_build: input.release_build,
+        })
+      );
     case 'product_set_price': {
       const stripe = await getStripeClient();
       if (!stripe) {
@@ -1192,6 +1231,10 @@ export const handler = async (rawEvent: LambdaEvent, context?: LambdaContext) =>
       }),
     });
   }
+  // QA-W16-3: this request cleared the MCP gate above — every tool handler
+  // reached via callTool for this request can treat the caller as
+  // MCP-authenticated without re-deriving it.
+  event.mcpGateAuthenticated = true;
   // W11 T11.10: a verified per-agent bearer token overrides self-declared
   // `agent_name` for every tool call in this request — see callTool's use
   // of `event.verifiedAgentName` below.
