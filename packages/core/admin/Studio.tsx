@@ -31,6 +31,14 @@ async function getToken(): Promise<string> {
   return (await m.getAccessToken()) ?? '';
 }
 
+// instantiate/instantiate_section/apply_theme all mint or change objects the
+// content library lists — invalidate so the library and Cmd-K palette don't
+// show a stale view after one of these succeeds.
+async function invalidateLibraryCache(): Promise<void> {
+  const { invalidateInventoryCache } = await import('@core/lib/admin/library-client');
+  invalidateInventoryCache();
+}
+
 type Rec = ObjectRecord<Record<string, unknown>>;
 
 interface RecipeMeta {
@@ -131,6 +139,7 @@ function TemplateGallery({ templates, onCreated }: { templates: Rec[]; onCreated
         title,
       });
       if (res.status === 200) {
+        void invalidateLibraryCache();
         const id = (res.body.record as { object_id?: string } | undefined)?.object_id;
         toast({ title: 'Page created', tone: 'success' });
         if (id) onCreated(`/admin/content/${encodeURIComponent(id)}?type=page`);
@@ -246,6 +255,7 @@ function SectionTemplateGallery({ sections, onCreated }: { sections: Rec[]; onCr
         target: { kind: 'standalone' },
       });
       if (res.status === 200) {
+        void invalidateLibraryCache();
         const id = (res.body.record as { object_id?: string } | undefined)?.object_id;
         toast({ title: 'Shared section minted', tone: 'success' });
         if (id) onCreated(`/admin/content/${encodeURIComponent(id)}?type=section`);
@@ -348,6 +358,7 @@ function ThemeGallery({ themes, owner }: { themes: Rec[]; owner: boolean }) {
       });
       await verb({ action: 'checkin', object_type: 'site', object_id: SITE_ID, lock_token: lockToken });
       if (res.status === 200) {
+        void invalidateLibraryCache();
         toast({
           title: 'Theme applied',
           description: 'The site palette changed in the working copy. Publish + release when ready.',

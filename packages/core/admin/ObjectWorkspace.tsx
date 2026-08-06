@@ -37,6 +37,15 @@ async function getToken(): Promise<string> {
   return (await m.getAccessToken()) ?? '';
 }
 
+// A successful write here (patch / publish / discard / create_variant) can
+// change what the library list should show (display name, updated_at,
+// status, unpublished-changes pill) — invalidate so the next library visit
+// or palette open refetches instead of showing a stale row.
+async function invalidateLibraryCache(): Promise<void> {
+  const { invalidateInventoryCache } = await import('@core/lib/admin/library-client');
+  invalidateInventoryCache();
+}
+
 type Rec = ObjectRecord<Record<string, unknown>>;
 
 function parseLocation(): { id: string; type: ObjectType | undefined } {
@@ -259,6 +268,7 @@ function ArticleSettingsCard({ record, onSaved }: { record: Rec; onSaved: () => 
       const outcome = await session.patch([{ op: 'set_article_meta', fields }]);
       await session.checkin();
       if (outcome.ok) {
+        void invalidateLibraryCache();
         toast({ title: 'Article settings saved as a draft', tone: 'success' });
         onSaved();
       } else {
@@ -468,9 +478,15 @@ function WorkspaceBody() {
   }, []);
 
   // Every accepted write refreshes the record — the preview re-renders and
-  // readiness re-computes on each approved patch.
+  // readiness re-computes on each approved patch. Chat is the primary
+  // editing surface here and its write tools overlap the mutating-verb list
+  // (patch/create_variant/instantiate*/publish/discard/apply_theme) — the
+  // library list needs the same invalidation these buttons get.
   useEffect(() => {
-    if (chat.writeStamp > 0) void load();
+    if (chat.writeStamp > 0) {
+      void invalidateLibraryCache();
+      void load();
+    }
   }, [chat.writeStamp]);
 
   const runAction = async (fn: () => Promise<void>) => {
@@ -495,6 +511,7 @@ function WorkspaceBody() {
       const res = await session.publish();
       await session.checkin();
       if (res.status === 200) {
+        void invalidateLibraryCache();
         toast({ title: 'Published', tone: 'success' });
         await load();
       } else {
@@ -516,6 +533,7 @@ function WorkspaceBody() {
         object_id: record.object_id,
       });
       if (res.status === 200) {
+        void invalidateLibraryCache();
         toast({ title: 'Changes discarded', tone: 'success' });
         await load();
       } else {
@@ -559,6 +577,7 @@ function WorkspaceBody() {
         (res.body as { object?: { object_id?: string }; object_id?: string }).object?.object_id ??
         (res.body as { object_id?: string }).object_id;
       if (res.status === 200 && newId) {
+        void invalidateLibraryCache();
         toast({ title: 'Variant created', tone: 'success' });
         window.location.assign(`/admin/content/${encodeURIComponent(newId)}?type=content_item`);
       } else {
