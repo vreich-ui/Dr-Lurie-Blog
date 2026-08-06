@@ -33,7 +33,7 @@ export function objectTypeLabel(type: ObjectType): string {
   return OBJECT_TYPE_LABELS[type] ?? titleCase(String(type).replace(/_/g, ' '));
 }
 
-// ─── generic helpers ─────────────────────────────────────────────────
+// ─── generic helpers ────────────────────────────────
 
 type Bag = Record<string, unknown>;
 
@@ -72,7 +72,7 @@ function firstHeadingText(html: string | undefined): string | undefined {
   return text || undefined;
 }
 
-// ─── object display name ──────────────────────────────────────────────
+// ─── object display name ──────────────────────────
 
 /**
  * A human title for an object, derived from its body. Never returns a raw
@@ -133,22 +133,73 @@ function fallback(record: Pick<ObjectRecord, 'object_type'>): string {
   return `Untitled ${objectTypeLabel(record.object_type).toLowerCase()}`;
 }
 
-// ─── principals + history phrasing ───────────────────────────────────────
+// ─── principals + history phrasing ─────────────────────────
+
+// D2(b) (2026-08-06): 'unattributed-agent' is the sentinel object-store.ts /
+// mcp.ts persist when a tool call declares no agent_name (agent_name:
+// declared || 'unattributed-agent'). Special-cased HERE, at the display
+// layer, rather than by changing what gets stored: the sentinel is persisted
+// data other code (and historical history[] entries already on disk) may
+// match against, so the fix is in how it renders, not in what's written.
+// Without this it title-cases straight through to "Unattributed-Agent
+// (agent)" — technically routed through this same function, but still an
+// internal string leaking into the activity feed.
+const UNATTRIBUTED_AGENT_SENTINEL = 'unattributed-agent';
+
+/**
+ * D3 (2026-08-06): the pure email → friendly-name derivation, extracted out
+ * of principalName() so the server-side default-display-name sites
+ * (admin-users.ts's synthesizedRecord, user-invite.ts's first-invite record)
+ * can reuse the SAME derivation instead of writing a second one. This module
+ * has no client-only dependencies (no browser globals — see the imports
+ * above), so it's safe to import from server function code; audit-feed.ts
+ * already does exactly that for objectDisplayName/verbToPhrase/idTooltip.
+ *
+ * The local part is plus-tag-stripped before title-casing
+ * (`wolf+test@x.com` → "Wolf", not the un-word-boundaried "Wolf+test" the
+ * un-stripped titleCase regex would produce — `+` isn't in the
+ * separator-to-space set below, so it would otherwise ride along inside one
+ * "word"). Dots/underscores/hyphens become spaces and title-case; a
+ * non-name-like local part (`admin`, `no-reply`) still title-cases to
+ * something readable ("Admin", "No Reply") — there's no signal in an email
+ * address to do better than that.
+ */
+export function friendlyNameFromEmail(email: string): string {
+  const local = email.split('@')[0]?.split('+')[0] ?? '';
+  const cleaned = titleCase(local.replace(/[._-]+/g, ' ')).trim();
+  return cleaned || email;
+}
 
 /** A human name for a principal — person's email local-part, or agent name. */
 export function principalName(principal: Principal | undefined): string {
   if (!principal) return 'Someone';
   if (principal.kind === 'agent') {
+    if (principal.agent_name === UNATTRIBUTED_AGENT_SENTINEL) return 'An unnamed agent';
     return `${titleCase(principal.agent_name.replace(/[_-]+/g, ' '))} (agent)`;
   }
   const email = str(principal.email);
   if (!email) return 'A signed-in user';
-  const local = email.split('@')[0];
-  return titleCase(local.replace(/[._-]+/g, ' '));
+  return friendlyNameFromEmail(email);
 }
 
-/** action → past-tense verb phrase (object-agnostic; the timeline supplies context). */
-const VERB_PHRASES: Record<string, string> = {
+/**
+ * action → past-tense verb phrase (object-agnostic; the timeline supplies
+ * context). Exported (not just used internally) so its key coverage can be
+ * asserted directly against the real action-name surface in
+ * display-name.test.ts — see that test for why this exists and what it
+ * enumerates against.
+ *
+ * D2(a) (2026-08-06): this map was missing almost every `object-patch-ops.ts`
+ * op name. Every `patch` op's own `op` literal (e.g. `move_section`,
+ * `set_site_fields`) becomes the persisted `history[].action` verbatim —
+ * object-patch-apply.ts: `action: op.op` — so EVERY entry in
+ * `patchOpUnionSchema` (schema/object-patch-ops.ts) needs a phrase here, not
+ * just the handful that happened to get one. Also added: `retire` (W14 F6)
+ * and `refresh` (the ACTUAL history action object-lock.ts's refreshObjectLock
+ * writes — `refresh_lock` below is the verb-level REQUEST action name, which
+ * is a different string and was never the one landing in history).
+ */
+export const VERB_PHRASES: Record<string, string> = {
   create: 'created',
   object_create: 'created',
   create_request: 'created',
@@ -162,15 +213,6 @@ const VERB_PHRASES: Record<string, string> = {
   checkin_request: 'requested check-in',
   admin_checkin: 'checked in',
   patch: 'edited',
-  update_item: 'updated',
-  update_section_data: 'updated section content',
-  upsert_section: 'updated a section',
-  admin_update_node: 'edited a block',
-  admin_save_draft: 'saved a draft',
-  patch_agent_output: 'updated agent output',
-  patch_canonical_input: 'updated the canonical input',
-  submit_review: 'submitted for review',
-  review_decide: 'reviewed',
   validate: 'validated',
   publish: 'published',
   publish_by_time: 'published',
@@ -178,10 +220,72 @@ const VERB_PHRASES: Record<string, string> = {
   apply_theme: 'applied a theme',
   discard: 'discarded changes',
   refresh_lock: 'refreshed the lock',
+  refresh: 'refreshed the lock',
   admin_refresh_lock: 'refreshed the lock',
   force_release: 'force-released the lock',
   admin_force_release: 'force-released the lock',
   mark_agent_complete: 'completed an agent stage',
+  retire: 'retired',
+  submit_review: 'submitted for review',
+  review_decide: 'reviewed',
+
+  // ─── object-patch-ops.ts op names (W15 patch grammar, C§2.0) ─────────
+  // Pages / shared sections
+  set_page_meta: 'updated page details',
+  upsert_section: 'updated a section',
+  update_section_data: 'updated section content',
+  move_section: 'reordered a section',
+  set_section_visibility: "changed a section's visibility",
+  remove_section: 'removed a section',
+  // Navigation
+  set_nav_meta: 'updated navigation details',
+  upsert_group: 'updated a navigation group',
+  move_group: 'reordered a navigation group',
+  remove_group: 'removed a navigation group',
+  upsert_item: 'updated a navigation item',
+  update_item: 'updated',
+  move_item: 'reordered a navigation item',
+  remove_item: 'removed a navigation item',
+  upsert_action: 'updated a navigation action',
+  remove_action: 'removed a navigation action',
+  // Taxonomy terms
+  add_term: 'added a taxonomy term',
+  update_term: 'updated a taxonomy term',
+  deprecate_term: 'deprecated a taxonomy term',
+  reactivate_term: 'reactivated a taxonomy term',
+  remove_term: 'removed a taxonomy term',
+  // Site
+  set_site_fields: 'updated site details',
+  set_site_brand_tokens: 'updated the site palette',
+  // Product
+  set_product_fields: 'updated product details',
+  set_product_price: 'updated the product price',
+  // Article (content_item)
+  set_article_meta: 'updated article details',
+  upsert_node: 'updated a content block',
+  update_node: 'edited a block',
+  admin_update_node: 'edited a block',
+  move_node: 'reordered a content block',
+  set_node_visibility: "changed a content block's visibility",
+  remove_node: 'removed a content block',
+  admin_save_draft: 'saved a draft',
+  patch_agent_output: 'updated agent output',
+  patch_canonical_input: 'updated the canonical input',
+  // Page templates
+  set_template_meta: 'updated template details',
+  upsert_slot: 'updated a template slot',
+  move_slot: 'reordered a template slot',
+  remove_slot: 'removed a template slot',
+  // Section templates
+  set_section_template_meta: 'updated section template details',
+  replace_blueprint: 'replaced the section blueprint',
+  update_blueprint_data: 'updated the section blueprint',
+  // Theme
+  set_theme_fields: 'updated theme details',
+  // Tracking config / editorial voice singletons
+  set_tracking: 'updated tracking settings',
+  set_tracking_config_fields: 'updated the tracker registry',
+  set_voice_fields: 'updated the editorial voice',
 };
 
 /**
@@ -202,7 +306,7 @@ export function verbToPhrase(entry: Pick<HistoryEntry, 'action' | 'actor' | 'det
   return `${principalName(entry.actor)} ${verb}`;
 }
 
-// ─── id tooltip ──────────────────────────────────────────────────────
+// ─── id tooltip ────────────────────────────────
 
 /** Frames a raw id for a title/tooltip — the only sanctioned place an id shows. */
 export function idTooltip(id: string | undefined): string {

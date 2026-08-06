@@ -14,17 +14,17 @@ import { Badge, Button, Card, EmptyState, Skeleton } from './primitives';
 import { Input } from './forms';
 import { Dialog, ConfirmDialog, useToast } from './overlays';
 import { IconAlertTriangle, IconPalette, IconSparkles } from './icons';
-import type { ObjectRecord, ObjectType } from '@core/schema/object-record-v1';
-// NOTE: this component hydrates client:load, so getSiteIdentity() here only
-// ever sees the COMMITTED config (src/config/site-identity.ts) — browsers
-// have no process.env, so SITE_OBJECT_ID and other env overrides do not
-// reach client-rendered admin surfaces. A tenant that wants env-only
-// configuration must still edit the committed config for any
-// client-bundled surface to agree with the server. Pre-existing
-// limitation (the literal this replaced had the same ceiling); not
-// addressed here since bridging server config into client bundles is new
-// infrastructure beyond this dehardcode pass.
-import { getSiteIdentity } from '@core/lib/site-identity';
+import type { ObjectRecord } from '@core/schema/object-record-v1';
+// D2: identity is resolved server-side by the /admin/studio.astro route
+// (where process.env is real) and threaded down as a prop, all the way to
+// ThemeGallery below — this component no longer calls getSiteIdentity()
+// itself, which used to see only the COMMITTED config on the client (no
+// process.env in the browser) and silently ignore any SITE_* env override.
+import type { SiteIdentity } from '@core/lib/site-identity';
+// A pure, side-effect-free sync accessor (no network, no bundling cost worth
+// deferring) — safe to import statically so the very first render can read
+// whatever was cached, instead of racing a dynamic import against paint.
+import { peekCachedStudioData, STUDIO_PERSISTED_MAX_AGE_MS } from '@core/lib/admin/studio-client';
 
 async function getToken(): Promise<string> {
   const m = await import('@core/lib/admin/goTrueClient');
@@ -32,11 +32,17 @@ async function getToken(): Promise<string> {
 }
 
 // instantiate/instantiate_section/apply_theme all mint or change objects the
-// content library lists — invalidate so the library and Cmd-K palette don't
-// show a stale view after one of these succeeds.
+// content library lists (and, for the recipe types themselves, the Studio
+// galleries below) — invalidate both caches so neither the library, the
+// Cmd-K palette, nor Studio's own galleries show a stale view after one of
+// these succeeds.
 async function invalidateLibraryCache(): Promise<void> {
-  const { invalidateInventoryCache } = await import('@core/lib/admin/library-client');
+  const [{ invalidateInventoryCache }, { invalidateStudioCache }] = await Promise.all([
+    import('@core/lib/admin/library-client'),
+    import('@core/lib/admin/studio-client'),
+  ]);
   invalidateInventoryCache();
+  invalidateStudioCache();
 }
 
 type Rec = ObjectRecord<Record<string, unknown>>;
@@ -69,17 +75,6 @@ async function verb(request: Record<string, unknown>): Promise<{ status: number;
   return callObjectVerb(getToken, request) as Promise<{ status: number; body: Record<string, unknown> }>;
 }
 
-async function loadType(type: ObjectType): Promise<Rec[]> {
-  const listed = await verb({ action: 'list', object_type: type });
-  const ids = ((listed.body.objects as { object_id: string }[] | undefined) ?? []).map((row) => row.object_id);
-  const records: Rec[] = [];
-  for (const id of ids) {
-    const res = await verb({ action: 'get', object_type: type, object_id: id });
-    if (res.status === 200 && res.body.record) records.push(res.body.record as Rec);
-  }
-  return records;
-}
-
 function MetaLines({ record }: { record: Rec }) {
   const meta = metaOf(record);
   return (
@@ -99,7 +94,7 @@ function MetaLines({ record }: { record: Rec }) {
   );
 }
 
-// ─── page-template gallery ───────────────────────────────────────────────────
+// ─── page-template gallery ──────────────────────────────────────────────
 
 function TemplateGallery({ templates, onCreated }: { templates: Rec[]; onCreated: (id: string) => void }) {
   const { toast } = useToast();
@@ -230,7 +225,7 @@ function TemplateGallery({ templates, onCreated }: { templates: Rec[]; onCreated
   );
 }
 
-// ─── section-template gallery ────────────────────────────────────────────────
+// ─── section-template gallery ──────────────────────────────────────
 
 function SectionTemplateGallery({ sections, onCreated }: { sections: Rec[]; onCreated: (path: string) => void }) {
   const { toast } = useToast();
@@ -317,13 +312,13 @@ function Swatch({ color, label }: { color: string; label: string }) {
   );
 }
 
-function ThemeGallery({ themes, owner }: { themes: Rec[]; owner: boolean }) {
+function ThemeGallery({ themes, owner, identity }: { themes: Rec[]; owner: boolean; identity: SiteIdentity }) {
   const { toast } = useToast();
   const [target, setTarget] = useState<Rec | null>(null);
   const [diff, setDiff] = useState<Record<string, unknown> | null>(null);
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
-  const SITE_ID = getSiteIdentity().siteId;
+  const SITE_ID = identity.siteId;
 
   const dryRun = async (record: Rec) => {
     setTarget(record);
@@ -486,37 +481,83 @@ function ThemeGallery({ themes, owner }: { themes: Rec[]; owner: boolean }) {
   );
 }
 
-// ─── the studio page ─────────────────────────────────────────────────────────
+// ─── the studio page ───────────────────────────────────────────────────────
 
-function StudioBody() {
-  const [templates, setTemplates] = useState<Rec[] | null>(null);
-  const [sections, setSections] = useState<Rec[] | null>(null);
-  const [themes, setThemes] = useState<Rec[] | null>(null);
+// Synchronous, no-network read of the last known Studio data — used as the
+// initial render state so a repeat visit (e.g. switching Studio tabs away
+// and back) paints immediately instead of the full blocking skeleton, the
+// same stale-while-revalidate pattern ContentLibrary already uses for the
+// content library.
+function initialCachedStudioData(): { templates: Rec[]; sections: Rec[]; themes: Rec[] } | null {
+  if (typeof window === 'undefined') return null;
+  const cached = peekCachedStudioData();
+  if (!cached) return null;
+  if (Date.now() - cached.fetchedAt > STUDIO_PERSISTED_MAX_AGE_MS) return null;
+  return cached.data;
+}
+
+function StudioBody({ identity }: { identity: SiteIdentity }) {
+  const [initialData] = useState(initialCachedStudioData);
+  const [templates, setTemplates] = useState<Rec[] | null>(initialData?.templates ?? null);
+  const [sections, setSections] = useState<Rec[] | null>(initialData?.sections ?? null);
+  const [themes, setThemes] = useState<Rec[] | null>(initialData?.themes ?? null);
+  // A background refetch always runs, even when cached data painted
+  // immediately — this just controls the small inline "refreshing…"
+  // indicator instead of the big per-gallery skeletons.
+  const [refreshing, setRefreshing] = useState(initialData !== null);
   const [owner, setOwner] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    let alive = true;
     (async () => {
+      // D1(b): fetchMe() used to be awaited BEFORE the recipe-loading call
+      // started, adding a full extra round-trip to the waterfall. It doesn't
+      // need to — fetchMe hits a different endpoint (admin-users, not
+      // admin-object) and its only effect here is gating the theme "Apply
+      // theme…" button behind Owner (setOwner below); nothing in the recipe
+      // loads reads it. It's genuinely independent, so it now runs
+      // concurrently with fetchStudioData() instead of ahead of it. Its own
+      // try/catch is kept nested (rather than folded into the outer one) so
+      // a fetchMe failure still degrades to "not owner" instead of blanking
+      // the whole page — the same behaviour as before.
+      const fetchOwner = (async () => {
+        try {
+          const { fetchMe } = await import('@core/lib/admin/users-client');
+          const me = await fetchMe(getToken);
+          if (alive) setOwner(me.roles.includes('owner'));
+        } catch {
+          /* ignore */
+        }
+      })();
       try {
-        const { fetchMe } = await import('@core/lib/admin/users-client');
-        const me = await fetchMe(getToken);
-        setOwner(me.roles.includes('owner'));
-      } catch {
-        /* ignore */
-      }
-      try {
-        const [tpl, stpl, thm] = await Promise.all([
-          loadType('template'),
-          loadType('section_template'),
-          loadType('theme'),
-        ]);
-        setTemplates(tpl);
-        setSections(stpl);
-        setThemes(thm);
+        const { fetchStudioData } = await import('@core/lib/admin/studio-client');
+        // Never force here — a fresh in-memory/TTL cache (e.g. populated by
+        // this very call a moment ago on a fast tab-switch remount) is
+        // reused instead of firing a second full network sweep.
+        const data = await fetchStudioData(getToken);
+        if (alive) {
+          setTemplates(data.templates);
+          setSections(data.sections);
+          setThemes(data.themes);
+          setRefreshing(false);
+        }
       } catch (loadError) {
-        setError(loadError instanceof Error ? loadError.message : 'Could not load the recipe family.');
+        if (alive) {
+          // If we already have cached data on screen, a failed background
+          // refresh shouldn't blow away a working view — just stop spinning.
+          if (initialData !== null) {
+            setRefreshing(false);
+          } else {
+            setError(loadError instanceof Error ? loadError.message : 'Could not load the recipe family.');
+          }
+        }
       }
+      await fetchOwner;
     })();
+    return () => {
+      alive = false;
+    };
   }, []);
 
   if (error) {
@@ -527,6 +568,15 @@ function StudioBody() {
 
   return (
     <div className="flex flex-col gap-6">
+      {refreshing ? (
+        <p
+          className="flex items-center gap-1.5 text-[length:var(--adm-text-xs)] text-[var(--adm-text-muted)]"
+          role="status"
+          aria-live="polite"
+        >
+          <span className="inline-block animate-pulse">●</span> Refreshing…
+        </p>
+      ) : null}
       <section>
         <h2 className="mb-3 text-[length:var(--adm-text-lg)] font-semibold text-[var(--adm-text-heading)]">
           Page templates
@@ -534,7 +584,11 @@ function StudioBody() {
         {templates === null ? (
           <Skeleton variant="rect" height={140} />
         ) : templates.length === 0 ? (
-          <EmptyState icon={<IconSparkles size={22} />} title="No page templates yet" />
+          <EmptyState
+            icon={<IconSparkles size={22} />}
+            title="No page templates yet"
+            message="There's no in-app form for minting one — page templates are created conversationally through the CMS Agents, or by an agent calling object_create with object_type: 'template' (include description, whenToUse, and scope so it can publish)."
+          />
         ) : (
           <TemplateGallery templates={templates} onCreated={navigate} />
         )}
@@ -546,7 +600,11 @@ function StudioBody() {
         {sections === null ? (
           <Skeleton variant="rect" height={140} />
         ) : sections.length === 0 ? (
-          <EmptyState icon={<IconSparkles size={22} />} title="No section templates yet" />
+          <EmptyState
+            icon={<IconSparkles size={22} />}
+            title="No section templates yet"
+            message="There's no in-app form for minting one — section templates are created conversationally through the CMS Agents, or by an agent calling object_create with object_type: 'section_template' (include description, whenToUse, and scope so it can publish)."
+          />
         ) : (
           <SectionTemplateGallery sections={sections} onCreated={navigate} />
         )}
@@ -561,9 +619,13 @@ function StudioBody() {
         {themes === null ? (
           <Skeleton variant="rect" height={140} />
         ) : themes.length === 0 ? (
-          <EmptyState icon={<IconPalette size={22} />} title="No themes yet" />
+          <EmptyState
+            icon={<IconPalette size={22} />}
+            title="No themes yet"
+            message="There's no in-app form for minting one — themes are created conversationally through the CMS Agents, or by an agent calling object_create with object_type: 'theme' (include description, whenToUse, and scope so it can publish)."
+          />
         ) : (
-          <ThemeGallery themes={themes} owner={owner} />
+          <ThemeGallery themes={themes} owner={owner} identity={identity} />
         )}
       </section>
       <p className="text-[length:var(--adm-text-xs)] text-[var(--adm-text-muted)]">
@@ -574,10 +636,14 @@ function StudioBody() {
   );
 }
 
-export default function Studio() {
+export interface StudioProps {
+  identity: SiteIdentity;
+}
+
+export default function Studio({ identity }: StudioProps) {
   return (
-    <AdminShell currentPath="/admin/studio" title="Templates & Themes">
-      <StudioBody />
+    <AdminShell currentPath="/admin/studio" title="Templates & Themes" identity={identity}>
+      <StudioBody identity={identity} />
     </AdminShell>
   );
 }
