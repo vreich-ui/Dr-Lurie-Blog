@@ -814,10 +814,16 @@ const mediaPolicyContract = (policy: MediaPolicy): MediaPolicyContract => ({
   preferred_image_format: policy.preferredImageFormat,
   over_budget: policy.overBudget,
   note:
-    'Per-site image budget (src/config/media-policy.ts), enforced by the server-side pdf-tool artifact bridge. ' +
-    'Encode images to preferred_image_format and keep each within max_image_bytes. over_budget=warn stores an ' +
-    'over-limit image but flags it (abide unless a human/admin explicitly asks for a larger one); block rejects it. ' +
-    'To fix an already-stored oversize image, ask pdf-tool to shrink it under the budget.',
+    'Per-site image budget (src/config/media-policy.ts), DOCUMENTED intent for the server-side pdf-tool artifact ' +
+    'bridge. Encode images to preferred_image_format and keep each within max_image_bytes. As documented here, ' +
+    'over_budget=warn should store an over-limit image but flag it (abide unless a human/admin explicitly asks ' +
+    'for a larger one); block should reject it outright. KNOWN DISCREPANCY (QA-W16-5, 2026-08-06, to be ' +
+    'reconciled with pdf-tool): every site in this fleet is currently configured over_budget:"warn", but the ' +
+    'live pdf-tool service actually HARD-BLOCKS an over-budget image regardless of this setting — pdf-tool is ' +
+    "being fixed concurrently in its own repo; until that lands (and this note is updated to match whichever " +
+    'behavior it settles on), treat over_budget=warn here as ASPIRATIONAL and expect create_agent_artifact_job ' +
+    'to reject an over-budget image outright rather than store-and-flag it. To fix an already-stored oversize ' +
+    'image, ask pdf-tool to shrink it under the budget.',
 });
 
 // ─── workflow (sequence, lock discipline, error catalog) ─────────────────────
