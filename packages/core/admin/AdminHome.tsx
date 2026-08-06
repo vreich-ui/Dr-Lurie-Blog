@@ -13,6 +13,7 @@
 import { useEffect, useRef, useState } from 'react';
 
 import { AdminShell } from './AdminShell';
+import type { SiteIdentity } from '@core/lib/site-identity';
 import { Badge, Button, Card, EmptyState, Skeleton, StatCard } from './primitives';
 import { useToast } from './overlays';
 import {
@@ -401,7 +402,11 @@ function ActivityFeedCard({ data, nowMs }: { data: HomeData; nowMs: number }) {
   );
 }
 
-export default function AdminHome() {
+export interface AdminHomeProps {
+  identity: SiteIdentity;
+}
+
+export default function AdminHome({ identity }: AdminHomeProps) {
   const [data, setData] = useState<HomeData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -430,7 +435,7 @@ export default function AdminHome() {
   const stats = data?.inbox.stats;
 
   return (
-    <AdminShell currentPath="/admin" title="Workspace home">
+    <AdminShell currentPath="/admin" title="Workspace home" identity={identity}>
       <div className="flex flex-col gap-6">
         <QuickActions />
 
