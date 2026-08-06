@@ -16,7 +16,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { AdminShell } from './AdminShell';
-import { getSiteIdentity } from '@core/lib/site-identity';
+import type { SiteIdentity } from '@core/lib/site-identity';
 import { Badge, Button, Card, EmptyState, StatusPill, Skeleton, IconButton } from './primitives';
 import { Tabs } from './menus';
 import { Input, Select, Textarea } from './forms';
@@ -169,7 +169,15 @@ function readinessFromValidate(body: Record<string, unknown>): ReadinessGroup[] 
 // Same fields, same registry-backed pickers, same edit-time contract
 // validation — all through set_article_meta under EditSession.
 
-function ArticleSettingsCard({ record, onSaved }: { record: Rec; onSaved: () => void }) {
+function ArticleSettingsCard({
+  record,
+  onSaved,
+  identity,
+}: {
+  record: Rec;
+  onSaved: () => void;
+  identity: SiteIdentity;
+}) {
   const { toast } = useToast();
   const body = record.body ?? {};
   const taxonomy = (body.taxonomy ?? {}) as { category?: string; tags?: string[] };
@@ -190,7 +198,7 @@ function ArticleSettingsCard({ record, onSaved }: { record: Rec; onSaved: () => 
         const res = await callObjectVerb(getToken, {
           action: 'get',
           object_type: 'taxonomy',
-          object_id: getSiteIdentity().taxonomyId,
+          object_id: identity.taxonomyId,
         });
         const kinds = ((res.body as { record?: { body?: { kinds?: Record<string, { terms?: { slug?: string }[] }> } } })
           .record?.body?.kinds ?? {}) as Record<string, { terms?: { slug?: string }[] }>;
@@ -398,7 +406,7 @@ function DedicatedAgentPicker({ objectId, owner }: { objectId: string; owner: bo
 
 // ─── workspace body
 
-function WorkspaceBody() {
+function WorkspaceBody({ identity }: { identity: SiteIdentity }) {
   const { toast } = useToast();
   const [record, setRecord] = useState<Rec | null>(null);
   const [readiness, setReadiness] = useState<ReadinessGroup[] | null>(null);
@@ -764,7 +772,7 @@ function WorkspaceBody() {
           <DedicatedAgentPicker objectId={record.object_id} owner={owner} />
         </div>
         {record.object_type === 'content_item' ? (
-          <ArticleSettingsCard record={record} onSaved={() => void load()} />
+          <ArticleSettingsCard record={record} onSaved={() => void load()} identity={identity} />
         ) : null}
         <Tabs
           tabs={[
@@ -813,10 +821,14 @@ function WorkspaceBody() {
   );
 }
 
-export default function ObjectWorkspace() {
+export interface ObjectWorkspaceProps {
+  identity: SiteIdentity;
+}
+
+export default function ObjectWorkspace({ identity }: ObjectWorkspaceProps) {
   return (
-    <AdminShell currentPath="/admin/content" title="Object workspace">
-      <WorkspaceBody />
+    <AdminShell currentPath="/admin/content" title="Object workspace" identity={identity}>
+      <WorkspaceBody identity={identity} />
     </AdminShell>
   );
 }
