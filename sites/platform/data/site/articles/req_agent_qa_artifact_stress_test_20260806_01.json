@@ -1,8 +1,8 @@
 {
   "__generated": {
-    "at": "2026-08-06T07:36:47.436Z",
+    "at": "2026-08-06T08:16:22.046Z",
     "from": "objects/content_item/by-id/req_agent_qa_artifact_stress_test_20260806_01.json",
-    "record_version": 8
+    "record_version": 14
   },
   "deck": "A tester's pass at every corner of the pdf-tool bridge on this platform: ten-plus PDFs, ten-plus images, deliberate size-limit violations, bad ids, and every renderer this site has never tried.",
   "description": "A live QA pass exercising create_pdf_template, publish_pdf_template, and create_agent_artifact_job across all four renderers and both artifact kinds, with a running log of what broke and what needs finishing.",
@@ -93,6 +93,417 @@
         "ctaLink": "/pdf/req_agent_qa_artifact_stress_test_20260806_01/cf2511423857908be90676e6859d5317893fed49fd19786ed397ed72e4ea0036.pdf",
         "ctaText": "Download the photo one-pager PDF",
         "title": "Download: One-Pager With an Embedded Photo (base64 control)"
+      }
+    },
+    {
+      "id": "n_downloadresults",
+      "kind": "action",
+      "private": {
+        "intent": "navigate",
+        "strategy": "resolution"
+      },
+      "public": {
+        "body": "A twelfth PDF, added after this article first went live: a title, a subtitle, a real matplotlib-generated bar chart embedded as a base64 image, and a multi-paragraph summary in one layout — proof pdfme can do more than single-field, text-only pages.",
+        "ctaLink": "/pdf/req_agent_qa_artifact_stress_test_20260806_01/45cb955d2bcf31ff20d9f44a1ccd4fa113cac1b02ffe241988349795a7724682.pdf",
+        "ctaText": "Download the results report PDF",
+        "title": "Download: QA Results Report (richer design, chart embedded)"
+      }
+    },
+    {
+      "id": "n_allimages",
+      "kind": "content",
+      "private": {
+        "intent": "educate",
+        "strategy": "proof"
+      },
+      "public": {
+        "body": "Ten distinct images produced through create_agent_artifact_job during this run: two photorealistic photos, two charts, two schema diagrams, two cartoons, and two edge-case probes (a no-requirements fallback-model test and a text-in-image stamp test). All ten are shown below at their generated size.",
+        "images": [
+          {
+            "alt": "Photorealistic product photo of a serum bottle",
+            "caption": "Photorealistic — product photo, 1536×1024, usageContext article_header",
+            "src": "/img/req_agent_qa_artifact_stress_test_20260806_01/71387e36e9e793fdc4c8e176c39187f45928fdaf662e9d4e11285ab468652270.webp",
+            "type": "image"
+          },
+          {
+            "alt": "Photorealistic lifestyle photo of hands typing at a keyboard",
+            "caption": "Photorealistic — lifestyle photo, 1024×1024, usageContext article_body",
+            "src": "/img/req_agent_qa_artifact_stress_test_20260806_01/64859dd1f02e8e1731c5763fc71850e5369aa41526d832d1022f7f4d391a66af.webp",
+            "type": "image"
+          },
+          {
+            "alt": "Bar chart of quarterly revenue",
+            "caption": "Chart — quarterly revenue bar chart, 1024×1024",
+            "src": "/img/req_agent_qa_artifact_stress_test_20260806_01/c1311b60e383aedfb92ee9e3db1b37f5244657e47a62c51c6347a5841776f0e9.webp",
+            "type": "image"
+          },
+          {
+            "alt": "Line chart of a traffic trend",
+            "caption": "Chart — traffic-trend line chart, 1024×1024, usageContext category_page",
+            "src": "/img/req_agent_qa_artifact_stress_test_20260806_01/77c50ba785ed261cfe987ff2eee97f494409870c236ddacbf6835598e706d46b.webp",
+            "type": "image"
+          },
+          {
+            "alt": "Flowchart diagram of the content pipeline",
+            "caption": "Schema — content-pipeline flowchart, 1536×1024, usageContext article_body",
+            "src": "/img/req_agent_qa_artifact_stress_test_20260806_01/f9091075bc641f5f3feedb08d4efda1be1e5e24ec935a28c8ef74f7f3f638da0.webp",
+            "type": "image"
+          },
+          {
+            "alt": "Architecture diagram of client, API, and backend",
+            "caption": "Schema — client/API/backend architecture diagram, 1024×1024, usageContext article_body",
+            "src": "/img/req_agent_qa_artifact_stress_test_20260806_01/54b28ac59ee675fcf37a556a1890b930920511bbf72cb5b40c75dd75db40b41d.webp",
+            "type": "image"
+          },
+          {
+            "alt": "Cartoon illustration of a robot mascot",
+            "caption": "Cartoon — robot mascot, 1024×1024, usageContext category_page",
+            "src": "/img/req_agent_qa_artifact_stress_test_20260806_01/9fdaa10cfa0dd9f64b44cc9eb3fb94a7f37f0f27c4d82c55b53fdc115b0281fe.webp",
+            "type": "image"
+          },
+          {
+            "alt": "Cartoon illustration of a bug-hunter character",
+            "caption": "Cartoon — bug-hunter illustration, 1024×1024, usageContext article_body",
+            "src": "/img/req_agent_qa_artifact_stress_test_20260806_01/e2e7f7691e5bffb830d753de610c9695df1885ebbbb987d0c0b7109c77b9c307.webp",
+            "type": "image"
+          },
+          {
+            "alt": "Illustration generated with no usageContext set",
+            "caption": "Fallback-model probe — no requirements.image.usageContext set, routed to the default model, 1024×1024",
+            "src": "/img/req_agent_qa_artifact_stress_test_20260806_01/2efb7975f75a93f581ac6242cee2e3b3875bd3c3d39e852d19e6db1358c52ace.webp",
+            "type": "image"
+          },
+          {
+            "alt": "Image with QA APPROVED text stamped into it",
+            "caption": "Text-in-image stamp test — \"QA APPROVED\", 1024×1024",
+            "src": "/img/req_agent_qa_artifact_stress_test_20260806_01/311fd933ee129fdd1231fb2ba3554d3138ea3c3f85e04b6e2fab6c52ba22da89.webp",
+            "type": "image"
+          }
+        ],
+        "title": "All Ten Generated Images, Shown Inline"
+      }
+    },
+    {
+      "id": "n_alldownloads",
+      "kind": "content",
+      "private": {
+        "intent": "navigate",
+        "strategy": "resolution"
+      },
+      "public": {
+        "body": {
+          "content": [
+            {
+              "content": [
+                {
+                  "data": {},
+                  "marks": [],
+                  "nodeType": "text",
+                  "value": "Two PDFs were linked above as featured examples. Here are the other nine produced during this run, each a different length, purpose, or design:"
+                }
+              ],
+              "data": {},
+              "nodeType": "paragraph"
+            },
+            {
+              "content": [
+                {
+                  "content": [
+                    {
+                      "content": [
+                        {
+                          "data": {},
+                          "marks": [],
+                          "nodeType": "text",
+                          "value": "Short single-paragraph article export (6.3 KB) — "
+                        },
+                        {
+                          "content": [
+                            {
+                              "data": {},
+                              "marks": [],
+                              "nodeType": "text",
+                              "value": "download"
+                            }
+                          ],
+                          "data": {
+                            "uri": "https://kugel-platform.netlify.app/pdf/req_agent_qa_artifact_stress_test_20260806_01/8bbec2e69eb21109426da78f0a3fd2fb3931450d1254cbbda1763aa770507878.pdf"
+                          },
+                          "nodeType": "hyperlink"
+                        }
+                      ],
+                      "data": {},
+                      "nodeType": "paragraph"
+                    }
+                  ],
+                  "data": {},
+                  "nodeType": "list-item"
+                },
+                {
+                  "content": [
+                    {
+                      "content": [
+                        {
+                          "data": {},
+                          "marks": [],
+                          "nodeType": "text",
+                          "value": "Long-form article, deliberate text-overflow probe (9.1 KB) — "
+                        },
+                        {
+                          "content": [
+                            {
+                              "data": {},
+                              "marks": [],
+                              "nodeType": "text",
+                              "value": "download"
+                            }
+                          ],
+                          "data": {
+                            "uri": "https://kugel-platform.netlify.app/pdf/req_agent_qa_artifact_stress_test_20260806_01/12857b2339ff6cc963906bef0fdccc71b442933042c441321d60f56ff0207a95.pdf"
+                          },
+                          "nodeType": "hyperlink"
+                        }
+                      ],
+                      "data": {},
+                      "nodeType": "paragraph"
+                    }
+                  ],
+                  "data": {},
+                  "nodeType": "list-item"
+                },
+                {
+                  "content": [
+                    {
+                      "content": [
+                        {
+                          "data": {},
+                          "marks": [],
+                          "nodeType": "text",
+                          "value": "Marketing one-pager with no image, missing-image path (6.5 KB) — "
+                        },
+                        {
+                          "content": [
+                            {
+                              "data": {},
+                              "marks": [],
+                              "nodeType": "text",
+                              "value": "download"
+                            }
+                          ],
+                          "data": {
+                            "uri": "https://kugel-platform.netlify.app/pdf/req_agent_qa_artifact_stress_test_20260806_01/aff21400fac91acdc1297a92a58f4c53d63090aba94fad200596b02569a54838.pdf"
+                          },
+                          "nodeType": "hyperlink"
+                        }
+                      ],
+                      "data": {},
+                      "nodeType": "paragraph"
+                    }
+                  ],
+                  "data": {},
+                  "nodeType": "list-item"
+                },
+                {
+                  "content": [
+                    {
+                      "content": [
+                        {
+                          "data": {},
+                          "marks": [],
+                          "nodeType": "text",
+                          "value": "Landscape certificate #1 (6.3 KB) — "
+                        },
+                        {
+                          "content": [
+                            {
+                              "data": {},
+                              "marks": [],
+                              "nodeType": "text",
+                              "value": "download"
+                            }
+                          ],
+                          "data": {
+                            "uri": "https://kugel-platform.netlify.app/pdf/req_agent_qa_artifact_stress_test_20260806_01/12a4cad12947d554bffab44f90acb17b28caf02be9876d22e219d020da049bcd.pdf"
+                          },
+                          "nodeType": "hyperlink"
+                        }
+                      ],
+                      "data": {},
+                      "nodeType": "paragraph"
+                    }
+                  ],
+                  "data": {},
+                  "nodeType": "list-item"
+                },
+                {
+                  "content": [
+                    {
+                      "content": [
+                        {
+                          "data": {},
+                          "marks": [],
+                          "nodeType": "text",
+                          "value": "Landscape certificate #2, deliberate text-overflow probe (7.1 KB) — "
+                        },
+                        {
+                          "content": [
+                            {
+                              "data": {},
+                              "marks": [],
+                              "nodeType": "text",
+                              "value": "download"
+                            }
+                          ],
+                          "data": {
+                            "uri": "https://kugel-platform.netlify.app/pdf/req_agent_qa_artifact_stress_test_20260806_01/85786fac323740e70a22acd8260b44b1ae51f4dc83b0d840a5827d4259e4405f.pdf"
+                          },
+                          "nodeType": "hyperlink"
+                        }
+                      ],
+                      "data": {},
+                      "nodeType": "paragraph"
+                    }
+                  ],
+                  "data": {},
+                  "nodeType": "list-item"
+                },
+                {
+                  "content": [
+                    {
+                      "content": [
+                        {
+                          "data": {},
+                          "marks": [],
+                          "nodeType": "text",
+                          "value": "Three-page report, sparse/minimal content (5.4 KB) — "
+                        },
+                        {
+                          "content": [
+                            {
+                              "data": {},
+                              "marks": [],
+                              "nodeType": "text",
+                              "value": "download"
+                            }
+                          ],
+                          "data": {
+                            "uri": "https://kugel-platform.netlify.app/pdf/req_agent_qa_artifact_stress_test_20260806_01/26a26b1965c9c7cc41b318d316cc8f93a2213f5dd756c3d916a560630ef230d3.pdf"
+                          },
+                          "nodeType": "hyperlink"
+                        }
+                      ],
+                      "data": {},
+                      "nodeType": "paragraph"
+                    }
+                  ],
+                  "data": {},
+                  "nodeType": "list-item"
+                },
+                {
+                  "content": [
+                    {
+                      "content": [
+                        {
+                          "data": {},
+                          "marks": [],
+                          "nodeType": "text",
+                          "value": "Maximum-length single-page stress test (8.8 KB) — "
+                        },
+                        {
+                          "content": [
+                            {
+                              "data": {},
+                              "marks": [],
+                              "nodeType": "text",
+                              "value": "download"
+                            }
+                          ],
+                          "data": {
+                            "uri": "https://kugel-platform.netlify.app/pdf/req_agent_qa_artifact_stress_test_20260806_01/070e62766c34cc737b7d60021a6884fd66088133c99e0cb8176694fc04d2a9d3.pdf"
+                          },
+                          "nodeType": "hyperlink"
+                        }
+                      ],
+                      "data": {},
+                      "nodeType": "paragraph"
+                    }
+                  ],
+                  "data": {},
+                  "nodeType": "list-item"
+                },
+                {
+                  "content": [
+                    {
+                      "content": [
+                        {
+                          "data": {},
+                          "marks": [],
+                          "nodeType": "text",
+                          "value": "Empty-data edge case, near-blank output (0.6 KB) — "
+                        },
+                        {
+                          "content": [
+                            {
+                              "data": {},
+                              "marks": [],
+                              "nodeType": "text",
+                              "value": "download"
+                            }
+                          ],
+                          "data": {
+                            "uri": "https://kugel-platform.netlify.app/pdf/req_agent_qa_artifact_stress_test_20260806_01/707941c0cb93bb7041258a73040fec7ff236a35e29869b7d45f9f108989dc5d7.pdf"
+                          },
+                          "nodeType": "hyperlink"
+                        }
+                      ],
+                      "data": {},
+                      "nodeType": "paragraph"
+                    }
+                  ],
+                  "data": {},
+                  "nodeType": "list-item"
+                },
+                {
+                  "content": [
+                    {
+                      "content": [
+                        {
+                          "data": {},
+                          "marks": [],
+                          "nodeType": "text",
+                          "value": "Pricing sheet (8.1 KB) — "
+                        },
+                        {
+                          "content": [
+                            {
+                              "data": {},
+                              "marks": [],
+                              "nodeType": "text",
+                              "value": "download"
+                            }
+                          ],
+                          "data": {
+                            "uri": "https://kugel-platform.netlify.app/pdf/req_agent_qa_artifact_stress_test_20260806_01/8d7a9c3e5584b2444942c9b2d54681348dc3b38476834fb8bc2d6f0581b726a3.pdf"
+                          },
+                          "nodeType": "hyperlink"
+                        }
+                      ],
+                      "data": {},
+                      "nodeType": "paragraph"
+                    }
+                  ],
+                  "data": {},
+                  "nodeType": "list-item"
+                }
+              ],
+              "data": {},
+              "nodeType": "unordered-list"
+            }
+          ],
+          "data": {},
+          "nodeType": "document"
+        },
+        "title": "The Other Nine PDFs From This Run, All Linked"
       }
     }
   ],
