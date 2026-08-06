@@ -8,7 +8,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
 
-import { contentItemPreview, productPreview, tokenSwatches, tokenFonts } from './preview-logic.js';
+import { contentItemPreview, productPreview, tokenSwatches, tokenFonts, pageSectionLabel } from './preview-logic.js';
 import type { ObjectRecord } from '../../schema/object-record-v1.js';
 
 const rec = (object_type: ObjectRecord['object_type'], body: unknown, object_id = 'obj_1') =>
@@ -129,5 +129,38 @@ describe('token swatches', () => {
   it('is defensive against missing/garbage tokens', () => {
     assert.deepEqual(tokenSwatches(undefined), []);
     assert.deepEqual(tokenFonts({ fonts: 'nope' }), []);
+  });
+});
+
+describe('pageSectionLabel (D3-sharedref)', () => {
+  it('labels an ordinary section by its type', () => {
+    const label = pageSectionLabel({ id: 's_1', type: 'hero', data: { heading: 'Hi' } }, 0);
+    assert.equal(label, 'hero');
+  });
+
+  it('labels a shared_ref by its stamped denormalized name, NOT the literal "shared_ref"', () => {
+    const label = pageSectionLabel(
+      { id: 's_1', type: 'shared_ref', data: { section: 'sec_abc123', sectionName: 'Barrier Repair CTA' } },
+      0
+    );
+    assert.equal(label, 'Barrier Repair CTA');
+  });
+
+  it('a shared_ref whose sectionName is somehow null at read time (defensive — the write path never stamps null; see object-verbs.ts) still degrades to the ref/index fallback, never "shared_ref" and never "null"', () => {
+    const label = pageSectionLabel({ id: 's_1', type: 'shared_ref', data: { section: 'sec_gone', sectionName: null } }, 2);
+    assert.equal(label, 'Section 3');
+  });
+
+  it('backward compat: an OLD-shape shared_ref with no sectionName field at all degrades to the ref/index fallback, never "shared_ref" and never crashes/undefined', () => {
+    const oldShapeSection = { id: 's_1', type: 'shared_ref', data: { section: 'sec_abc123' } };
+    assert.equal(pageSectionLabel(oldShapeSection, 4), 'Section 5');
+    // Same fixture with a `ref` sibling field present still prefers it over the index fallback.
+    const oldShapeWithRef = { id: 's_1', type: 'shared_ref', ref: 'sec_abc123', data: { section: 'sec_abc123' } };
+    assert.equal(pageSectionLabel(oldShapeWithRef, 4), 'sec_abc123');
+  });
+
+  it('is defensive against a garbage/non-object entry — falls back to the index label, never throws', () => {
+    assert.equal(pageSectionLabel(null, 1), 'Section 2');
+    assert.equal(pageSectionLabel('not-an-object', 6), 'Section 7');
   });
 });
