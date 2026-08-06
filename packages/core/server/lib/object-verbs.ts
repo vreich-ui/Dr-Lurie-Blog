@@ -486,6 +486,31 @@ const loadRecord = async (store: ObjectVerbStore, key: string): Promise<ObjectRe
   return raw ? (JSON.parse(raw) as ObjectRecord) : undefined;
 };
 
+/**
+ * 2026-08-06 hotfix: `loadRecord` for use inside a bulk sweep
+ * (`listAllObjectRecords`, `inventory`'s list form). A single-object verb
+ * (`get`, `patch`, `checkout`, …) should still let a `loadRecord` failure
+ * propagate — a transient store error there is real and the caller should
+ * see it, not a false 404. But a sweep over every object in the store is a
+ * different contract: it already promises callers ("unreadable/unparseable
+ * keys are skipped, never thrown on" — see `listAllObjectRecords`'s doc
+ * comment) that one bad key degrades that ONE row, not the whole response.
+ * That promise held for JSON.parse failures but not for `store.get` itself
+ * rejecting — and once record loads run with real concurrency
+ * (`STORE_READ_CONCURRENCY`) instead of one at a time, a single transient
+ * Netlify Blobs read failure under the resulting burst load reliably turned
+ * into "Object request could not be processed" for the ENTIRE content
+ * library, every time it fired. This closes that gap for the sweep paths.
+ */
+const loadRecordForSweep = async (store: ObjectVerbStore, key: string): Promise<ObjectRecord | undefined> => {
+  try {
+    return await loadRecord(store, key);
+  } catch (error) {
+    console.warn(`Sweep: skipping unreadable object record at "${key}".`, error);
+    return undefined;
+  }
+};
+
 const ok = (body: Record<string, unknown>): ObjectVerbResult => ({ status: 200, body });
 const err = (status: number, body: Record<string, unknown>): ObjectVerbResult => ({ status, body });
 
@@ -788,31 +813,6 @@ export const listAllObjectRecords = async (
     records.push(record);
   }
   return records;
-};
-
-/**
- * 2026-08-06 hotfix: `loadRecord` for use inside a bulk sweep
- * (`listAllObjectRecords`, `inventory`'s list form). A single-object verb
- * (`get`, `patch`, `checkout`, …) should still let a `loadRecord` failure
- * propagate — a transient store error there is real and the caller should
- * see it, not a false 404. But a sweep over every object in the store is a
- * different contract: it already promises callers ("unreadable/unparseable
- * keys are skipped, never thrown on" — see `listAllObjectRecords`'s doc
- * comment) that one bad key degrades that ONE row, not the whole response.
- * That promise held for JSON.parse failures but not for `store.get` itself
- * rejecting — and once record loads run with real concurrency
- * (`STORE_READ_CONCURRENCY`) instead of one at a time, a single transient
- * Netlify Blobs read failure under the resulting burst load reliably turned
- * into "Object request could not be processed" for the ENTIRE content
- * library, every time it fired. This closes that gap for the sweep paths.
- */
-const loadRecordForSweep = async (store: ObjectVerbStore, key: string): Promise<ObjectRecord | undefined> => {
-  try {
-    return await loadRecord(store, key);
-  } catch (error) {
-    console.warn(`Sweep: skipping unreadable object record at "${key}".`, error);
-    return undefined;
-  }
 };
 
 // ─── the dispatcher ───────────────────────────────────────────────────────────
