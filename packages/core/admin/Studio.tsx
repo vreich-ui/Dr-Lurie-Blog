@@ -94,7 +94,7 @@ function MetaLines({ record }: { record: Rec }) {
   );
 }
 
-// ─── page-template gallery ─────────────────────────────────────────────
+// ─── page-template gallery ───────────────────────────────────────────────────
 
 function TemplateGallery({ templates, onCreated }: { templates: Rec[]; onCreated: (id: string) => void }) {
   const { toast } = useToast();
@@ -225,7 +225,7 @@ function TemplateGallery({ templates, onCreated }: { templates: Rec[]; onCreated
   );
 }
 
-// ─── section-template gallery ──────────────────────────────────────────
+// ─── section-template gallery ────────────────────────────────────────────────
 
 function SectionTemplateGallery({ sections, onCreated }: { sections: Rec[]; onCreated: (path: string) => void }) {
   const { toast } = useToast();
@@ -297,7 +297,7 @@ function SectionTemplateGallery({ sections, onCreated }: { sections: Rec[]; onCr
   );
 }
 
-// ─── theme gallery ──────────────────────────────────────────────────────
+// ─── theme gallery ───────────────────────────────────────────────────────────
 
 function Swatch({ color, label }: { color: string; label: string }) {
   return (
@@ -481,7 +481,7 @@ function ThemeGallery({ themes, owner, identity }: { themes: Rec[]; owner: boole
   );
 }
 
-// ─── the studio page ────────────────────────────────────────────────────
+// ─── the studio page ─────────────────────────────────────────────────────────
 
 // Synchronous, no-network read of the last known Studio data — used as the
 // initial render state so a repeat visit (e.g. switching Studio tabs away
