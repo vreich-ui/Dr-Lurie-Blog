@@ -17,6 +17,18 @@
  * the budget or flip warn↔block by editing that file — no code changes. It is
  * `satisfies`-checked at compile time AND zod-parsed at runtime; a malformed
  * config THROWS rather than silently resolving to a default.
+ *
+ * KNOWN DISCREPANCY (QA-W16-5, 2026-08-06, to be reconciled with pdf-tool):
+ * every site's committed config here is `overBudget: 'warn'`, but the live
+ * pdf-tool service actually HARD-BLOCKS an over-budget image regardless of
+ * this setting — pdf-tool is being fixed concurrently in its own repo.
+ * `imageExceedsBudget`/`overBudget` below still compute the documented
+ * "warn" intent; the enforcement gap is entirely on pdf-tool's side. Once
+ * pdf-tool's fix lands, update this file's docstring and
+ * object-contract.ts's `mediaPolicyContract` note to whichever behavior it
+ * settles on (either honor `warn` for real, or change every site's config
+ * to `block` to match reality) rather than leaving both sides of the split
+ * documented inconsistently.
  */
 import { z } from 'zod';
 

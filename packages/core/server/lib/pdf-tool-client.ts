@@ -229,6 +229,47 @@ export const publishPlatformPdfTemplate = (
     options
   );
 
+/**
+ * QA-W16-2: react-pdf/typst/chromium templates require a PASSED validation
+ * report before publish_pdf_template will activate them (pdf-tool enforces
+ * this; publishPlatformPdfTemplate surfaces the refusal as HTTP 409
+ * TEMPLATE_VALIDATION_REQUIRED). Until this bridge existed, no site connector
+ * could ever produce that report — validate_pdf_template and
+ * get_pdf_template_validation are pdf-tool's own tools for exactly this, and
+ * they require the same storage grant (siteId + token) that
+ * createPlatformPdfTemplate above already mints and forwards server-side.
+ * These two mirror that exact pattern: the grant is built here, forwarded to
+ * pdf-tool, and never returned to the MCP caller.
+ */
+export const validatePlatformPdfTemplate = (
+  grant: PdfToolStorageGrant,
+  input: { templateId: string; version?: number },
+  options: PdfToolClientOptions = {}
+) =>
+  postPdfTool(
+    'validate-pdf-template',
+    projectPayload(grant, {
+      templateId: input.templateId,
+      ...(input.version ? { version: input.version } : {}),
+    }),
+    options
+  );
+
+export const getPlatformPdfTemplateValidation = (
+  grant: PdfToolStorageGrant,
+  input: { templateId: string; version?: number; validationId?: string },
+  options: PdfToolClientOptions = {}
+) =>
+  postPdfTool(
+    'get-pdf-template-validation',
+    projectPayload(grant, {
+      templateId: input.templateId,
+      ...(input.version ? { version: input.version } : {}),
+      ...(input.validationId ? { validationId: input.validationId } : {}),
+    }),
+    options
+  );
+
 export const deletePlatformPdfTemplate = (
   grant: PdfToolStorageGrant,
   input: { templateId: string; version?: number; reason?: string },
