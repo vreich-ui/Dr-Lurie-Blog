@@ -1,8 +1,8 @@
 {
   "__generated": {
-    "at": "2026-08-02T18:21:31.959Z",
+    "at": "2026-08-06T08:16:26.326Z",
     "from": "objects/site/by-id/site_platform.json",
-    "record_version": 6
+    "record_version": 10
   },
   "blog": {
     "categoryBase": "category",
@@ -12,25 +12,25 @@
   },
   "brandTokens": {
     "colors": {
-      "accent": "rgb(0 150 136)",
-      "bg-page": "rgb(255 255 255)",
-      "bg-page-dark": "rgb(10 12 20)",
-      "bg-surface": "rgb(245 246 248)",
+      "accent": "rgb(204 120 92)",
+      "bg-page": "rgb(250 249 245)",
+      "bg-page-dark": "rgb(24 22 20)",
+      "bg-surface": "rgb(244 242 236)",
       "gold": "rgb(191 155 48)",
-      "primary": "rgb(51 102 204)",
-      "secondary": "rgb(38 77 153)",
-      "text-default": "rgb(38 43 48)",
-      "text-heading": "rgb(20 24 28)",
-      "text-muted": "rgb(60 67 75 / 76%)"
+      "primary": "rgb(204 120 92)",
+      "secondary": "rgb(45 42 38)",
+      "text-default": "rgb(45 42 38)",
+      "text-heading": "rgb(30 27 24)",
+      "text-muted": "rgb(90 84 76 / 80%)"
     },
     "fonts": {
-      "heading": "Georgia, serif",
-      "sans": "system-ui, sans-serif",
-      "serif": "Georgia, serif"
+      "heading": "\"Iowan Old Style\", \"Palatino Linotype\", Palatino, Georgia, serif",
+      "sans": "ui-sans-serif, system-ui, -apple-system, \"Segoe UI\", Helvetica, Arial, sans-serif",
+      "serif": "\"Iowan Old Style\", \"Palatino Linotype\", Palatino, Georgia, serif"
     },
     "layout": {
-      "containerWidth": "wide",
-      "sectionRhythm": "default"
+      "containerWidth": "default",
+      "sectionRhythm": "airy"
     },
     "shape": {
       "buttonShape": "soft",
@@ -39,7 +39,7 @@
     },
     "type": {
       "headingWeight": "medium",
-      "scale": "default"
+      "scale": "editorial"
     }
   },
   "chrome": {
