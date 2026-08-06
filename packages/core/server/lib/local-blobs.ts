@@ -29,17 +29,44 @@ const isTestRun = process.env.NODE_TEST_CONTEXT !== undefined;
 const getLocalBlobsRoot = () =>
   localBlobsRootForTesting ?? join(process.cwd(), '.netlify', isTestRun ? `local-blobs-${process.pid}` : 'local-blobs');
 
+// Metadata sidecars live in a wholly separate tree from the blob bytes so they
+// never show up as spurious keys in list() (which walks the blob tree
+// recursively). Mirrors getLocalBlobsRoot's pid-scoping for test isolation.
+const getLocalBlobsMetaRoot = () =>
+  localBlobsRootForTesting
+    ? `${localBlobsRootForTesting}-meta`
+    : join(process.cwd(), '.netlify', isTestRun ? `local-blobs-meta-${process.pid}` : 'local-blobs-meta');
+
 const toPath = (storeName: string, key: string) => join(getLocalBlobsRoot(), storeName, key);
+
+const toMetaPath = (storeName: string, key: string) => join(getLocalBlobsMetaRoot(), storeName, `${key}.json`);
 
 const toBlobKey = (storeRoot: string, filePath: string) => relative(storeRoot, filePath).split(sep).join('/');
 
 export type LocalBlobValue = string | Buffer | Uint8Array | ArrayBuffer;
 
+export type LocalBlobMetadata = Record<string, string>;
+
+// Matches blob-store.ts's BlobSetOptions (metadata + onlyIfNew) — some consumers (e.g.
+// order-reissue.ts) declare their own narrower local `Store` type expecting `onlyIfNew` on
+// set/setJSON options, so this shape has to be a superset of every such option bag rather
+// than just the fields the local fallback itself acts on. `onlyIfNew` is accepted but not
+// enforced here (this fallback exists for local dev/tests, not production correctness).
+export type LocalBlobSetOptions = { metadata?: LocalBlobMetadata; onlyIfNew?: boolean };
+
 export type LocalBlobStore = {
-  set: (key: string, value: LocalBlobValue) => Promise<void>;
+  set: (key: string, value: LocalBlobValue, options?: LocalBlobSetOptions) => Promise<void>;
   get: (key: string) => Promise<string | null>;
+  // Mirrors @netlify/blobs' Store.getWithMetadata (netlify-blobs.d.ts) closely enough for the
+  // production code paths that call it to work unchanged against the local fallback.
+  // Optional so the many pre-existing hand-rolled fake stores in tests (which predate this
+  // method and only implement get/set/setJSON/del/list) keep satisfying this type.
+  getWithMetadata?: (
+    key: string,
+    options?: { type?: 'arrayBuffer' | 'buffer' | 'text' }
+  ) => Promise<{ data: unknown; metadata?: LocalBlobMetadata } | null>;
   del: (key: string) => Promise<void>;
-  setJSON: (key: string, value: unknown) => Promise<void>;
+  setJSON: (key: string, value: unknown, options?: LocalBlobSetOptions) => Promise<void>;
   list: (options?: {
     prefix?: string;
     directories?: boolean;
@@ -96,22 +123,53 @@ export const createLocalBlobStore = (storeName: string): LocalBlobStore => {
     }
   };
 
+  const readMetadata = async (key: string): Promise<LocalBlobMetadata | undefined> => {
+    try {
+      return JSON.parse(await readFile(toMetaPath(storeName, key), 'utf8')) as LocalBlobMetadata;
+    } catch (error) {
+      if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') return undefined;
+
+      throw error;
+    }
+  };
+
+  const writeMetadata = async (key: string, metadata: LocalBlobMetadata | undefined) => {
+    const metaPath = toMetaPath(storeName, key);
+
+    if (!metadata) {
+      await rm(metaPath, { force: true });
+      return;
+    }
+
+    await mkdir(dirname(metaPath), { recursive: true });
+    await writeFile(metaPath, JSON.stringify(metadata));
+  };
+
   return {
-    async set(key, value) {
+    async set(key, value, options) {
       const filePath = toPath(storeName, key);
 
       await mkdir(dirname(filePath), { recursive: true });
       await writeFile(filePath, typeof value === 'string' ? value : new Uint8Array(value));
+      await writeMetadata(key, options?.metadata);
     },
 
     get: getBlob as LocalBlobStore['get'],
 
-    async del(key) {
-      await rm(toPath(storeName, key), { force: true });
+    async getWithMetadata(key, options) {
+      const data = await getBlob(key, options);
+      if (data === null) return null;
+
+      return { data, metadata: await readMetadata(key) };
     },
 
-    async setJSON(key, value) {
-      await this.set(key, JSON.stringify(value, null, 2));
+    async del(key) {
+      await rm(toPath(storeName, key), { force: true });
+      await rm(toMetaPath(storeName, key), { force: true });
+    },
+
+    async setJSON(key, value, options) {
+      await this.set(key, JSON.stringify(value, null, 2), options);
     },
 
     async list(options) {

@@ -22,6 +22,7 @@ import { appendCommerceEvent, hashEmail, newCommerceEvent } from '../lib/commerc
 import { readOrder } from '../lib/commerce-orders.js';
 import { loadPublishedProduct } from '../lib/commerce-products.js';
 import { purchaseTokenSecret, verifyPurchaseToken } from '../lib/purchase-tokens.js';
+import { sanitizeFilename } from '../lib/artifact-filename.js';
 
 type LambdaEvent = {
   blobs?: string;
@@ -44,8 +45,6 @@ const CONTENT_TYPES: Record<string, string> = {
   jpeg: 'image/jpeg',
   webp: 'image/webp',
 };
-
-const sanitizeFilename = (value: string): string => value.replace(/[^a-zA-Z0-9._-]/g, '_');
 
 const handlerImpl = async (event: LambdaEvent) => {
   if (event.httpMethod !== 'GET') return reply(405, { error: 'Method not allowed' });
