@@ -37,7 +37,16 @@ export const collectBlobListItems = async (result: BlobListResponse): Promise<Bl
  * store. High enough to collapse a serial ~70-record sweep into a handful of
  * parallel batches, low enough not to hammer the underlying blob API.
  */
-export const STORE_READ_CONCURRENCY = 16;
+// Lowered from 16 (2026-08-06 hotfix): a burst of 16 concurrent Netlify Blobs
+// reads against a single site-objects store — hit on every /admin/content
+// load once the reads stopped being serial — was tripping transient
+// get()/list() failures in production (a single rejected read, previously an
+// even-rarer event spread across a slow serial sweep, now aborted the WHOLE
+// inventory/audit/validation sweep — see the resilience fix in the callers
+// below for the other half of this). 8 keeps most of the parallelism win
+// while roughly halving how many blob requests are in flight against the
+// store at once.
+export const STORE_READ_CONCURRENCY = 8;
 
 /**
  * Map `items` through `fn` with at most `limit` in flight at once, preserving
