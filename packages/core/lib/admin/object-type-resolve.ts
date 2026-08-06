@@ -12,6 +12,13 @@
  * Pure resolution lives in `resolveObjectType` (injectable inventory lister,
  * node-testable); `resolveWorkspaceObjectType` binds it to the admin-object
  * verb endpoint for the island.
+ *
+ * Perf: this used to call `callObjectVerb({action:'inventory'})` directly —
+ * a THIRD independent full object-store sweep alongside ContentLibrary's and
+ * AdminShell's, none of them sharing a result. It now goes through
+ * `library-client`'s cached/in-flight-de-duped `fetchInventoryRows`, so a
+ * bare deep link opened moments after the library page (or the palette)
+ * loaded reuses that sweep instead of firing its own.
  */
 import { objectTypeFromId } from '../object-ids.js';
 import type { ObjectType } from '../../schema/object-record-v1.js';
@@ -35,18 +42,17 @@ export const resolveObjectType = async (
   return (row?.object_type as ObjectType | undefined) ?? undefined;
 };
 
-/** The island binding: inventory via the admin-object verb endpoint. */
+/**
+ * The island binding: inventory via the shared, cached library-client
+ * fetcher (not a raw `callObjectVerb` call) — a `force: false` read either
+ * returns the already-cached/in-flight rows from ContentLibrary/AdminShell
+ * or falls through to one fresh sweep of its own, exactly as before.
+ */
 export const resolveWorkspaceObjectType = (
   getToken: () => Promise<string>,
   objectId: string
 ): Promise<ObjectType | undefined> =>
   resolveObjectType(objectId, async () => {
-    const { callObjectVerb } = await import('../edit-mode/verbs-client.js');
-    const { status, body } = await callObjectVerb(getToken, { action: 'inventory' });
-    if (status !== 200) {
-      throw new Error(
-        String((body as { error?: string }).error ?? '') || `The content inventory request failed (HTTP ${status}).`
-      );
-    }
-    return (body.objects as InventoryTypeRow[] | undefined) ?? [];
+    const { fetchInventoryRows } = await import('./library-client.js');
+    return fetchInventoryRows(getToken);
   });

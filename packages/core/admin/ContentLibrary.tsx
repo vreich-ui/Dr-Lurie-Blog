@@ -26,6 +26,10 @@ import {
 } from '@core/lib/admin/library-logic';
 import { objectTypeLabel, idTooltip } from '@core/lib/admin/display-name';
 import type { ObjectType } from '@core/schema/object-record-v1';
+// A pure, side-effect-free sync accessor (no network, no bundling cost worth
+// deferring) — safe to import statically so the very first render can read
+// whatever was cached, instead of racing a dynamic import against paint.
+import { peekCachedInventoryRows, INVENTORY_PERSISTED_MAX_AGE_MS } from '@core/lib/admin/library-client';
 
 async function getToken(): Promise<string> {
   const m = await import('@core/lib/admin/goTrueClient');
@@ -112,9 +116,27 @@ function LibraryTable({ rows, now }: { rows: LibraryRow[]; now: number }) {
   return <DataTable columns={columns} rows={rows} getRowKey={(r) => r.object_id} />;
 }
 
+// Synchronous, no-network read of the last known rows — used as the initial
+// render state so a repeat visit paints immediately instead of the full
+// blocking skeleton. `undefined` window (SSR) or a genuinely stale/absent
+// cache both fall back to exactly the prior behavior (empty rows, loading).
+function initialCachedRows(): LibraryRow[] | null {
+  if (typeof window === 'undefined') return null;
+  const cached = peekCachedInventoryRows();
+  if (!cached) return null;
+  if (Date.now() - cached.fetchedAt > INVENTORY_PERSISTED_MAX_AGE_MS) return null;
+  return cached.rows;
+}
+
 function ContentLibraryBody() {
-  const [rows, setRows] = useState<LibraryRow[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [initialRows] = useState<LibraryRow[] | null>(initialCachedRows);
+  const [rows, setRows] = useState<LibraryRow[]>(initialRows ?? []);
+  // Only block on the full skeleton when there was nothing cached to show.
+  const [loading, setLoading] = useState(initialRows === null);
+  // A background refetch always runs, even when cached rows painted
+  // immediately — this just controls whether it shows the small inline
+  // indicator instead of the big blocking skeleton.
+  const [refreshing, setRefreshing] = useState(initialRows !== null);
   const [error, setError] = useState<string | null>(null);
   const [type, setType] = useState<ObjectType | 'all'>('all');
   const [query, setQuery] = useState('');
@@ -126,15 +148,25 @@ function ContentLibraryBody() {
     (async () => {
       try {
         const { fetchInventoryRows } = await import('@core/lib/admin/library-client');
+        // Never force here — a fresh in-memory/TTL cache (e.g. populated by
+        // this very call a moment ago on a fast re-mount, or by the palette)
+        // is reused instead of firing a second network sweep.
         const fetched = await fetchInventoryRows(getToken);
         if (alive) {
           setRows(fetched);
           setLoading(false);
+          setRefreshing(false);
         }
       } catch (err) {
         if (alive) {
-          setError(err instanceof Error ? err.message : 'Could not load the content library.');
-          setLoading(false);
+          // If we already have cached rows on screen, a failed background
+          // refresh shouldn't blow away a working view — just stop spinning.
+          if (initialRows !== null) {
+            setRefreshing(false);
+          } else {
+            setError(err instanceof Error ? err.message : 'Could not load the content library.');
+            setLoading(false);
+          }
         }
       }
     })();
@@ -153,6 +185,9 @@ function ContentLibraryBody() {
       .map((t) => ({ value: t, label: objectTypeLabel(t), count: counts[t] })),
   ];
 
+  // Only the true first-load (nothing cached to show yet) gets the big
+  // blocking skeleton — a cached render shows rows immediately and the
+  // small inline "refreshing…" indicator below instead (stale-while-revalidate).
   if (loading) {
     return (
       <div className="flex flex-col gap-3">
@@ -172,6 +207,16 @@ function ContentLibraryBody() {
 
   return (
     <div className="flex flex-col gap-4">
+      {refreshing ? (
+        <p
+          className="flex items-center gap-1.5 text-[length:var(--adm-text-xs)] text-[var(--adm-text-muted)]"
+          role="status"
+          aria-live="polite"
+        >
+          <span className="inline-block animate-pulse">●</span> Refreshing…
+        </p>
+      ) : null}
+
       <div className="flex flex-wrap items-center gap-2">
         {typeChips.map((chip) => {
           const active = type === chip.value;

@@ -135,6 +135,17 @@ export const logout = async (): Promise<void> => {
   const user = currentUser();
   clearStorage();
   setKeepSignedIn(false);
+  // W-perf: the cached inventory rows (in-memory + sessionStorage) are keyed
+  // by site slug only, not by user — clear them on sign-out so a shared
+  // machine's next sign-in never paints the previous user's cached library
+  // rows before its own fetch lands. Dynamic import: logout() itself has no
+  // other reason to depend on the admin library-client module.
+  try {
+    const { invalidateInventoryCache } = await import('./library-client.js');
+    invalidateInventoryCache();
+  } catch {
+    // ignored — nothing to invalidate if the module can't load
+  }
   if (user?.token.access_token) {
     await fetch(`${getBase()}/logout`, {
       method: 'POST',
