@@ -355,6 +355,11 @@ const saveFinalArtifact = async (store: BlobStore, reference: ArtifactReference,
       sha256: reference.sha256,
       sizeBytes: String(reference.sizeBytes),
       createdAtISO: reference.createdAtISO,
+      // Mirrors the pdf-tool-side artifact metadata so directly-uploaded
+      // artifacts get the same human Content-Disposition filename behavior
+      // as pdf-tool-generated ones in get-public-pdf.ts.
+      ...(reference.originalFilename ? { originalFilename: reference.originalFilename } : {}),
+      ...(reference.label ? { label: reference.label } : {}),
     },
   });
 
