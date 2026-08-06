@@ -258,7 +258,9 @@ const BODY_SCHEMAS: Partial<Record<ObjectType, { safeParse: (v: unknown) => { su
   };
 
 // Mirrors node-renderer.ts TIPTAP_ALLOWED (A§1.5): the only tags TipTap emits.
-const RICHTEXT_ALLOWED_TAGS = new Set(['p', 'br', 'strong', 'em', 'a', 'ul', 'ol', 'li', 'h2', 'h3']);
+// `code` widens the vocabulary (inline code display, theme-tokens.ts `mono`
+// font) — additive, every existing body still validates unchanged.
+const RICHTEXT_ALLOWED_TAGS = new Set(['p', 'br', 'strong', 'em', 'a', 'ul', 'ol', 'li', 'h2', 'h3', 'code']);
 const HTML_TAG_RE = /<\/?([a-z][a-z0-9-]*)\b[^>]*>/gi;
 const ANCHOR_HREF_RE = /<a\b[^>]*?\bhref\s*=\s*["']([^"']*)["'][^>]*>/gi;
 const LOOKS_LIKE_HTML_RE = /<[a-z!/]/i;

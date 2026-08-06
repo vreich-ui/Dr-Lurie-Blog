@@ -52,7 +52,7 @@ const textToParagraphs = (text: string): HTMLElement => {
 // Only allows the tags TipTap can produce; strips everything else (keeps children).
 // Links: only http/https href, forced target+rel.
 
-const TIPTAP_ALLOWED = new Set(['p', 'br', 'strong', 'em', 'a', 'ul', 'ol', 'li', 'h2', 'h3']);
+const TIPTAP_ALLOWED = new Set(['p', 'br', 'strong', 'em', 'a', 'ul', 'ol', 'li', 'h2', 'h3', 'code']);
 const SAFE_HREF_RE = /^https?:\/\//i;
 
 function sanitizeChildren(src: ParentNode, dst: Element | DocumentFragment): void {

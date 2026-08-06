@@ -16,9 +16,11 @@
  *      links are https-only.
  *
  * Grammar (08-articles-plan §2.2, this task's brief): p, br, strong, em,
- * a[https only], ul, ol, li, h2, h3. Blockquote and other heading levels are
- * OUT of this field grammar and are stripped client-side; a hand-built
- * violation is additionally rejected server-side by validateObject.
+ * a[https only], ul, ol, li, h2, h3, plus the `code` mark (inline code
+ * display — widened alongside rich-text-v1.ts's grammars). Blockquote,
+ * code BLOCKS, and other heading levels are OUT of this field grammar and
+ * are stripped client-side; a hand-built violation is additionally rejected
+ * server-side by validateObject.
  */
 import {
   proseMirrorToRichTextV1,
@@ -35,7 +37,7 @@ export const GRAMMAR_BLOCKS = new Set(['paragraph', 'heading', 'bulletList', 'or
 /** Inline node types permitted inside a block. */
 export const GRAMMAR_INLINES = new Set(['text', 'hardBreak']);
 /** Marks permitted on a text run. */
-export const GRAMMAR_MARKS = new Set(['bold', 'italic', 'link']);
+export const GRAMMAR_MARKS = new Set(['bold', 'italic', 'code', 'link']);
 /** Heading levels permitted (h2, h3 only). */
 export const GRAMMAR_HEADING_LEVELS = new Set([2, 3]);
 
@@ -46,7 +48,7 @@ const HTTPS_ONLY = /^https:\/\//i;
 const sanitizeMarks = (marks: ProseMirrorMark[] | undefined): ProseMirrorMark[] => {
   const out: ProseMirrorMark[] = [];
   for (const mark of marks ?? []) {
-    if (mark.type === 'bold' || mark.type === 'italic') {
+    if (mark.type === 'bold' || mark.type === 'italic' || mark.type === 'code') {
       out.push({ type: mark.type });
     } else if (mark.type === 'link') {
       const href = mark.attrs?.href;
@@ -54,7 +56,7 @@ const sanitizeMarks = (marks: ProseMirrorMark[] | undefined): ProseMirrorMark[] 
       // the link mark but KEEPS the text (never silently lose content).
       if (typeof href === 'string' && HTTPS_ONLY.test(href)) out.push({ type: 'link', attrs: { href } });
     }
-    // any other mark (strike, code, …) is dropped
+    // any other mark (strike, …) is dropped
   }
   return out;
 };
@@ -162,8 +164,8 @@ export interface CreateRichTextEditorOptions {
 /**
  * Mount a grammar-bound TipTap editor into `element`. Browser-only: @tiptap/*
  * are dynamically imported so they never enter the test/SSR graph. StarterKit is
- * pared to the grammar (headings 2–3; no blockquote/code/strike/hr); Link is
- * https-only and cannot be opened on click.
+ * pared to the grammar (headings 2–3, inline code; no blockquote/code
+ * blocks/strike/hr); Link is https-only and cannot be opened on click.
  */
 export const createRichTextEditor = async (options: CreateRichTextEditorOptions): Promise<RichTextEditorHandle> => {
   const [{ Editor }, { default: StarterKit }, { default: Link }] = await Promise.all([
@@ -183,10 +185,10 @@ export const createRichTextEditor = async (options: CreateRichTextEditorOptions)
         heading: { levels: [2, 3] },
         // Everything outside the grammar off — the toolbar can only offer what
         // the schema permits, and paste is additionally run through the
-        // sanitizer below.
+        // sanitizer below. `code` (the inline mark) stays on; `codeBlock`
+        // (multi-line, no rich-text-v1 node type yet) stays off.
         blockquote: false,
         codeBlock: false,
-        code: false,
         strike: false,
         horizontalRule: false,
         link: false,

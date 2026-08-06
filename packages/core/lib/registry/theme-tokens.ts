@@ -39,8 +39,15 @@ export const THEME_DARK_COLOR_KEYS = THEME_COLOR_KEYS.filter((key) => key !== 'b
   (key) => `dark:${key}` as const
 );
 
-/** The font-stack keys (`--aw-font-<key>`); all required by the zod shape. */
-export const THEME_FONT_KEYS = ['sans', 'serif', 'heading'] as const;
+/**
+ * The font-stack keys (`--aw-font-<key>`). `sans`/`serif`/`heading` are
+ * required by the zod shape; `mono` (added for code/typewriter display) is
+ * OPTIONAL there — an absent value falls back to `FALLBACK_FONTS.mono`,
+ * which is the exact stack Tailwind's own preflight already assigns
+ * `code`/`kbd`/`samp`/`pre`, so a theme that never sets it renders
+ * byte-identically to today.
+ */
+export const THEME_FONT_KEYS = ['sans', 'serif', 'heading', 'mono'] as const;
 export type ThemeFontKey = (typeof THEME_FONT_KEYS)[number];
 
 /**
@@ -71,6 +78,10 @@ export const FALLBACK_FONTS: Record<string, string> = {
   sans: "'Inter Variable'",
   serif: "'Source Serif 4', Georgia, serif",
   heading: "'Playfair Display', 'Times New Roman', serif",
+  // Tailwind's own Preflight stack for code/kbd/samp/pre (v3 base reset) —
+  // reused verbatim so an unset `mono` token renders byte-identically to the
+  // browser/Tailwind default that already applies today.
+  mono: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
 };
 
 // ─── Theme token axes (T10.1, 11-platformization-plan §1.1) ──────────────────

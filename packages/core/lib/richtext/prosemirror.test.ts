@@ -53,6 +53,14 @@ describe('proseMirrorToRichTextV1', () => {
     assert.equal((para.content[1].content as unknown[]).length, 2);
   });
 
+  it('maps the code mark', () => {
+    const converted = proseMirrorToRichTextV1(
+      pmDoc({ type: 'paragraph', content: [pmText('npm test', [{ type: 'code' }])] })
+    );
+    const para = converted.content[0] as { content: Array<{ marks: Array<{ type: string }> }> };
+    assert.deepEqual(para.content[0].marks, [{ type: 'code' }]);
+  });
+
   it('encodes hardBreak as a newline in the text stream', () => {
     const converted = proseMirrorToRichTextV1(
       pmDoc({ type: 'paragraph', content: [pmText('one'), { type: 'hardBreak' }, pmText('two')] })
@@ -102,6 +110,22 @@ describe('richTextV1ToProseMirror', () => {
     assert.equal(para?.content?.length, 2);
     const linked = para?.content?.[1];
     assert.deepEqual(linked?.marks, [{ type: 'bold' }, { type: 'link', attrs: { href: '/guide' } }]);
+  });
+
+  it('maps the code mark back to ProseMirror', () => {
+    const doc = parseRichTextV1({
+      nodeType: 'document',
+      data: {},
+      content: [
+        {
+          nodeType: 'paragraph',
+          data: {},
+          content: [{ nodeType: 'text', value: 'npm test', marks: [{ type: 'code' }], data: {} }],
+        },
+      ],
+    });
+    const pm = richTextV1ToProseMirror(doc);
+    assert.deepEqual(pm.content?.[0]?.content?.[0]?.marks, [{ type: 'code' }]);
   });
 
   it('throws on embeds (no editor representation until W7.7)', () => {

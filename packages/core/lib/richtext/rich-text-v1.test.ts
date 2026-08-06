@@ -74,6 +74,10 @@ describe('rich_text.v1 schema', () => {
     assert.ok(!isRichTextV1(doc(paragraph(text('x', [{ type: 'underline' }])))));
   });
 
+  it('accepts the code mark', () => {
+    assert.ok(isRichTextV1(doc(paragraph(text('npm test', [{ type: 'code' }])))));
+  });
+
   it('rejects embeds without a target id and unknown extra keys', () => {
     assert.ok(!isRichTextV1(doc({ nodeType: 'embedded-entry-block', data: {}, content: [] })));
     const extras = doc(paragraph(text('x')));
@@ -104,6 +108,13 @@ describe('rich_text.v1 field grammars', () => {
   const proseDoc = parseRichTextV1(
     doc({ nodeType: 'heading-2', data: {}, content: [text('H')] }, paragraph(text('body', [{ type: 'bold' }])))
   );
+
+  it('every field grammar allows the code mark (widened alongside the tag allowlist)', () => {
+    const withCode = parseRichTextV1(doc(paragraph(text('x', [{ type: 'code' }]))));
+    assert.deepEqual(validateRichTextGrammar(withCode, INLINE_COPY_GRAMMAR), []);
+    assert.deepEqual(validateRichTextGrammar(withCode, PROSE_GRAMMAR), []);
+    assert.deepEqual(validateRichTextGrammar(withCode, ARTICLE_BODY_GRAMMAR), []);
+  });
 
   it('INLINE_COPY_GRAMMAR refuses headings but allows paragraph + link + marks', () => {
     const violations = validateRichTextGrammar(proseDoc, INLINE_COPY_GRAMMAR);

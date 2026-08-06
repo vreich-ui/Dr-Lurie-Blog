@@ -57,6 +57,7 @@ export const renderRichTextV1Html = (doc: unknown, options: RenderRichTextOption
     renderMark: {
       [MARKS.BOLD]: (text) => `<strong>${text}</strong>`,
       [MARKS.ITALIC]: (text) => `<em>${text}</em>`,
+      [MARKS.CODE]: (text) => `<code>${text}</code>`,
     },
     renderNode: {
       [BLOCKS.EMBEDDED_ENTRY]: (node) => {

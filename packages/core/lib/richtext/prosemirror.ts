@@ -21,11 +21,7 @@
  */
 import { BLOCKS, INLINES, MARKS } from '@contentful/rich-text-types';
 
-import type {
-  RichTextV1Document,
-  RichTextV1Hyperlink,
-  RichTextV1Text,
-} from '../../lib/richtext/rich-text-v1.js';
+import type { RichTextV1Document, RichTextV1Hyperlink, RichTextV1Text } from '../../lib/richtext/rich-text-v1.js';
 
 // ---------- ProseMirror JSON shapes (structural, not @tiptap types: the
 // mapper is data-level and must not drag editor packages into the build) ----
@@ -53,30 +49,32 @@ const fail = (direction: string, what: string): never => {
 
 // ---------- ProseMirror → rich_text.v1 ----------
 
-type InlineRun = { text: string; bold: boolean; italic: boolean; href: string | null };
+type InlineRun = { text: string; bold: boolean; italic: boolean; code: boolean; href: string | null };
 
 const inlineRuns = (nodes: ProseMirrorNode[]): InlineRun[] => {
   const runs: InlineRun[] = [];
   for (const node of nodes) {
     if (node.type === 'hardBreak') {
       // Break rides inside the adjacent text value ('\n'), Contentful-style.
-      runs.push({ text: '\n', bold: false, italic: false, href: null });
+      runs.push({ text: '\n', bold: false, italic: false, code: false, href: null });
       continue;
     }
     if (node.type !== 'text') fail('pm→ct', `unsupported inline node type '${node.type}'`);
     let bold = false;
     let italic = false;
+    let code = false;
     let href: string | null = null;
     for (const mark of node.marks ?? []) {
       if (mark.type === 'bold') bold = true;
       else if (mark.type === 'italic') italic = true;
+      else if (mark.type === 'code') code = true;
       else if (mark.type === 'link') {
         const uri = mark.attrs?.href;
         if (typeof uri !== 'string' || uri === '') fail('pm→ct', 'link mark without an href');
         href = uri as string;
       } else fail('pm→ct', `unsupported mark '${mark.type}'`);
     }
-    runs.push({ text: node.text ?? '', bold, italic, href });
+    runs.push({ text: node.text ?? '', bold, italic, code, href });
   }
   return runs;
 };
@@ -84,8 +82,12 @@ const inlineRuns = (nodes: ProseMirrorNode[]): InlineRun[] => {
 const runToText = (run: InlineRun): RichTextV1Text => ({
   nodeType: 'text',
   value: run.text,
-  marks: [...(run.bold ? [{ type: MARKS.BOLD }] : []), ...(run.italic ? [{ type: MARKS.ITALIC }] : [])] as Array<{
-    type: typeof MARKS.BOLD | typeof MARKS.ITALIC;
+  marks: [
+    ...(run.bold ? [{ type: MARKS.BOLD }] : []),
+    ...(run.italic ? [{ type: MARKS.ITALIC }] : []),
+    ...(run.code ? [{ type: MARKS.CODE }] : []),
+  ] as Array<{
+    type: typeof MARKS.BOLD | typeof MARKS.ITALIC | typeof MARKS.CODE;
   }>,
   data: {},
 });
@@ -166,6 +168,7 @@ const textToPm = (node: RichTextV1Text, href: string | null): ProseMirrorNode[] 
   for (const mark of node.marks) {
     if (mark.type === MARKS.BOLD) marks.push({ type: 'bold' });
     else if (mark.type === MARKS.ITALIC) marks.push({ type: 'italic' });
+    else if (mark.type === MARKS.CODE) marks.push({ type: 'code' });
     else fail('ct→pm', `unsupported mark '${mark.type}'`);
   }
   if (href !== null) marks.push({ type: 'link', attrs: { href } });
