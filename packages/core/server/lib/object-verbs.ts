@@ -486,6 +486,31 @@ const loadRecord = async (store: ObjectVerbStore, key: string): Promise<ObjectRe
   return raw ? (JSON.parse(raw) as ObjectRecord) : undefined;
 };
 
+/**
+ * 2026-08-06 hotfix: `loadRecord` for use inside a bulk sweep
+ * (`listAllObjectRecords`, `inventory`'s list form). A single-object verb
+ * (`get`, `patch`, `checkout`, …) should still let a `loadRecord` failure
+ * propagate — a transient store error there is real and the caller should
+ * see it, not a false 404. But a sweep over every object in the store is a
+ * different contract: it already promises callers ("unreadable/unparseable
+ * keys are skipped, never thrown on" — see `listAllObjectRecords`'s doc
+ * comment) that one bad key degrades that ONE row, not the whole response.
+ * That promise held for JSON.parse failures but not for `store.get` itself
+ * rejecting — and once record loads run with real concurrency
+ * (`STORE_READ_CONCURRENCY`) instead of one at a time, a single transient
+ * Netlify Blobs read failure under the resulting burst load reliably turned
+ * into "Object request could not be processed" for the ENTIRE content
+ * library, every time it fired. This closes that gap for the sweep paths.
+ */
+const loadRecordForSweep = async (store: ObjectVerbStore, key: string): Promise<ObjectRecord | undefined> => {
+  try {
+    return await loadRecord(store, key);
+  } catch (error) {
+    console.warn(`Sweep: skipping unreadable object record at "${key}".`, error);
+    return undefined;
+  }
+};
+
 const ok = (body: Record<string, unknown>): ObjectVerbResult => ({ status: 200, body });
 const err = (status: number, body: Record<string, unknown>): ObjectVerbResult => ({ status, body });
 
@@ -657,12 +682,19 @@ export const listAllObjectRecords = async (
   options: { status?: 'active' | 'archived' } = {}
 ): Promise<ObjectRecord[]> => {
   // The 13 per-type listings are independent — issue them together instead of
-  // one at a time (no ordering constraint on `list` itself).
+  // one at a time (no ordering constraint on `list` itself). A transient
+  // failure listing one type degrades to "0 items from that type this
+  // sweep" rather than failing the whole request — matches the per-record
+  // resilience below (2026-08-06 hotfix).
   const perTypeItems = await Promise.all(
     objectTypes.map((objectType) =>
       store
         .list({ prefix: `objects/${objectType}/by-id/`, directories: false, paginate: true })
         .then(collectBlobListItems)
+        .catch((error: unknown) => {
+          console.warn(`listAllObjectRecords: skipping unlistable object type "${objectType}".`, error);
+          return [];
+        })
     )
   );
   // Flatten in objectTypes order (unchanged from the old nested loop) so the
@@ -670,7 +702,9 @@ export const listAllObjectRecords = async (
   // relies on (audit-feed.ts) — is identical to before; only the per-record
   // loads below run concurrently.
   const items = perTypeItems.flat();
-  const loaded = await mapWithConcurrency(items, STORE_READ_CONCURRENCY, (item) => loadRecord(store, item.key));
+  const loaded = await mapWithConcurrency(items, STORE_READ_CONCURRENCY, (item) =>
+    loadRecordForSweep(store, item.key)
+  );
 
   const records: ObjectRecord[] = [];
   for (const record of loaded) {
@@ -740,17 +774,24 @@ export const handleObjectVerb = async (
       };
       const types = request.object_type ? [request.object_type] : objectTypes;
       // The per-type listings are independent — issue them together; final
-      // output order comes from the sort below regardless of load order.
+      // output order comes from the sort below regardless of load order. A
+      // transient failure listing one type degrades to "0 rows from that
+      // type this sweep" rather than failing the whole request — matches the
+      // per-record resilience below (2026-08-06 hotfix).
       const perTypeItems = await Promise.all(
         types.map((objectType) =>
           store
             .list({ prefix: `objects/${objectType}/by-id/`, directories: false, paginate: true })
             .then(collectBlobListItems)
+            .catch((error: unknown) => {
+              console.warn(`inventory: skipping unlistable object type "${objectType}".`, error);
+              return [];
+            })
         )
       );
       const inventoryItems = perTypeItems.flat();
       const loadedRecords = await mapWithConcurrency(inventoryItems, STORE_READ_CONCURRENCY, (item) =>
-        loadRecord(store, item.key)
+        loadRecordForSweep(store, item.key)
       );
       const rows: InventoryRow[] = [];
       for (const record of loadedRecords) {

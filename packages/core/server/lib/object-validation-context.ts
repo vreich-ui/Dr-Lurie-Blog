@@ -19,7 +19,7 @@
  */
 import { readArtifactReference, type ArtifactIndexStore } from './artifact-index.js';
 import { MAJOR_KEY_ARTIFACT_REF_RE, PUBLIC_ARTIFACT_PATH_RE, rawArtifactRefForPublicPath } from './artifact-trust.js';
-import { collectBlobListItems, mapWithConcurrency, STORE_READ_CONCURRENCY } from './blob-list.js';
+import { collectBlobListItems, mapWithConcurrency, STORE_READ_CONCURRENCY, type BlobListItem } from './blob-list.js';
 import { loadContentItemIds } from './content-item-index.js';
 import type { ArtifactRefResolution, ObjectValidationContext, PageTypeConstraint } from './object-validate.js';
 import type { ObjectVerbStore } from './object-verbs.js';
@@ -131,6 +131,9 @@ export const buildStoreValidationContext = async (
   // one at a time; then load every listed record with bounded concurrency
   // instead of one `get` at a time. `records` is a Map keyed by
   // `${objectType}:${object_id}`, so load order never affects its contents.
+  // A transient failure listing one type degrades to "0 items from that type
+  // this sweep" rather than failing validation context-build entirely
+  // (2026-08-06 hotfix — matches the per-record resilience below).
   const perTypeItems = await Promise.all(
     objectTypes.map((objectType) =>
       store
@@ -139,13 +142,28 @@ export const buildStoreValidationContext = async (
           objectType,
           items: await collectBlobListItems(listResult),
         }))
+        .catch((error: unknown) => {
+          console.warn(`buildStoreValidationContext: skipping unlistable object type "${objectType}".`, error);
+          return { objectType, items: [] as BlobListItem[] };
+        })
     )
   );
   const keyedItems = perTypeItems.flatMap(({ objectType, items }) =>
     items.map((item) => ({ objectType, key: item.key }))
   );
   await mapWithConcurrency(keyedItems, STORE_READ_CONCURRENCY, async ({ objectType, key }) => {
-    const raw = await store.get(key);
+    // 2026-08-06 hotfix: a `store.get` here used to run one-at-a-time; now it
+    // runs with real concurrency (STORE_READ_CONCURRENCY), so a single
+    // transient Netlify Blobs read failure under that burst load must not
+    // abort context-building for every other object — same contract this
+    // block already gives a corrupt/unparseable record below.
+    let raw: string | null;
+    try {
+      raw = await store.get(key);
+    } catch (error) {
+      console.warn(`buildStoreValidationContext: skipping unreadable object record at "${key}".`, error);
+      return;
+    }
     if (!raw) return;
     try {
       const record = JSON.parse(raw) as ObjectRecord;
