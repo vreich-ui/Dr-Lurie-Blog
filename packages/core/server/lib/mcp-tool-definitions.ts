@@ -29,13 +29,16 @@ const SINGLE_SHOT_ARTIFACT_GUIDANCE_MAX_BYTES = 750_000;
 const mediaPortabilityWarning =
   'Media portability constraint: repo-style paths (src/assets/.../uploads/<slug>/...) are scoped to the specific article slug they were generated for and must NEVER be copied into a different request public_media_src or artifactReferences. portable:false and scoped_to_slug/scoped_to_request_id metadata are machine-readable hard constraints, not suggestions. Only artifact pointers freshly resolved for the CURRENT request (image/{requestId}/{sha}.{ext} or pdf/{requestId}/{sha}.{ext}) are safe inputs for a new or repair request. See docs/agents/naming-convention.md for canonical naming rules.';
 
-
 export const stringSchema = (description?: string) => ({
   type: 'string',
   minLength: 1,
   ...(description ? { description } : {}),
 });
-export const intSchema = (description?: string) => ({ type: 'integer', minimum: 0, ...(description ? { description } : {}) });
+export const intSchema = (description?: string) => ({
+  type: 'integer',
+  minimum: 0,
+  ...(description ? { description } : {}),
+});
 export const nullableStringSchema = (description?: string) => ({
   anyOf: [{ type: 'string', minLength: 1 }, { type: 'null' }],
   ...(description ? { description } : {}),
@@ -84,17 +87,18 @@ export const idempotencyKeyJsonSchema = stringSchema(
 export const ARTIFACT_TEMPLATE_ERROR_CODES: Record<string, { http: number; meaning: string }> = {
   pdf_tool_bridge_not_configured: {
     http: 503,
-    meaning: "This site's PDF_TOOL_BASE_URL/PDF_TOOL_AGENT_RUN_TOKEN are not configured — an operator setup gap, not a caller mistake.",
+    meaning:
+      "This site's PDF_TOOL_BASE_URL/PDF_TOOL_AGENT_RUN_TOKEN are not configured — an operator setup gap, not a caller mistake.",
   },
   pdf_tool_bridge_request_failed: {
     http: 0,
     meaning:
-      'pdf-tool rejected or could not be reached for the request; the real HTTP status is in this error\'s own statusCode field and any pdf-tool-specific code (e.g. TEMPLATE_VALIDATION_REQUIRED) is spread in verbatim alongside it.',
+      "pdf-tool rejected or could not be reached for the request; the real HTTP status is in this error's own statusCode field and any pdf-tool-specific code (e.g. TEMPLATE_VALIDATION_REQUIRED) is spread in verbatim alongside it.",
   },
   template_scope_required: { http: 400, meaning: 'site_id is required for every pdf-template bridge call.' },
   template_site_mismatch: {
     http: 403,
-    meaning: 'The supplied site_id names a different site than this deployment owns — use that site\'s own connector.',
+    meaning: "The supplied site_id names a different site than this deployment owns — use that site's own connector.",
   },
   artifact_scope_required: { http: 400, meaning: 'site_id and request_id are both required for the artifact bridge.' },
   artifact_site_mismatch: { http: 403, meaning: 'site_id does not match this deployment.' },
@@ -109,11 +113,13 @@ export const ARTIFACT_TEMPLATE_ERROR_CODES: Record<string, { http: number; meani
   },
   pdf_tool_invalid_response: {
     http: 502,
-    meaning: 'pdf-tool returned 2xx but the body was missing a field this bridge requires (e.g. jobId) — retry, then escalate if it repeats.',
+    meaning:
+      'pdf-tool returned 2xx but the body was missing a field this bridge requires (e.g. jobId) — retry, then escalate if it repeats.',
   },
   artifact_materialization_unverified: {
     http: 502,
-    meaning: "pdf-tool reported the job complete but this bridge's own server-side verification of the resulting bytes failed — do not trust the artifact reference; re-run the job.",
+    meaning:
+      "pdf-tool reported the job complete but this bridge's own server-side verification of the resulting bytes failed — do not trust the artifact reference; re-run the job.",
   },
   TEMPLATE_VALIDATION_REQUIRED: {
     http: 409,
@@ -351,7 +357,7 @@ export const TOOL_DEFINITIONS_PART1: ToolDefinition[] = [
   {
     name: 'create_agent_artifact_job',
     description:
-      "Create a pdf-tool artifact job through THIS site's trusted Platform bridge. Pass the owning site_id and content-item request_id; Platform resolves the canonical pdf-tool project, verifies request ownership, mints and forwards a fresh short-lived storage grant server-side, and never returns the grant — never attempt to supply your own grant/storage/token argument, it is always minted for you. Do not call pdf-tool directly or guess projectId. The job is asynchronous: poll get_agent_artifact_job_status with the returned jobId; do not recreate it. For template-driven PDFs pass template_id + data (+ optional assets) instead of a prompt. If this call itself times out or 502s (ambiguous whether the job was created), retry with the SAME idempotency_key to get back the original jobId instead of creating a second job. Error codes (error_code field) this bridge and pdf-tool can return: artifact_scope_required, artifact_site_mismatch, artifact_request_not_found, artifact_request_scope_mismatch, pdf_tool_bridge_not_configured, pdf_tool_bridge_request_failed, pdf_tool_invalid_response — see this platform's docs for the full artifact/template error catalog (meaning + what to do for each).",
+      "Create a pdf-tool artifact job through THIS site's trusted Platform bridge. Pass the owning site_id and content-item request_id; Platform resolves the canonical pdf-tool project, verifies request ownership, mints and forwards a fresh short-lived storage grant server-side, and never returns the grant — never attempt to supply your own grant/storage/token argument, it is always minted for you. Do not call pdf-tool directly or guess projectId. The job is asynchronous, BUT this call itself waits briefly (a few seconds, budget permitting) for it to finish: with a warm worker and a fast render the job is often already done before you could poll, so a SINGLE completing create call may come back with the terminal artifactReference, public_path, and verified fields already populated — check for those before polling. jobId and polling instructions are ALWAYS present in the response regardless, so it is always safe to poll get_agent_artifact_job_status with the returned jobId if the job is still running (status will not be complete yet) or if you prefer to ignore the inline result; do not recreate the job. Pass wait:false to skip the inline wait and get the old fire-and-forget 202-style response immediately. For template-driven PDFs pass template_id + data (+ optional assets) instead of a prompt. If this call itself times out or 502s (ambiguous whether the job was created), retry with the SAME idempotency_key to get back the original jobId instead of creating a second job. Error codes (error_code field) this bridge and pdf-tool can return: artifact_scope_required, artifact_site_mismatch, artifact_request_not_found, artifact_request_scope_mismatch, pdf_tool_bridge_not_configured, pdf_tool_bridge_request_failed, pdf_tool_invalid_response — see this platform's docs for the full artifact/template error catalog (meaning + what to do for each).",
     inputSchema: objectSchema(
       {
         site_id: stringSchema('Owning site object id, e.g. site_acme. Must match this deployment.'),
@@ -367,7 +373,15 @@ export const TOOL_DEFINITIONS_PART1: ToolDefinition[] = [
         ),
         template_id: stringSchema('A published pdf_template id to render from, in place of prompt.'),
         data: anyObjectSchema('Template data payload for a template_id-driven PDF render.'),
-        assets: anyObjectSchema('Optional supporting assets (e.g. {images: [...]}) for a template_id-driven PDF render.'),
+        assets: anyObjectSchema(
+          'Optional supporting assets (e.g. {images: [...]}) for a template_id-driven PDF render.'
+        ),
+        wait: {
+          type: 'boolean',
+          default: true,
+          description:
+            'When true (default), this call waits briefly, internally, for the job to finish and returns the completed artifact inline when it does within budget. Pass false for the old fire-and-forget behavior: return immediately once the job is created, with no internal wait.',
+        },
         idempotency_key: idempotencyKeyJsonSchema,
       },
       ['site_id', 'request_id', 'artifact_kind', 'filename']
@@ -423,7 +437,7 @@ export const TOOL_DEFINITIONS_PART1: ToolDefinition[] = [
   {
     name: 'list_pdf_templates',
     description:
-      "List pdf-tool PDF templates for THIS site through the trusted Platform bridge. Site ownership, canonical project, and storage grant are resolved server-side.",
+      'List pdf-tool PDF templates for THIS site through the trusted Platform bridge. Site ownership, canonical project, and storage grant are resolved server-side.',
     inputSchema: objectSchema(
       {
         site_id: stringSchema('Owning site object id; must match this deployment.'),
@@ -435,8 +449,7 @@ export const TOOL_DEFINITIONS_PART1: ToolDefinition[] = [
   },
   {
     name: 'get_pdf_template',
-    description:
-      "Fetch a pdf-tool PDF template record for THIS site through the trusted Platform bridge.",
+    description: 'Fetch a pdf-tool PDF template record for THIS site through the trusted Platform bridge.',
     inputSchema: objectSchema(
       {
         site_id: stringSchema('Owning site object id; must match this deployment.'),
@@ -476,7 +489,7 @@ export const TOOL_DEFINITIONS_PART1: ToolDefinition[] = [
   {
     name: 'publish_pdf_template',
     description:
-      'Publish (activate) a pdf-tool PDF template version for THIS site through the trusted Platform bridge. Required sequence by renderer: pdfme creates then publishes immediately (warn-only on lint issues, matching pdfme\'s existing behavior). react-pdf/typst/chromium MUST go create_pdf_template -> validate_pdf_template -> poll get_pdf_template_validation to a terminal report -> publish_pdf_template; with no PASSED report on file for the exact version, this call refuses verbatim as HTTP 409 TEMPLATE_VALIDATION_REQUIRED (it does not run validation for you).',
+      "Publish (activate) a pdf-tool PDF template version for THIS site through the trusted Platform bridge. Required sequence by renderer: pdfme creates then publishes immediately (warn-only on lint issues, matching pdfme's existing behavior). react-pdf/typst/chromium MUST go create_pdf_template -> validate_pdf_template -> poll get_pdf_template_validation to a terminal report -> publish_pdf_template; with no PASSED report on file for the exact version, this call refuses verbatim as HTTP 409 TEMPLATE_VALIDATION_REQUIRED (it does not run validation for you).",
     inputSchema: objectSchema(
       {
         site_id: stringSchema('Owning site object id; must match this deployment.'),
@@ -489,7 +502,7 @@ export const TOOL_DEFINITIONS_PART1: ToolDefinition[] = [
   {
     name: 'delete_pdf_template',
     description:
-      "Deactivate a pdf-tool PDF template for THIS site through the trusted Platform bridge. This is a soft, reversible deactivation (status -> disabled), NOT a hard delete: the underlying template data and stored bytes are preserved. A disabled template is hidden from list_pdf_templates by default, and is blocked from publish_pdf_template and from rendering (create_agent_artifact_job) until reactivated. Deactivating an already-disabled template succeeds without error (idempotent).",
+      'Deactivate a pdf-tool PDF template for THIS site through the trusted Platform bridge. This is a soft, reversible deactivation (status -> disabled), NOT a hard delete: the underlying template data and stored bytes are preserved. A disabled template is hidden from list_pdf_templates by default, and is blocked from publish_pdf_template and from rendering (create_agent_artifact_job) until reactivated. Deactivating an already-disabled template succeeds without error (idempotent).',
     inputSchema: objectSchema(
       {
         site_id: stringSchema('Owning site object id; must match this deployment.'),
