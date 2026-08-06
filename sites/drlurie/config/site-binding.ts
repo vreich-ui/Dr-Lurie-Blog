@@ -20,4 +20,7 @@ export const drlurieSiteBinding: SiteBinding = {
   siteId: siteIdentityConfig.siteId,
   env: PLATFORM_ENV_NAMES,
   dataRoot: 'sites/drlurie/data/site',
+  // Perf profiling (2026-08-06): admin-object/admin-audit cold starts add
+  // ~1.3s TTFB to /admin/content. Warm them on the same schedule as /mcp.
+  warmAdminKeepalive: true,
 };

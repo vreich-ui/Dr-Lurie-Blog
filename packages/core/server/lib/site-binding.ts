@@ -54,6 +54,15 @@ export type SiteBinding = {
   readonly env: SiteBindingEnvNames;
   /** This site's committed-export root, e.g. 'sites/drlurie/data/site' (W11 T11.6). */
   readonly dataRoot: string;
+  /**
+   * Opt this site's scheduled mcp-keepalive run into also warming its
+   * admin-object / admin-audit functions (the /admin/content read path),
+   * not just /mcp. Defaults to unset/false — a site opts in explicitly in
+   * its own `sites/<site>/config/site-binding.ts` rather than core deciding
+   * per site identity, so this stays a plain per-site data field instead of
+   * a site-name literal in fleet law.
+   */
+  readonly warmAdminKeepalive?: boolean;
 };
 
 /**
