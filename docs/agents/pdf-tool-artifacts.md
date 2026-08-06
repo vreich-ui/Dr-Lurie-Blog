@@ -21,17 +21,19 @@ legacy tool name is guessed.
 ## Current architecture
 
 1. The agent creates or updates the Dr. Lurie workflow JSON through the existing Dr. Lurie MCP checkout, patch, and checkin tools.
-2. The agent calls Dr. Lurie's Platform bridge to create an artifact job; Platform resolves `site_drlurie → dr-lurie`, checks that the request is an owned `content_item`, and calls pdf-tool with the grant server-side:
+2. The agent calls Dr. Lurie's Platform bridge to create an artifact job; Platform resolves `site_drlurie → dr-lurie`, checks that the request is an owned `content_item`, and calls pdf-tool with the grant server-side, as a `create_agent_artifact_job` `tools/call` against pdf-tool's single `/mcp` endpoint:
 
    ```http
-   POST {PDF_TOOL_BASE_URL}/.netlify/functions/create-agent-artifact-job
+   POST {PDF_TOOL_BASE_URL}/.netlify/functions/mcp
    ```
 
-3. The agent polls the Platform bridge until the job completes:
+3. The agent polls the Platform bridge until the job completes; Platform itself calls pdf-tool's `get_agent_artifact_job_status` tool the same way, through the same `/mcp` endpoint:
 
    ```http
-   GET {PDF_TOOL_BASE_URL}/.netlify/functions/get-agent-artifact-job-status
+   POST {PDF_TOOL_BASE_URL}/.netlify/functions/mcp
    ```
+
+   (L1: Platform used to call eleven separate standalone Netlify Functions, one per pdf-tool operation -- each is its own function container, so calls kept landing on cold, unwarmed instances even when pdf-tool's `mcp` function itself was warm. Every call now routes through that one already-warm `/mcp` endpoint instead, as a `tools/call` naming the equivalent tool.)
 
 4. Platform verifies pdf-tool's materialization response and returns a Dr. Lurie-native `ArtifactReference` plus `/img/...` or `/pdf/...` public path, with no grant or proof.
 5. The agent uses the existing Dr. Lurie MCP checkout, patch, and checkin tools to insert that `ArtifactReference` into the authoritative workflow JSON.

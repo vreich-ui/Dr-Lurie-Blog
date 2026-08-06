@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { publicPathForArtifactRef } from './artifact-trust.js';
 import type { PdfToolStorageGrant } from './pdf-tool-storage-grant.js';
 
@@ -49,6 +50,27 @@ export const sanitizePdfToolPayload = (value: unknown, secrets: string[] = []): 
   return safe;
 };
 
+/**
+ * L1: Platform used to POST to eleven separate standalone Netlify Functions on pdf-tool
+ * (`/.netlify/functions/create-agent-artifact-job`, `/get-agent-artifact-job-status`, ...).
+ * Every distinct function name is its own Netlify Function container, so a burst of calls
+ * across different tools kept hitting cold, unwarmed instances even when pdf-tool's `mcp`
+ * function itself was warm (see warm-ping-scheduled.ts, which only ever pinged `mcp`).
+ * postPdfTool now routes every call through that single already-warm `/mcp` JSON-RPC
+ * endpoint instead, as a `tools/call` request naming the equivalent tool (the standalone
+ * function's kebab-case name maps 1:1 onto the MCP tool's snake_case name).
+ *
+ * Two behavioral notes carried over from pdf-tool's docs/MCP_BRIDGE_PARITY.md (added by the
+ * chore/mcp-statuscode-parity PR that made this migration safe):
+ *  - `validate-pdf-template` and `get-pdf-template-validation` never had standalone Netlify
+ *    Functions at all -- validatePlatformPdfTemplate/getPlatformPdfTemplateValidation below
+ *    were calling a URL that 404s today. Routing through `/mcp` is not just a latency
+ *    optimization for these two: it's the fix that makes them work.
+ *  - A tool's HTTP status is not observable via MCP on SUCCESS (e.g. create_pdf_template's
+ *    201, create_agent_artifact_job's 202 both collapse to this function's `statusCode: 200`)
+ *    -- confirmed unused by any caller in this codebase. On error it IS preserved: pdf-tool's
+ *    mcp.ts carries the original statusCode inside `structuredContent.statusCode`.
+ */
 const postPdfTool = async (
   functionName: string,
   payload: Record<string, unknown>,
@@ -59,10 +81,15 @@ const postPdfTool = async (
 
   let response: Response;
   try {
-    response = await (options.fetchImpl ?? globalThis.fetch)(`${config.baseUrl}/.netlify/functions/${functionName}`, {
+    response = await (options.fetchImpl ?? globalThis.fetch)(`${config.baseUrl}/.netlify/functions/mcp`, {
       method: 'POST',
       headers: { authorization: `Bearer ${config.token}`, 'content-type': 'application/json' },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: randomUUID(),
+        method: 'tools/call',
+        params: { name: functionName.replace(/-/g, '_'), arguments: payload },
+      }),
     });
   } catch {
     return { ok: false, statusCode: 502, error: 'pdf-tool is unreachable from Platform.' };
@@ -74,21 +101,45 @@ const postPdfTool = async (
   } catch {
     return { ok: false, statusCode: 502, error: `pdf-tool returned a non-JSON response (HTTP ${response.status}).` };
   }
-  const internalMaterializationProof =
-    isRecord(raw) && typeof raw.materializationProof === 'string' ? raw.materializationProof : undefined;
+
   const storageToken =
     isRecord(payload.storage) && typeof payload.storage.token === 'string' ? payload.storage.token : undefined;
-  const safe = sanitizePdfToolPayload(raw, [config.token, ...(storageToken ? [storageToken] : [])]);
+  const secrets = [config.token, ...(storageToken ? [storageToken] : [])];
+
+  // A successful tools/call always carries `result.structuredContent` (see pdf-tool's
+  // mcp.ts toolContent/errorContent) -- true for both a business SUCCESS and a business
+  // ERROR, both delivered at HTTP 200. Anything else (non-2xx, or a 200 with no `result`,
+  // e.g. "Unknown tool") means the call never reached tool code at all; fall back to
+  // whatever pdf-tool sent, sanitized the same way, exactly like the pre-MCP bridge did.
+  const rpcResult =
+    isRecord(raw) && isRecord((raw as { result?: unknown }).result)
+      ? (raw as { result: Record<string, unknown> }).result
+      : undefined;
+  const bodySource = rpcResult ? rpcResult.structuredContent : raw;
+  const internalMaterializationProof =
+    isRecord(bodySource) && typeof bodySource.materializationProof === 'string'
+      ? bodySource.materializationProof
+      : undefined;
+  const safe = sanitizePdfToolPayload(bodySource, secrets);
   const body = isRecord(safe) ? safe : {};
-  if (!response.ok) {
-    return {
-      ok: false,
-      statusCode: response.status,
-      error: typeof body.error === 'string' ? body.error : `pdf-tool request failed (HTTP ${response.status}).`,
-      body,
-    };
+
+  if (rpcResult && !rpcResult.isError) {
+    return { ok: true, statusCode: 200, body, internalMaterializationProof };
   }
-  return { ok: true, statusCode: response.status, body, internalMaterializationProof };
+
+  const jsonRpcError =
+    isRecord(raw) && isRecord((raw as { error?: unknown }).error)
+      ? (raw as { error: Record<string, unknown> }).error
+      : undefined;
+  const statusCode =
+    typeof body.statusCode === 'number' ? body.statusCode : response.status !== 200 ? response.status : 502;
+  const error =
+    typeof body.error === 'string'
+      ? body.error
+      : typeof jsonRpcError?.message === 'string'
+        ? String(sanitizePdfToolPayload(jsonRpcError.message, secrets))
+        : `pdf-tool request failed (HTTP ${response.status}).`;
+  return { ok: false, statusCode, error, body };
 };
 
 export type PlatformArtifactJobInput = {

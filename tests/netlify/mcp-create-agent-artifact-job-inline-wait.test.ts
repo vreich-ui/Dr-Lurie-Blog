@@ -6,6 +6,7 @@ import test from 'node:test';
 
 import { handler, _mcpInternal, type LambdaEvent } from '../../netlify/functions/mcp.js';
 import { setLocalBlobsRootForTesting } from '../../packages/core/server/lib/local-blobs.js';
+import { stubPdfToolMcp, type PdfToolMcpRoute } from './pdf-tool-mcp-fetch-stub.js';
 
 const { resolveArtifactJobInlineWaitBudgetMs } = _mcpInternal;
 
@@ -81,16 +82,10 @@ const referenceForRequest = (requestId: string) => ({
   originalFilename: 'inline.webp',
 });
 
-const withMockedFetch = async <T>(
-  impl: (url: URL, body: Record<string, unknown>) => Promise<Response> | Response,
-  run: () => Promise<T>
-): Promise<T> => {
+const withMockedFetch = async <T>(routes: Record<string, PdfToolMcpRoute>, run: () => Promise<T>): Promise<T> => {
   const originalFetch = globalThis.fetch;
-  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
-    const url = new URL(String(input));
-    const body = JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>;
-    return impl(url, body);
-  }) as typeof fetch;
+  const { fetchImpl } = stubPdfToolMcp(routes);
+  globalThis.fetch = fetchImpl;
   try {
     return await run();
   } finally {
@@ -134,46 +129,45 @@ test('a job that completes within budget comes back inline, with jobId + polling
   let statusCalls = 0;
 
   await withMockedFetch(
-    (url, body) => {
-      if (url.pathname.endsWith('/create-agent-artifact-job')) {
-        return Response.json(
-          {
-            jobId: 'job-fast',
-            status: 'pending',
-            projectId: body.projectId,
-            requestId: body.requestId,
-            artifactKind: body.artifactKind,
-          },
-          { status: 202 }
-        );
-      }
-      if (url.pathname.endsWith('/get-agent-artifact-job-status')) {
+    {
+      create_agent_artifact_job: (body) => ({
+        status: 202,
+        body: {
+          jobId: 'job-fast',
+          status: 'pending',
+          projectId: body.projectId,
+          requestId: body.requestId,
+          artifactKind: body.artifactKind,
+        },
+      }),
+      get_agent_artifact_job_status: (body) => {
         statusCalls += 1;
         // First poll still running, second poll (well within the ~1s job
         // completion window and the 10s default budget) reports complete.
         if (statusCalls === 1) {
-          return Response.json({ jobId: 'job-fast', status: 'pending', projectId: body.projectId, requestId });
+          return { body: { jobId: 'job-fast', status: 'pending', projectId: body.projectId, requestId } };
         }
-        return Response.json({
-          jobId: 'job-fast',
-          status: 'complete',
-          projectId: body.projectId,
-          requestId,
-          artifactKind: 'image',
-          artifactReference: reference,
-          materializationProof: PROOF_SECRET,
-        });
-      }
-      if (url.pathname.endsWith('/verify-agent-artifact')) {
-        return Response.json({
+        return {
+          body: {
+            jobId: 'job-fast',
+            status: 'complete',
+            projectId: body.projectId,
+            requestId,
+            artifactKind: 'image',
+            artifactReference: reference,
+            materializationProof: PROOF_SECRET,
+          },
+        };
+      },
+      verify_agent_artifact: (body) => ({
+        body: {
           verified: true,
           projectId: body.projectId,
           requestId: body.requestId,
           artifactReference: body.artifactReference,
           materializationProof: `${PROOF_SECRET}-rotated`,
-        });
-      }
-      return Response.json({ error: 'unexpected path' }, { status: 404 });
+        },
+      }),
     },
     async () => {
       const created = await rpc('create_agent_artifact_job', {
@@ -213,24 +207,21 @@ test('a job still running when the wait budget expires returns the unchanged 202
 
   try {
     await withMockedFetch(
-      (url, body) => {
-        if (url.pathname.endsWith('/create-agent-artifact-job')) {
-          return Response.json(
-            {
-              jobId: 'job-slow',
-              status: 'pending',
-              projectId: body.projectId,
-              requestId: body.requestId,
-              artifactKind: body.artifactKind,
-            },
-            { status: 202 }
-          );
-        }
-        if (url.pathname.endsWith('/get-agent-artifact-job-status')) {
+      {
+        create_agent_artifact_job: (body) => ({
+          status: 202,
+          body: {
+            jobId: 'job-slow',
+            status: 'pending',
+            projectId: body.projectId,
+            requestId: body.requestId,
+            artifactKind: body.artifactKind,
+          },
+        }),
+        get_agent_artifact_job_status: (body) => {
           statusCalls += 1;
-          return Response.json({ jobId: 'job-slow', status: 'pending', projectId: body.projectId, requestId });
-        }
-        return Response.json({ error: 'unexpected path' }, { status: 404 });
+          return { body: { jobId: 'job-slow', status: 'pending', projectId: body.projectId, requestId } };
+        },
       },
       async () => {
         const created = await rpc('create_agent_artifact_job', {
@@ -263,33 +254,32 @@ test('a job that fails during the internal wait surfaces the failure, not a pend
   let statusCalls = 0;
 
   await withMockedFetch(
-    (url, body) => {
-      if (url.pathname.endsWith('/create-agent-artifact-job')) {
-        return Response.json(
-          {
-            jobId: 'job-failed',
-            status: 'pending',
-            projectId: body.projectId,
-            requestId: body.requestId,
-            artifactKind: body.artifactKind,
-          },
-          { status: 202 }
-        );
-      }
-      if (url.pathname.endsWith('/get-agent-artifact-job-status')) {
+    {
+      create_agent_artifact_job: (body) => ({
+        status: 202,
+        body: {
+          jobId: 'job-failed',
+          status: 'pending',
+          projectId: body.projectId,
+          requestId: body.requestId,
+          artifactKind: body.artifactKind,
+        },
+      }),
+      get_agent_artifact_job_status: (body) => {
         statusCalls += 1;
         if (statusCalls === 1) {
-          return Response.json({ jobId: 'job-failed', status: 'pending', projectId: body.projectId, requestId });
+          return { body: { jobId: 'job-failed', status: 'pending', projectId: body.projectId, requestId } };
         }
-        return Response.json({
-          jobId: 'job-failed',
-          status: 'failed',
-          projectId: body.projectId,
-          requestId,
-          error: 'pdf-tool render worker crashed',
-        });
-      }
-      return Response.json({ error: 'unexpected path' }, { status: 404 });
+        return {
+          body: {
+            jobId: 'job-failed',
+            status: 'failed',
+            projectId: body.projectId,
+            requestId,
+            error: 'pdf-tool render worker crashed',
+          },
+        };
+      },
     },
     async () => {
       const created = await rpc('create_agent_artifact_job', {
@@ -320,32 +310,31 @@ test('wait:false returns the fire-and-forget response immediately with zero inte
   let statusCalls = 0;
 
   await withMockedFetch(
-    (url, body) => {
-      if (url.pathname.endsWith('/create-agent-artifact-job')) {
-        return Response.json(
-          {
-            jobId: 'job-optout',
-            status: 'pending',
-            projectId: body.projectId,
-            requestId: body.requestId,
-            artifactKind: body.artifactKind,
-          },
-          { status: 202 }
-        );
-      }
-      if (url.pathname.endsWith('/get-agent-artifact-job-status')) {
-        statusCalls += 1;
-        return Response.json({
+    {
+      create_agent_artifact_job: (body) => ({
+        status: 202,
+        body: {
           jobId: 'job-optout',
-          status: 'complete',
+          status: 'pending',
           projectId: body.projectId,
-          requestId,
-          artifactKind: 'image',
-          artifactReference: referenceForRequest(requestId),
-          materializationProof: PROOF_SECRET,
-        });
-      }
-      return Response.json({ error: 'unexpected path' }, { status: 404 });
+          requestId: body.requestId,
+          artifactKind: body.artifactKind,
+        },
+      }),
+      get_agent_artifact_job_status: (body) => {
+        statusCalls += 1;
+        return {
+          body: {
+            jobId: 'job-optout',
+            status: 'complete',
+            projectId: body.projectId,
+            requestId,
+            artifactKind: 'image',
+            artifactReference: referenceForRequest(requestId),
+            materializationProof: PROOF_SECRET,
+          },
+        };
+      },
     },
     async () => {
       const created = await rpc('create_agent_artifact_job', {
@@ -374,26 +363,23 @@ test('the internal wait stops polling early when the remaining invocation budget
   let statusCallsShortBudget = 0;
 
   await withMockedFetch(
-    (url, body) => {
-      if (url.pathname.endsWith('/create-agent-artifact-job')) {
-        return Response.json(
-          {
-            jobId: 'job-shortbudget',
-            status: 'pending',
-            projectId: body.projectId,
-            requestId: body.requestId,
-            artifactKind: body.artifactKind,
-          },
-          { status: 202 }
-        );
-      }
-      if (url.pathname.endsWith('/get-agent-artifact-job-status')) {
+    {
+      create_agent_artifact_job: (body) => ({
+        status: 202,
+        body: {
+          jobId: 'job-shortbudget',
+          status: 'pending',
+          projectId: body.projectId,
+          requestId: body.requestId,
+          artifactKind: body.artifactKind,
+        },
+      }),
+      get_agent_artifact_job_status: (body) => {
         statusCallsShortBudget += 1;
         // Never completes -- the only way this resolves quickly is by
         // respecting the (short) remaining invocation budget.
-        return Response.json({ jobId: 'job-shortbudget', status: 'pending', projectId: body.projectId, requestId });
-      }
-      return Response.json({ error: 'unexpected path' }, { status: 404 });
+        return { body: { jobId: 'job-shortbudget', status: 'pending', projectId: body.projectId, requestId } };
+      },
     },
     async () => {
       const created = await rpc(
@@ -424,29 +410,28 @@ test('the internal wait stops polling early when the remaining invocation budget
   let statusCallsControl = 0;
 
   await withMockedFetch(
-    (url, body) => {
-      if (url.pathname.endsWith('/create-agent-artifact-job')) {
-        return Response.json(
-          {
-            jobId: 'job-control',
-            status: 'pending',
-            projectId: body.projectId,
-            requestId: body.requestId,
-            artifactKind: body.artifactKind,
-          },
-          { status: 202 }
-        );
-      }
-      if (url.pathname.endsWith('/get-agent-artifact-job-status')) {
-        statusCallsControl += 1;
-        return Response.json({
+    {
+      create_agent_artifact_job: (body) => ({
+        status: 202,
+        body: {
           jobId: 'job-control',
           status: 'pending',
           projectId: body.projectId,
-          requestId: requestId2,
-        });
-      }
-      return Response.json({ error: 'unexpected path' }, { status: 404 });
+          requestId: body.requestId,
+          artifactKind: body.artifactKind,
+        },
+      }),
+      get_agent_artifact_job_status: (body) => {
+        statusCallsControl += 1;
+        return {
+          body: {
+            jobId: 'job-control',
+            status: 'pending',
+            projectId: body.projectId,
+            requestId: requestId2,
+          },
+        };
+      },
     },
     async () => {
       await rpc(

@@ -6,6 +6,7 @@ import test from 'node:test';
 
 import { handler } from '../../netlify/functions/mcp.js';
 import { createLocalBlobStore, setLocalBlobsRootForTesting } from '../../packages/core/server/lib/local-blobs.js';
+import { stubPdfToolMcp } from './pdf-tool-mcp-fetch-stub.js';
 
 const REQUEST_ID = 'req_agent_simple_skincare_routine_id_choose_20260802_01';
 const STORAGE_SECRET = 'storage-secret-never-expose';
@@ -108,22 +109,14 @@ test('content-item contract directs agents to the Platform bridge without projec
 test('Platform creates two Dr. Lurie WebP jobs, polls them, verifies both slots, and never exposes grants or proofs', async () => {
   await resetAndSeedRequest();
   const originalFetch = globalThis.fetch;
-  const calls: Array<{ path: string; authorization?: string; body: Record<string, unknown> }> = [];
   const statusReads = new Map<string, number>();
 
-  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
-    const url = new URL(String(input));
-    const body = JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>;
-    calls.push({
-      path: url.pathname,
-      authorization: new Headers(init?.headers).get('authorization') ?? undefined,
-      body,
-    });
-
-    if (url.pathname.endsWith('/create-agent-artifact-job')) {
+  const { calls, fetchImpl } = stubPdfToolMcp({
+    create_agent_artifact_job: (body) => {
       const slot = String(body.slot);
-      return Response.json(
-        {
+      return {
+        status: 202,
+        body: {
           jobId: `job-${slot}`,
           status: 'pending',
           projectId: body.projectId,
@@ -131,42 +124,42 @@ test('Platform creates two Dr. Lurie WebP jobs, polls them, verifies both slots,
           artifactKind: body.artifactKind,
           polling: { tool: 'get_agent_artifact_job_status', input: { projectId: body.projectId } },
         },
-        { status: 202 }
-      );
-    }
-    if (url.pathname.endsWith('/get-agent-artifact-job-status')) {
+      };
+    },
+    get_agent_artifact_job_status: (body) => {
       const jobId = String(body.jobId);
       const slot = jobId.replace(/^job-/, '');
       const count = (statusReads.get(jobId) ?? 0) + 1;
       statusReads.set(jobId, count);
-      return Response.json(
-        count === 1
-          ? { jobId, status: 'pending', projectId: body.projectId, requestId: REQUEST_ID, artifactKind: 'image' }
-          : {
-              jobId,
-              status: 'complete',
-              projectId: body.projectId,
-              requestId: REQUEST_ID,
-              artifactKind: 'image',
-              artifactReference: referenceForSlot(slot),
-              materializationProof: PROOF_SECRET,
-            }
-      );
-    }
-    if (url.pathname.endsWith('/get-agent-artifact-by-slot')) {
-      return Response.json({ artifact: referenceForSlot(String(body.slot)), materializationProof: PROOF_SECRET });
-    }
-    if (url.pathname.endsWith('/verify-agent-artifact')) {
-      return Response.json({
+      return {
+        body:
+          count === 1
+            ? { jobId, status: 'pending', projectId: body.projectId, requestId: REQUEST_ID, artifactKind: 'image' }
+            : {
+                jobId,
+                status: 'complete',
+                projectId: body.projectId,
+                requestId: REQUEST_ID,
+                artifactKind: 'image',
+                artifactReference: referenceForSlot(slot),
+                materializationProof: PROOF_SECRET,
+              },
+      };
+    },
+    get_agent_artifact_by_slot: (body) => ({
+      body: { artifactReference: referenceForSlot(String(body.slot)), materializationProof: PROOF_SECRET },
+    }),
+    verify_agent_artifact: (body) => ({
+      body: {
         verified: true,
         projectId: body.projectId,
         requestId: body.requestId,
         artifactReference: body.artifactReference,
         materializationProof: `${PROOF_SECRET}-rotated`,
-      });
-    }
-    return Response.json({ error: 'unexpected path' }, { status: 404 });
-  }) as typeof fetch;
+      },
+    }),
+  });
+  globalThis.fetch = fetchImpl;
 
   try {
     const logs: Array<Record<string, unknown>> = [];
@@ -235,9 +228,13 @@ test('Platform creates two Dr. Lurie WebP jobs, polls them, verifies both slots,
     }
 
     assert.equal(
-      calls.filter((call) => call.path.endsWith('/create-agent-artifact-job')).length,
+      calls.filter((call) => call.tool === 'create_agent_artifact_job').length,
       2,
       'polling must not recreate jobs'
+    );
+    assert.ok(
+      calls.every((call) => call.path === '/.netlify/functions/mcp'),
+      'every pdf-tool call must route through the single warm /mcp endpoint, not per-tool functions'
     );
     for (const call of calls) {
       assert.equal(call.authorization, `Bearer ${RUN_SECRET}`);
