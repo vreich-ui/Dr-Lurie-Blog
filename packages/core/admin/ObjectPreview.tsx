@@ -54,7 +54,7 @@ function KeyRows({ rows }: { rows: Array<[string, ReactNode]> }) {
   );
 }
 
-// ─── per-type strategies ────────────────────────────────────────────────────────
+PLACEHOLDER_DASH_MARKER
 
 function ContentItemPreview({ record }: { record: Rec }) {
   const p = contentItemPreview(record);
