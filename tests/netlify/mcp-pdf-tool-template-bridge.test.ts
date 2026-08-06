@@ -316,6 +316,12 @@ test('create_agent_artifact_job forwards template_id, data, and assets to pdf-to
       template_id: 'tpl_report_card',
       data,
       assets,
+      // This stub only mocks create-agent-artifact-job; opt out of the
+      // create call's own inline status wait (covered by
+      // mcp-create-agent-artifact-job-inline-wait.test.ts) so the test
+      // doesn't spend its whole ~10s default budget retrying an unmocked
+      // get-agent-artifact-job-status route.
+      wait: false,
     });
     assert.ok(!created.result.isError, JSON.stringify(created.result.structuredContent));
 

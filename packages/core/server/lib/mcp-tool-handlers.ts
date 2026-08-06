@@ -583,6 +583,146 @@ const platformPolling = (scope: ArtifactBridgeScope, jobId: string) => ({
   terminal_statuses: ['complete', 'failed'],
 });
 
+// ── create_agent_artifact_job inline "fast path" (see resolveArtifactJobInlineWaitBudgetMs
+//    below). With a warm pdf-tool worker and a fast render, the job is often
+//    already finished before a caller's first poll would even arrive; making
+//    every caller eat a network round trip just to be told "still running"
+//    then a second round trip to fetch the result that already existed is
+//    pure latency. So immediately after a successful job creation (unless the
+//    caller opted out with wait:false) we poll pdf-tool's own status
+//    ourselves, inside this same invocation, and hand back a terminal result
+//    directly when we get one in time. Callers that still poll afterwards are
+//    unaffected either way: jobId + polling instructions are always present,
+//    so an old client that ignores the extra fields and polls anyway just
+//    gets a terminal status back on its first poll instead of a 404. ──
+const ARTIFACT_JOB_INLINE_WAIT_DEFAULT_MS = 10_000;
+const ARTIFACT_JOB_INLINE_POLL_INTERVAL_MS = 500;
+// Mirrors RELEASE_WAIT_SAFETY_MARGIN_MS's reasoning one level down: leaves
+// enough of the function's own remaining invocation budget for one more
+// status round trip (plus, on completion, the verify-agent-artifact round
+// trip) and response serialization to still land before the platform kills
+// the invocation. Smaller than the release margin because a status/verify
+// round trip is far cheaper than a build-hook POST + branch-HEAD resolution.
+const ARTIFACT_JOB_INLINE_WAIT_SAFETY_MARGIN_MS = 1_500;
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Caps the inline wait the same way resolveReleaseWaitBudgetSeconds caps the
+ * release poll: by this function's own remaining invocation budget, never
+ * past the point where a response could not be delivered before the
+ * function's own timeout. Unlike the release budget, 0 is a valid outcome
+ * here (skip the inline wait entirely and fall straight through to today's
+ * 202 shape) rather than a forced minimum, since there is no async operation
+ * that must be kicked off -- the job was already created.
+ */
+export const resolveArtifactJobInlineWaitBudgetMs = (
+  invocationDeadlineMs: number | undefined,
+  nowMs: number = Date.now(),
+  env: Record<string, string | undefined> = process.env
+) => {
+  const envOverrideRaw = Number(env.PDF_JOB_INLINE_WAIT_MS);
+  const requestedMs =
+    env.PDF_JOB_INLINE_WAIT_MS !== undefined && Number.isFinite(envOverrideRaw) && envOverrideRaw >= 0
+      ? envOverrideRaw
+      : ARTIFACT_JOB_INLINE_WAIT_DEFAULT_MS;
+
+  if (invocationDeadlineMs === undefined) return requestedMs;
+
+  const remainingMs = invocationDeadlineMs - nowMs - ARTIFACT_JOB_INLINE_WAIT_SAFETY_MARGIN_MS;
+  return Math.max(0, Math.min(requestedMs, remainingMs));
+};
+
+/**
+ * Fetches pdf-tool's job status once for the create-call inline fast path
+ * and, when the job has reached a terminal state, verifies a completed
+ * artifact -- exactly the same verification callGetAgentArtifactJobStatus
+ * performs on a completing poll, so the two never drift. basePayload
+ * (the create call's own today-shaped response: jobId, siteId, projectId,
+ * requestId, polling, ...) is spread underneath every terminal outcome so
+ * a caller that only reads those fields keeps working unchanged, including
+ * in the pathological error branches below (scope mismatch, missing
+ * ArtifactReference, failed verification).
+ *
+ * Deliberately does NOT touch or share mutable state with
+ * callGetAgentArtifactJobStatus -- it calls the same pdf-tool-client
+ * functions but keeps its own response assembly so this fast path can never
+ * change that endpoint's existing response shape.
+ */
+const pollArtifactJobForInlineWait = async (
+  event: LambdaEvent,
+  scope: ArtifactBridgeScope,
+  grant: Extract<ReturnType<typeof buildArtifactBridgeGrant>, { ok: true }>['grant'],
+  jobId: string,
+  basePayload: Record<string, unknown>
+): Promise<
+  { terminal: false } | { terminal: true; response: ReturnType<typeof toolResult> | ReturnType<typeof toolError> }
+> => {
+  const status = await getPlatformArtifactJobStatus(grant, jobId);
+  if (!status.ok) {
+    // A transient status-lookup hiccup shouldn't fail the whole create call
+    // -- keep polling until the budget runs out, then fall back to today's
+    // 202 shape exactly as if pdf-tool just hadn't finished yet.
+    event.log?.({ event: 'artifact_bridge_job_inline_wait_poll_failed', jobId, error: status.error });
+    return { terminal: false };
+  }
+  if (status.body.projectId !== grant.projectId || status.body.requestId !== scope.requestId) {
+    return {
+      terminal: true,
+      response: toolError('pdf-tool job scope does not match the requested site/content object.', {
+        ...basePayload,
+        error_code: 'artifact_job_scope_mismatch',
+      }),
+    };
+  }
+
+  const { polling: _pdfToolPolling, artifact: _duplicateArtifact, artifactReference, ...safeStatus } = status.body;
+  if (status.body.status !== 'complete') {
+    if (status.body.status !== 'failed') return { terminal: false };
+    // Terminal failure: surface it (status: 'failed' + whatever error detail
+    // pdf-tool sent) directly in this call's response instead of swallowing
+    // it into the generic pending/202 shape.
+    return { terminal: true, response: toolResult({ ...basePayload, ...safeStatus }) };
+  }
+
+  const claimed =
+    artifactReference && typeof artifactReference === 'object' && !Array.isArray(artifactReference)
+      ? (artifactReference as Record<string, unknown>)
+      : undefined;
+  if (!claimed) {
+    return {
+      terminal: true,
+      response: toolError('Completed pdf-tool job returned no ArtifactReference.', { ...basePayload }),
+    };
+  }
+  const verified = await verifyBridgeArtifact(grant, scope.requestId, claimed, status.internalMaterializationProof);
+  if (!verified.ok) {
+    return {
+      terminal: true,
+      response: { ...verified.result, structuredContent: { ...basePayload, ...verified.result.structuredContent } },
+    };
+  }
+
+  event.log?.({
+    event: 'artifact_bridge_job_verified',
+    siteId: scope.siteId,
+    requestId: scope.requestId,
+    projectId: grant.projectId,
+    jobId,
+    blobKey: verified.canonical.artifactReference.blobKey,
+  });
+  return {
+    terminal: true,
+    response: toolResult({
+      ...basePayload,
+      ...safeStatus,
+      artifactReference: verified.canonical.artifactReference,
+      public_path: verified.canonical.publicPath,
+      verified: true,
+    }),
+  };
+};
+
 export const callCreateAgentArtifactJob = async (event: LambdaEvent, input: Record<string, unknown>) => {
   const scoped = await resolveArtifactBridgeScope(event, input);
   if (!scoped.ok) return scoped.result;
@@ -591,6 +731,7 @@ export const callCreateAgentArtifactJob = async (event: LambdaEvent, input: Reco
   if ((artifactKind !== 'image' && artifactKind !== 'pdf') || !filename) {
     return toolError('artifact_kind must be image or pdf, and filename is required.');
   }
+  const wait = input.wait !== false;
 
   const built = buildArtifactBridgeGrant();
   if (!built.ok) return built.result;
@@ -626,13 +767,53 @@ export const callCreateAgentArtifactJob = async (event: LambdaEvent, input: Reco
     jobId,
   });
   const { polling: _pdfToolPolling, ...safeBody } = created.body;
-  return toolResult({
+  // Today's response shape -- ALWAYS present, on every path (fast-completed,
+  // failed-inline, timed-out, or wait:false), so an existing polling caller
+  // that only looks at jobId + polling keeps working unchanged.
+  const pendingResponsePayload = {
     ...safeBody,
     siteId: scoped.scope.siteId,
     projectId: built.grant.projectId,
     requestId: scoped.scope.requestId,
     polling: platformPolling(scoped.scope, jobId),
+  };
+
+  if (!wait) return toolResult(pendingResponsePayload);
+
+  const waitBudgetMs = resolveArtifactJobInlineWaitBudgetMs(event.invocationDeadlineMs);
+  const deadline = Date.now() + waitBudgetMs;
+  let pollCount = 0;
+
+  while (Date.now() < deadline) {
+    pollCount += 1;
+    const polled = await pollArtifactJobForInlineWait(event, scoped.scope, built.grant, jobId, pendingResponsePayload);
+    if (polled.terminal) {
+      event.log?.({
+        event: 'artifact_bridge_job_inline_wait_resolved',
+        siteId: scoped.scope.siteId,
+        requestId: scoped.scope.requestId,
+        projectId: built.grant.projectId,
+        jobId,
+        pollCount,
+      });
+      return polled.response;
+    }
+
+    const remainingMs = deadline - Date.now();
+    if (remainingMs <= 0) break;
+    await sleep(Math.min(ARTIFACT_JOB_INLINE_POLL_INTERVAL_MS, remainingMs));
+  }
+
+  event.log?.({
+    event: 'artifact_bridge_job_inline_wait_timed_out',
+    siteId: scoped.scope.siteId,
+    requestId: scoped.scope.requestId,
+    projectId: built.grant.projectId,
+    jobId,
+    pollCount,
+    waitBudgetMs,
   });
+  return toolResult(pendingResponsePayload);
 };
 
 const verifyBridgeArtifact = async (

@@ -190,6 +190,7 @@ import {
   callReleaseToProduction,
   callTriggerNetlifyBuild,
   callVerifyArticleImages,
+  resolveArtifactJobInlineWaitBudgetMs,
   resolveReleaseWaitBudgetSeconds,
 } from '../lib/mcp-tool-handlers.js';
 
@@ -1227,6 +1228,7 @@ export const _mcpInternal = {
   hashAuthToken,
   verifiedAgentNameMemo,
   AUTH_MEMO_TTL_MS,
+  resolveArtifactJobInlineWaitBudgetMs,
   resolveReleaseWaitBudgetSeconds,
 };
 

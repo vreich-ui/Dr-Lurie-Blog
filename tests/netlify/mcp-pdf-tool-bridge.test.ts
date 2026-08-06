@@ -184,6 +184,12 @@ test('Platform creates two Dr. Lurie WebP jobs, polls them, verifies both slots,
           filename: `${slot}.webp`,
           slot,
           requirements: { maxBytes: 153600, image: { outputFormat: 'webp', size: '1536x1024' } },
+          // This test walks the pending -> complete poll sequence explicitly
+          // via separate get_agent_artifact_job_status calls below; opt out
+          // of the create call's own inline wait (covered by
+          // mcp-create-agent-artifact-job-inline-wait.test.ts) so it doesn't
+          // consume one of the two scripted status reads itself.
+          wait: false,
         },
         logs
       );

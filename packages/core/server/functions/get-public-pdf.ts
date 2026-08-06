@@ -1,6 +1,8 @@
 import type { SiteBinding } from '../lib/site-binding.js';
-import { getArtifactBlobStore } from '../lib/blob-store.js';
+import { getArtifactBlobStore, getArtifactIndexBlobStore } from '../lib/blob-store.js';
 import { normalizeArtifactBlobKey } from '../lib/artifacts.js';
+import { readArtifactReference, type ArtifactIndexStore } from '../lib/artifact-index.js';
+import { sanitizeFilename } from '../lib/artifact-filename.js';
 
 type LambdaEvent = {
   httpMethod?: string;
@@ -38,6 +40,95 @@ const getRequestedBlobKey = (event: LambdaEvent) =>
   getBlobKeyFromPublicPdfValue(toText(event.path)) ||
   getBlobKeyFromPublicPdfValue(toText(event.rawUrl));
 
+type BlobMetadata = Record<string, string>;
+
+type BinaryReadableBlobStoreWithMetadata = {
+  getWithMetadata: (
+    key: string,
+    options: { type: 'arrayBuffer' }
+  ) => Promise<{ data: ArrayBuffer | null; metadata?: BlobMetadata } | null>;
+};
+
+/**
+ * requestId/sha256 pulled straight out of the content-addressed blobKey shape
+ * `pdf/{requestId}/{sha256}.pdf` — the same split admin-blob-manager.ts's
+ * get-artifact-metadata action uses to key into the artifact-index store.
+ */
+const getArtifactPointerFromBlobKey = (blobKey: string): { requestId: string; sha256: string } | undefined => {
+  const [, requestId, filename] = blobKey.split('/');
+  const sha256 = filename?.match(/^[a-f0-9]{64}/i)?.[0]?.toLowerCase();
+
+  return requestId && sha256 ? { requestId, sha256 } : undefined;
+};
+
+const nameFromMetadata = (metadata: BlobMetadata | undefined): string =>
+  toText(metadata?.originalFilename) || toText(metadata?.label);
+
+/**
+ * Resolve the download filename, first hit wins:
+ *   1. the blob's own `originalFilename` metadata
+ *   2. the blob's own `label` metadata
+ *   3. the artifact-index reference for this blobKey's requestId/sha256 — read ONLY when
+ *      1-2 produced nothing, so the common/warm case (the blob already carries a name) stays
+ *      a single blob read and never touches the artifact-index store.
+ *   4. `fallbackName` (the blobKey's basename — today's behavior)
+ */
+const resolveDownloadFilename = async (
+  blobKey: string,
+  fallbackName: string,
+  metadata: BlobMetadata | undefined,
+  event: LambdaEvent
+): Promise<string> => {
+  const metadataName = nameFromMetadata(metadata);
+  if (metadataName) return metadataName;
+
+  const pointer = getArtifactPointerFromBlobKey(blobKey);
+  if (!pointer) return fallbackName;
+
+  try {
+    const indexStore = (await getArtifactIndexBlobStore(event)) as unknown as ArtifactIndexStore;
+    const reference = await readArtifactReference(indexStore, pointer.requestId, pointer.sha256);
+    const indexName = toText(reference?.originalFilename) || toText(reference?.label);
+    if (indexName) return indexName;
+  } catch (error) {
+    console.error('Failed to read artifact-index reference for download filename.', error);
+  }
+
+  return fallbackName;
+};
+
+const ensurePdfExtension = (name: string): string => (/\.pdf$/i.test(name) ? name : `${name}.pdf`);
+
+/**
+ * RFC 5987 attr-char excludes `'`, `(`, `)`, and `*`, none of which
+ * encodeURIComponent escapes on its own — widen it just enough to produce a
+ * valid `filename*=UTF-8''...` value.
+ */
+const encodeRFC5987ValueChars = (value: string): string =>
+  encodeURIComponent(value)
+    .replace(/['()]/g, (char) => `%${char.charCodeAt(0).toString(16).toUpperCase()}`)
+    .replace(/\*/g, '%2A');
+
+/**
+ * Emits BOTH Content-Disposition forms per RFC 6266 / RFC 5987 so non-ASCII
+ * names degrade gracefully: an ASCII-safe `filename=` for legacy clients, and
+ * the percent-encoded UTF-8 `filename*=` for everyone else. If sanitizing the
+ * resolved name collapses it to an empty stem (e.g. an all-symbols name),
+ * fall back to the sha-based name instead of serving a bare/underscore-only
+ * filename.
+ */
+const buildContentDisposition = (resolvedName: string, fallbackName: string): string => {
+  const displayCandidate = ensurePdfExtension(resolvedName);
+  const asciiCandidate = sanitizeFilename(displayCandidate);
+  const stem = asciiCandidate.replace(/\.pdf$/i, '');
+
+  const [displayName, asciiSafeName] = stem
+    ? [displayCandidate, asciiCandidate]
+    : [ensurePdfExtension(fallbackName), ensurePdfExtension(fallbackName)];
+
+  return `attachment; filename="${asciiSafeName}"; filename*=UTF-8''${encodeRFC5987ValueChars(displayName)}`;
+};
+
 const handlerImpl = async (event: LambdaEvent) => {
   if (event.httpMethod !== 'GET' && event.httpMethod !== 'HEAD') {
     return jsonResponse(405, { error: 'Method not allowed' });
@@ -51,23 +142,26 @@ const handlerImpl = async (event: LambdaEvent) => {
 
   try {
     const store = await getArtifactBlobStore(event);
-    const result = (await (
-      store as { get: (key: string, options: { type: 'arrayBuffer' }) => Promise<ArrayBuffer | null> }
-    ).get(blobKey, { type: 'arrayBuffer' })) as ArrayBuffer | null;
+    const result = await (store as unknown as BinaryReadableBlobStoreWithMetadata).getWithMetadata(blobKey, {
+      type: 'arrayBuffer',
+    });
 
-    if (!result) {
+    if (!result || result.data === null || result.data === undefined) {
       return jsonResponse(404, { error: 'PDF artifact not found.' });
     }
 
-    const buffer = Buffer.from(result);
-    const filename = blobKey.split('/').pop() || 'artifact.pdf';
+    const buffer = Buffer.from(result.data);
+    const fallbackName = blobKey.split('/').pop() || 'artifact.pdf';
+    const resolvedName = await resolveDownloadFilename(blobKey, fallbackName, result.metadata, event);
 
     return {
       statusCode: 200,
       headers: {
         'Content-Type': 'application/pdf',
-        'Cache-Control': 'public, max-age=3600',
-        'Content-Disposition': `attachment; filename="${filename}"`,
+        // Content-addressed key ⇒ the bytes for this URL can never change.
+        'Cache-Control': 'public, max-age=31536000, immutable',
+        'X-Content-Type-Options': 'nosniff',
+        'Content-Disposition': buildContentDisposition(resolvedName, fallbackName),
       },
       body: event.httpMethod === 'HEAD' ? '' : buffer.toString('base64'),
       isBase64Encoded: event.httpMethod !== 'HEAD',
