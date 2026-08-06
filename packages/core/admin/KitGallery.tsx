@@ -4,10 +4,11 @@
  * brief-writers' reference. It also demonstrates the identity module by
  * running objectDisplayName over sample records of all ten object types.
  */
-import { getSiteIdentity } from '../lib/site-identity.js';
+import type { SiteIdentity } from '../lib/site-identity.js';
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 
+import { AdminShell } from './AdminShell';
 import {
   Button,
   IconButton,
@@ -30,7 +31,6 @@ import {
   Dialog,
   ConfirmDialog,
   Drawer,
-  ToastProvider,
   useToast,
   DataTable,
   DiffView,
@@ -66,7 +66,7 @@ function Row({ children }: { children: ReactNode }) {
   return <div className="flex flex-wrap items-center gap-3">{children}</div>;
 }
 
-// ─── sample data ──────────────────────────────────────────────────────────────
+// ─── sample data ─────────────────────────────────────────────────────────
 
 const READINESS: ReadinessGroup[] = [
   {
@@ -135,7 +135,13 @@ const TABLE_COLUMNS: Column<DemoRow>[] = [
 ];
 
 // Sample records covering all ten object types — proves objectDisplayName.
-const DISPLAY_SAMPLES: Array<{ object_type: ObjectType; object_id: string; body: unknown }> = [
+// D2: takes the server-resolved identity as a parameter (rather than calling
+// getSiteIdentity() at module load) so the taxonomy/site/theme sample ids
+// reflect this deployment's real identity, env overrides included, instead
+// of whatever happened to be baked into the client bundle at build time.
+const buildDisplaySamples = (
+  identity: SiteIdentity
+): Array<{ object_type: ObjectType; object_id: string; body: unknown }> => [
   { object_type: 'page', object_id: 'page_404', body: { title: 'Page Not Found', route: '/404' } },
   {
     object_type: 'section',
@@ -143,11 +149,11 @@ const DISPLAY_SAMPLES: Array<{ object_type: ObjectType; object_id: string; body:
     body: { section: { id: 's_blog', data: { body: '<h2>Why This Blog Exists</h2>' } } },
   },
   { object_type: 'navigation', object_id: 'nav_footer', body: { role: 'footer', brand: {} } },
-  { object_type: 'taxonomy', object_id: getSiteIdentity().taxonomyId, body: { kinds: { category: {}, tag: {} } } },
-  { object_type: 'site', object_id: getSiteIdentity().siteId, body: { name: getSiteIdentity().brandName } },
+  { object_type: 'taxonomy', object_id: identity.taxonomyId, body: { kinds: { category: {}, tag: {} } } },
+  { object_type: 'site', object_id: identity.siteId, body: { name: identity.brandName } },
   { object_type: 'template', object_id: 'tpl_interior', body: { name: 'Interior page' } },
   { object_type: 'section_template', object_id: 'stpl_audience_grid', body: { name: 'Audience grid' } },
-  { object_type: 'theme', object_id: `thm_${getSiteIdentity().siteShortId}_default`, body: { name: 'Default theme' } },
+  { object_type: 'theme', object_id: `thm_${identity.siteShortId}_default`, body: { name: 'Default theme' } },
   {
     object_type: 'product',
     object_id: 'prod_barrier',
@@ -177,10 +183,11 @@ const TAXONOMY_KINDS = [
   },
 ];
 
-// ─── interactive gallery body (inside ToastProvider) ──────────────────────────
+// ─── interactive gallery body (inside AdminShell's ToastProvider) ────────────────────────────────
 
-function GalleryBody() {
+function GalleryBody({ identity }: { identity: SiteIdentity }) {
   const { toast } = useToast();
+  const displaySamples = buildDisplaySamples(identity);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -450,7 +457,7 @@ function GalleryBody() {
               </tr>
             </thead>
             <tbody>
-              {DISPLAY_SAMPLES.map((sample) => (
+              {displaySamples.map((sample) => (
                 <tr key={sample.object_id} className="border-t border-[var(--adm-border)]">
                   <td className="py-1.5 pr-4">
                     <Badge>{objectTypeLabel(sample.object_type)}</Badge>
@@ -548,24 +555,32 @@ function GalleryBody() {
   );
 }
 
-// ─── root with dark toggle + provider ─────────────────────────────────────────
+// ─── root with dark toggle, inside the shared admin chrome ──────────────────────────────────
 
-export default function KitGallery() {
+export interface KitGalleryProps {
+  identity: SiteIdentity;
+}
+
+export default function KitGallery({ identity }: KitGalleryProps) {
   const [dark, setDark] = useState(false);
 
   return (
-    <div className={dark ? 'dark' : undefined}>
-      <div className="adm-root rounded-[var(--adm-radius-lg)] bg-[var(--adm-surface-page)] p-4 sm:p-6">
-        <div className="mb-6 flex items-center justify-between">
-          <p className="text-[length:var(--adm-text-sm)] text-[var(--adm-text-muted)]">
-            Admin UI kit — every component, every state.
-          </p>
-          <Switch checked={dark} onCheckedChange={setDark} label={dark ? 'Dark' : 'Light'} />
+    <AdminShell currentPath="/admin/kit" title="Admin UI Kit" identity={identity}>
+      <div className={dark ? 'dark' : undefined}>
+        <div className="rounded-[var(--adm-radius-lg)] bg-[var(--adm-surface-page)] p-4 sm:p-6">
+          <div className="mb-6 flex items-center justify-between">
+            <p className="text-[length:var(--adm-text-sm)] text-[var(--adm-text-muted)]">
+              Admin UI kit — every component, every state.
+            </p>
+            <Switch checked={dark} onCheckedChange={setDark} label={dark ? 'Dark' : 'Light'} />
+          </div>
+          {/* AdminShell already wraps children in its own ToastProvider (T9.3),
+              same as every sibling page (Studio.tsx, MaintenancePage.tsx) — no
+              local <ToastProvider> here, GalleryBody's useToast() resolves to
+              the shell's. */}
+          <GalleryBody identity={identity} />
         </div>
-        <ToastProvider>
-          <GalleryBody />
-        </ToastProvider>
       </div>
-    </div>
+    </AdminShell>
   );
 }
