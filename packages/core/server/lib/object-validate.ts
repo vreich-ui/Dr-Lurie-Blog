@@ -130,6 +130,19 @@ export type ObjectValidationContext = {
   /** Effective variant type of a shared 'section' object (for structural re-check). */
   resolveSharedSectionType?: (objectId: string) => SectionType | undefined;
   /**
+   * Human display name of a shared 'section' object (D3-sharedref) — the
+   * `objectDisplayName` derivation for that target, so the shared_ref write
+   * path (object-verbs.ts) can stamp `data.sectionName` without a second
+   * store read of its own. NOT used by validation itself (the name is
+   * display-only, not a reference-integrity criterion); it rides on this
+   * context purely because the context is where a store-backed, per-write,
+   * synchronous resolver already lives. Absent, or returning undefined for a
+   * given id, both mean "cannot resolve a name" — the write path treats them
+   * identically and leaves `sectionName` unset (never `null`; see
+   * object-verbs.ts's stampSharedRefSectionNames for why).
+   */
+  resolveSharedSectionName?: (objectId: string) => string | undefined;
+  /**
    * Blueprint type of a section_template object (W8.2) — the
    * resolveSharedSectionType sibling, for template slot blueprintRef checks.
    */
