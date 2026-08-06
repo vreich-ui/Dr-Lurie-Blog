@@ -33,7 +33,7 @@ export function objectTypeLabel(type: ObjectType): string {
   return OBJECT_TYPE_LABELS[type] ?? titleCase(String(type).replace(/_/g, ' '));
 }
 
-// ─── generic helpers ────────────────────────────────
+// ─── generic helpers ─────────────────────────────
 
 type Bag = Record<string, unknown>;
 
@@ -72,7 +72,7 @@ function firstHeadingText(html: string | undefined): string | undefined {
   return text || undefined;
 }
 
-// ─── object display name ──────────────────────────
+// ─── object display name ───────────────────────────────
 
 /**
  * A human title for an object, derived from its body. Never returns a raw
@@ -133,7 +133,7 @@ function fallback(record: Pick<ObjectRecord, 'object_type'>): string {
   return `Untitled ${objectTypeLabel(record.object_type).toLowerCase()}`;
 }
 
-// ─── principals + history phrasing ─────────────────────────
+// ─── principals + history phrasing ────────────────────────
 
 // D2(b) (2026-08-06): 'unattributed-agent' is the sentinel object-store.ts /
 // mcp.ts persist when a tool call declares no agent_name (agent_name:
