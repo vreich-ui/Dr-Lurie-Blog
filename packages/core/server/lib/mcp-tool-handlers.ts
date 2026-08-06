@@ -50,6 +50,8 @@ import {
 import { validateFilename, validateRequestId } from '../../lib/agents-naming.js';
 import { getSiteIdentity } from '../../lib/site-identity.js';
 import { normalizeArtifactKindInput } from './mcp-artifact-admin.js';
+import { getIdempotencyBlobStore } from './blob-store.js';
+import { getCachedValue, setCachedValue, type IdempotencyBlobStore } from './idempotency-store.js';
 import {
   getHeader,
   invokeSaveArtifact,
@@ -486,6 +488,77 @@ const resolveArtifactBridgeScope = async (
   return { ok: true, scope: { siteId, requestId } };
 };
 
+// ── perf/drop-verify-hop-cache-scope, Change 2 ──────────────────────────────
+// resolveArtifactBridgeScope re-checks content_item ownership by invoking the
+// object store in-process — the SAME ownership fact `create_agent_artifact_job`
+// already proved once when the job was created. A status-poll loop calls
+// get_agent_artifact_job_status every ~2s (see platformPolling's
+// recommended_interval_ms) for the lifetime of a job, so that recheck used to
+// run on every single poll. Cache the resolved scope per jobId instead: a job
+// cannot outlive pdf-tool's own JOB_RUNNING_TIMEOUT_MS (12 minutes — see
+// pdf-tool's netlify/lib/agent-artifact-mcp.ts), so a cached scope is never
+// reused any longer than pdf-tool itself would still treat that job's request
+// as current.
+const ARTIFACT_BRIDGE_SCOPE_CACHE_NAMESPACE = 'artifact-bridge-scope';
+export const ARTIFACT_BRIDGE_SCOPE_CACHE_TTL_MS = 12 * 60_000;
+
+/**
+ * Testable core: given an already-resolved cache store and a `resolveLive`
+ * fallback, reuses a cached (siteId, requestId) scope keyed by jobId instead
+ * of re-invoking `resolveLive` (which does the real object-store round trip)
+ * on every poll. A cache HIT is still checked against the CALLER's siteId and
+ * requestId before being trusted — defense in depth against a jobId reused
+ * (or guessed) across scopes — so a mismatch always falls through to a live
+ * resolve rather than trusting the cache blindly. Only a SUCCESSFUL live
+ * resolve is cached; a scope error is never cached, so a fixable mistake
+ * (e.g. the content_item not existing YET) doesn't stick around for the rest
+ * of the TTL.
+ */
+export const resolveArtifactBridgeScopeForJobWithStore = async (
+  store: IdempotencyBlobStore,
+  resolveLive: () => Promise<
+    { ok: true; scope: ArtifactBridgeScope } | { ok: false; result: ReturnType<typeof toolError> }
+  >,
+  siteId: string,
+  requestId: string,
+  jobId: string
+): Promise<{ ok: true; scope: ArtifactBridgeScope } | { ok: false; result: ReturnType<typeof toolError> }> => {
+  const cached = await getCachedValue<ArtifactBridgeScope>(store, ARTIFACT_BRIDGE_SCOPE_CACHE_NAMESPACE, jobId);
+  if (cached && cached.siteId === siteId && cached.requestId === requestId) {
+    return { ok: true, scope: cached };
+  }
+
+  const resolved = await resolveLive();
+  if (resolved.ok) {
+    await setCachedValue(
+      store,
+      ARTIFACT_BRIDGE_SCOPE_CACHE_NAMESPACE,
+      jobId,
+      resolved.scope,
+      ARTIFACT_BRIDGE_SCOPE_CACHE_TTL_MS
+    );
+  }
+  return resolved;
+};
+
+/** Production entry point: resolves the real per-site idempotency store (same store PR #529 introduced) and delegates to the testable core above. */
+const resolveArtifactBridgeScopeForJob = async (
+  event: LambdaEvent,
+  input: Record<string, unknown>,
+  siteId: string,
+  requestId: string,
+  jobId: string
+) => {
+  const store = await getIdempotencyBlobStore(event);
+  return resolveArtifactBridgeScopeForJobWithStore(
+    store,
+    () => resolveArtifactBridgeScope(event, input),
+    siteId,
+    requestId,
+    jobId
+  );
+};
+
 const buildArtifactBridgeGrant = () => {
   const built = buildPdfToolStorageGrant();
   return built.ok
@@ -774,14 +847,35 @@ const verifyBridgeArtifact = async (
 };
 
 export const callGetAgentArtifactJobStatus = async (event: LambdaEvent, input: Record<string, unknown>) => {
-  const scoped = await resolveArtifactBridgeScope(event, input);
-  if (!scoped.ok) return scoped.result;
+  // Cheap, synchronous checks first — these must reject before anything async
+  // (scope cache lookup OR the pdf-tool network call) ever starts.
+  const siteId = toNonEmptyString(input.site_id);
+  const requestId = toNonEmptyString(input.request_id);
+  const identity = getSiteIdentity();
+  if (!siteId || !requestId) {
+    return toolError('site_id and request_id are required.', { error_code: 'artifact_scope_required' });
+  }
+  if (siteId !== identity.siteId) {
+    return toolError(
+      `Artifact scope mismatch: this deployment owns ${identity.siteId}, not ${siteId}. Use the owning site's Platform connector.`,
+      { error_code: 'artifact_site_mismatch' }
+    );
+  }
   const jobId = toNonEmptyString(input.job_id);
   if (!jobId) return toolError('job_id is required.');
   const built = buildArtifactBridgeGrant();
   if (!built.ok) return built.result;
 
-  const status = await getPlatformArtifactJobStatus(built.grant, jobId);
+  // perf/drop-verify-hop-cache-scope, Change 4: scope re-verification (cache
+  // hit: one strongly-consistent blob read; cache miss: the full object-store
+  // ownership check) and the pdf-tool status call share no dependency on each
+  // other's OUTPUT — only the response validation below needs both. Run them
+  // concurrently instead of paying both latencies back-to-back on every poll.
+  const [scoped, status] = await Promise.all([
+    resolveArtifactBridgeScopeForJob(event, input, siteId, requestId, jobId),
+    getPlatformArtifactJobStatus(built.grant, jobId),
+  ]);
+  if (!scoped.ok) return scoped.result;
   if (!status.ok) return pdfToolBridgeError(status);
   if (status.body.projectId !== built.grant.projectId || status.body.requestId !== scoped.scope.requestId) {
     return toolError('pdf-tool job scope does not match the requested site/content object.', {
@@ -798,13 +892,26 @@ export const callGetAgentArtifactJobStatus = async (event: LambdaEvent, input: R
       ? (artifactReference as Record<string, unknown>)
       : undefined;
   if (!claimed) return toolError('Completed pdf-tool job returned no ArtifactReference.');
-  const verified = await verifyBridgeArtifact(
-    built.grant,
-    scoped.scope.requestId,
-    claimed,
-    status.internalMaterializationProof
-  );
-  if (!verified.ok) return verified.result;
+
+  // perf/drop-verify-hop-cache-scope, Change 1: pdf-tool's own
+  // getAgentArtifactJobStatus already calls attestArtifactReference and
+  // returns materializationProof once the job is complete (see
+  // netlify/lib/agent-artifact-mcp.ts in pdf-tool) — this status response IS
+  // that same attestation. A second verify-agent-artifact round trip here
+  // would just re-attest the identical reference this response already
+  // carries proof for, strictly sequentially after the status call that
+  // already has it. Treat a present proof as the completion signal instead.
+  if (!status.internalMaterializationProof) {
+    return toolError('Completed pdf-tool job returned no materialization proof.', {
+      error_code: 'artifact_materialization_unverified',
+    });
+  }
+  const canonical = canonicalPlatformArtifact({ artifactReference: claimed });
+  if (!canonical) {
+    return toolError('pdf-tool status returned no canonical ArtifactReference.', {
+      error_code: 'pdf_tool_invalid_response',
+    });
+  }
 
   event.log?.({
     event: 'artifact_bridge_job_verified',
@@ -812,15 +919,15 @@ export const callGetAgentArtifactJobStatus = async (event: LambdaEvent, input: R
     requestId: scoped.scope.requestId,
     projectId: built.grant.projectId,
     jobId,
-    blobKey: verified.canonical.artifactReference.blobKey,
+    blobKey: canonical.artifactReference.blobKey,
   });
   return toolResult({
     ...safeStatus,
     siteId: scoped.scope.siteId,
     projectId: built.grant.projectId,
     requestId: scoped.scope.requestId,
-    artifactReference: verified.canonical.artifactReference,
-    public_path: verified.canonical.publicPath,
+    artifactReference: canonical.artifactReference,
+    public_path: canonical.publicPath,
     verified: true,
   });
 };

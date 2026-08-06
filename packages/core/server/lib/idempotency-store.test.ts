@@ -1,7 +1,13 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
 
-import { withIdempotencyStore, type IdempotencyBlobStore, type ToolCallResponse } from './idempotency-store.js';
+import {
+  getCachedValue,
+  setCachedValue,
+  withIdempotencyStore,
+  type IdempotencyBlobStore,
+  type ToolCallResponse,
+} from './idempotency-store.js';
 
 // ─── injected-store pattern (marginalia-store.test.ts's makeStore) ──────────
 const makeStore = (): IdempotencyBlobStore & { blobs: Map<string, string> } => {
@@ -94,7 +100,7 @@ describe('withIdempotencyStore', () => {
     assert.strictEqual(published.structuredContent?.replayed_from_idempotency_key, undefined);
   });
 
-  it('a concurrent same-key race converges on ONE winner: the loser replays the winner\'s result', async () => {
+  it("a concurrent same-key race converges on ONE winner: the loser replays the winner's result", async () => {
     const store = makeStore();
     let calls = 0;
     const run = async () => {
@@ -124,5 +130,74 @@ describe('withIdempotencyStore', () => {
 
     assert.strictEqual(calls, 1);
     assert.strictEqual(result.structuredContent?.id, 'obj_1');
+  });
+});
+
+// ─── getCachedValue / setCachedValue (perf/drop-verify-hop-cache-scope) ─────
+// The generic TTL cache riding the SAME strongly-consistent store the
+// idempotency records above use — mcp-tool-handlers.ts's artifact-bridge
+// scope cache is the first consumer.
+describe('getCachedValue / setCachedValue', () => {
+  it('a miss (never written) returns undefined', async () => {
+    const store = makeStore();
+    assert.strictEqual(await getCachedValue(store, 'ns', 'key-1'), undefined);
+  });
+
+  it('round-trips a value written within its TTL', async () => {
+    const store = makeStore();
+    await setCachedValue(store, 'ns', 'key-1', { hello: 'world' }, 60_000, 1_000);
+
+    assert.deepStrictEqual(await getCachedValue(store, 'ns', 'key-1', 1_000), { hello: 'world' });
+    assert.deepStrictEqual(await getCachedValue(store, 'ns', 'key-1', 1_000 + 59_999), { hello: 'world' });
+  });
+
+  it('an entry exactly at or past its TTL is a miss', async () => {
+    const store = makeStore();
+    await setCachedValue(store, 'ns', 'key-1', 'value', 60_000, 1_000);
+
+    assert.strictEqual(await getCachedValue(store, 'ns', 'key-1', 1_000 + 60_000), undefined);
+    assert.strictEqual(await getCachedValue(store, 'ns', 'key-1', 1_000 + 60_001), undefined);
+  });
+
+  it('namespaces keys so two callers never collide on the same bare key', async () => {
+    const store = makeStore();
+    await setCachedValue(store, 'ns-a', 'job-1', 'a', 60_000);
+    await setCachedValue(store, 'ns-b', 'job-1', 'b', 60_000);
+
+    assert.strictEqual(await getCachedValue(store, 'ns-a', 'job-1'), 'a');
+    assert.strictEqual(await getCachedValue(store, 'ns-b', 'job-1'), 'b');
+  });
+
+  it('a corrupt stored entry is a miss, not a thrown error', async () => {
+    const store = makeStore();
+    store.blobs.set('cache:ns:key-1', 'not valid json{{{');
+
+    assert.strictEqual(await getCachedValue(store, 'ns', 'key-1'), undefined);
+  });
+
+  it('a store read failure degrades to a miss instead of throwing', async () => {
+    const failingStore: IdempotencyBlobStore = {
+      async get() {
+        throw new Error('blob store unavailable');
+      },
+      async setJSON() {
+        return { modified: true };
+      },
+    };
+
+    assert.strictEqual(await getCachedValue(failingStore, 'ns', 'key-1'), undefined);
+  });
+
+  it('a store write failure never throws back to the caller', async () => {
+    const failingStore: IdempotencyBlobStore = {
+      async get() {
+        return null;
+      },
+      async setJSON() {
+        throw new Error('blob store unavailable');
+      },
+    };
+
+    await assert.doesNotReject(setCachedValue(failingStore, 'ns', 'key-1', 'value', 60_000));
   });
 });
