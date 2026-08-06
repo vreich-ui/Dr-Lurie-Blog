@@ -103,7 +103,7 @@ export const productPreviewSourceSchema = z.discriminatedUnion('kind', [
 ]);
 export type ProductPreviewSource = z.infer<typeof productPreviewSourceSchema>;
 
-// ─── media items (W10 T10.5) ─────────────────────────────────────────────────────────────────────
+// ─── media items (W10 T10.5) ─────────────────────────────────────────────────
 // Image or provider-allowlisted video. The video carries provider + ID only
 // (regex-pinned); the embed URL is a CODE-owned template in Media.astro —
 // data never carries a playable URL (the write+render safety posture).
