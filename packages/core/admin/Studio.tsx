@@ -15,16 +15,12 @@ import { Input } from './forms';
 import { Dialog, ConfirmDialog, useToast } from './overlays';
 import { IconAlertTriangle, IconPalette, IconSparkles } from './icons';
 import type { ObjectRecord } from '@core/schema/object-record-v1';
-// NOTE: this component hydrates client:load, so getSiteIdentity() here only
-// ever sees the COMMITTED config (src/config/site-identity.ts) — browsers
-// have no process.env, so SITE_OBJECT_ID and other env overrides do not
-// reach client-rendered admin surfaces. A tenant that wants env-only
-// configuration must still edit the committed config for any
-// client-bundled surface to agree with the server. Pre-existing
-// limitation (the literal this replaced had the same ceiling); not
-// addressed here since bridging server config into client bundles is new
-// infrastructure beyond this dehardcode pass.
-import { getSiteIdentity } from '@core/lib/site-identity';
+// D2: identity is resolved server-side by the /admin/studio.astro route
+// (where process.env is real) and threaded down as a prop, all the way to
+// ThemeGallery below — this component no longer calls getSiteIdentity()
+// itself, which used to see only the COMMITTED config on the client (no
+// process.env in the browser) and silently ignore any SITE_* env override.
+import type { SiteIdentity } from '@core/lib/site-identity';
 // A pure, side-effect-free sync accessor (no network, no bundling cost worth
 // deferring) — safe to import statically so the very first render can read
 // whatever was cached, instead of racing a dynamic import against paint.
@@ -98,7 +94,7 @@ function MetaLines({ record }: { record: Rec }) {
   );
 }
 
-// ─── page-template gallery ───────────────────────────────────────────────────
+// ─── page-template gallery ─────────────────────────────────────────────
 
 function TemplateGallery({ templates, onCreated }: { templates: Rec[]; onCreated: (id: string) => void }) {
   const { toast } = useToast();
@@ -229,7 +225,7 @@ function TemplateGallery({ templates, onCreated }: { templates: Rec[]; onCreated
   );
 }
 
-// ─── section-template gallery ────────────────────────────────────────────────
+// ─── section-template gallery ──────────────────────────────────────────
 
 function SectionTemplateGallery({ sections, onCreated }: { sections: Rec[]; onCreated: (path: string) => void }) {
   const { toast } = useToast();
@@ -301,7 +297,7 @@ function SectionTemplateGallery({ sections, onCreated }: { sections: Rec[]; onCr
   );
 }
 
-// ─── theme gallery ───────────────────────────────────────────────────────────
+// ─── theme gallery ──────────────────────────────────────────────────────
 
 function Swatch({ color, label }: { color: string; label: string }) {
   return (
@@ -316,13 +312,13 @@ function Swatch({ color, label }: { color: string; label: string }) {
   );
 }
 
-function ThemeGallery({ themes, owner }: { themes: Rec[]; owner: boolean }) {
+function ThemeGallery({ themes, owner, identity }: { themes: Rec[]; owner: boolean; identity: SiteIdentity }) {
   const { toast } = useToast();
   const [target, setTarget] = useState<Rec | null>(null);
   const [diff, setDiff] = useState<Record<string, unknown> | null>(null);
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
-  const SITE_ID = getSiteIdentity().siteId;
+  const SITE_ID = identity.siteId;
 
   const dryRun = async (record: Rec) => {
     setTarget(record);
@@ -485,7 +481,7 @@ function ThemeGallery({ themes, owner }: { themes: Rec[]; owner: boolean }) {
   );
 }
 
-// ─── the studio page ─────────────────────────────────────────────────────────
+// ─── the studio page ────────────────────────────────────────────────────
 
 // Synchronous, no-network read of the last known Studio data — used as the
 // initial render state so a repeat visit (e.g. switching Studio tabs away
@@ -500,7 +496,7 @@ function initialCachedStudioData(): { templates: Rec[]; sections: Rec[]; themes:
   return cached.data;
 }
 
-function StudioBody() {
+function StudioBody({ identity }: { identity: SiteIdentity }) {
   const [initialData] = useState(initialCachedStudioData);
   const [templates, setTemplates] = useState<Rec[] | null>(initialData?.templates ?? null);
   const [sections, setSections] = useState<Rec[] | null>(initialData?.sections ?? null);
@@ -515,13 +511,25 @@ function StudioBody() {
   useEffect(() => {
     let alive = true;
     (async () => {
-      try {
-        const { fetchMe } = await import('@core/lib/admin/users-client');
-        const me = await fetchMe(getToken);
-        if (alive) setOwner(me.roles.includes('owner'));
-      } catch {
-        /* ignore */
-      }
+      // D1(b): fetchMe() used to be awaited BEFORE the recipe-loading call
+      // started, adding a full extra round-trip to the waterfall. It doesn't
+      // need to — fetchMe hits a different endpoint (admin-users, not
+      // admin-object) and its only effect here is gating the theme "Apply
+      // theme…" button behind Owner (setOwner below); nothing in the recipe
+      // loads reads it. It's genuinely independent, so it now runs
+      // concurrently with fetchStudioData() instead of ahead of it. Its own
+      // try/catch is kept nested (rather than folded into the outer one) so
+      // a fetchMe failure still degrades to "not owner" instead of blanking
+      // the whole page — the same behaviour as before.
+      const fetchOwner = (async () => {
+        try {
+          const { fetchMe } = await import('@core/lib/admin/users-client');
+          const me = await fetchMe(getToken);
+          if (alive) setOwner(me.roles.includes('owner'));
+        } catch {
+          /* ignore */
+        }
+      })();
       try {
         const { fetchStudioData } = await import('@core/lib/admin/studio-client');
         // Never force here — a fresh in-memory/TTL cache (e.g. populated by
@@ -545,6 +553,7 @@ function StudioBody() {
           }
         }
       }
+      await fetchOwner;
     })();
     return () => {
       alive = false;
@@ -575,7 +584,11 @@ function StudioBody() {
         {templates === null ? (
           <Skeleton variant="rect" height={140} />
         ) : templates.length === 0 ? (
-          <EmptyState icon={<IconSparkles size={22} />} title="No page templates yet" />
+          <EmptyState
+            icon={<IconSparkles size={22} />}
+            title="No page templates yet"
+            message="There's no in-app form for minting one — page templates are created conversationally through the CMS Agents, or by an agent calling object_create with object_type: 'template' (include description, whenToUse, and scope so it can publish)."
+          />
         ) : (
           <TemplateGallery templates={templates} onCreated={navigate} />
         )}
@@ -587,7 +600,11 @@ function StudioBody() {
         {sections === null ? (
           <Skeleton variant="rect" height={140} />
         ) : sections.length === 0 ? (
-          <EmptyState icon={<IconSparkles size={22} />} title="No section templates yet" />
+          <EmptyState
+            icon={<IconSparkles size={22} />}
+            title="No section templates yet"
+            message="There's no in-app form for minting one — section templates are created conversationally through the CMS Agents, or by an agent calling object_create with object_type: 'section_template' (include description, whenToUse, and scope so it can publish)."
+          />
         ) : (
           <SectionTemplateGallery sections={sections} onCreated={navigate} />
         )}
@@ -602,9 +619,13 @@ function StudioBody() {
         {themes === null ? (
           <Skeleton variant="rect" height={140} />
         ) : themes.length === 0 ? (
-          <EmptyState icon={<IconPalette size={22} />} title="No themes yet" />
+          <EmptyState
+            icon={<IconPalette size={22} />}
+            title="No themes yet"
+            message="There's no in-app form for minting one — themes are created conversationally through the CMS Agents, or by an agent calling object_create with object_type: 'theme' (include description, whenToUse, and scope so it can publish)."
+          />
         ) : (
-          <ThemeGallery themes={themes} owner={owner} />
+          <ThemeGallery themes={themes} owner={owner} identity={identity} />
         )}
       </section>
       <p className="text-[length:var(--adm-text-xs)] text-[var(--adm-text-muted)]">
@@ -615,10 +636,14 @@ function StudioBody() {
   );
 }
 
-export default function Studio() {
+export interface StudioProps {
+  identity: SiteIdentity;
+}
+
+export default function Studio({ identity }: StudioProps) {
   return (
-    <AdminShell currentPath="/admin/studio" title="Templates & Themes">
-      <StudioBody />
+    <AdminShell currentPath="/admin/studio" title="Templates & Themes" identity={identity}>
+      <StudioBody identity={identity} />
     </AdminShell>
   );
 }
