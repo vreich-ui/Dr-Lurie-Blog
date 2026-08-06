@@ -1,5 +1,5 @@
 /**
- * MCP keep-warm + latency telemetry (scheduled function).
+ * MCP + admin-read keep-warm and latency telemetry (scheduled function).
  *
  * The /mcp endpoint is a synchronous serverless function: after ~5-15 idle
  * minutes its runtime instance is reclaimed and the next agent call pays a
@@ -16,14 +16,45 @@
  *    exercises the full auth + JSON-RPC + tool dispatch path.
  *  - Without it: GET /mcp?health=1, the unauthenticated liveness probe.
  *
+ * The admin read path (admin-object, admin-audit — the functions behind
+ * /admin/content) has the same cold-start problem: measured TTFB was 1.61s
+ * cold vs 0.33s warm on the unauthenticated 401 path alone (pure bundle-load
+ * cost, before any blob-store I/O). Both functions call
+ * resolveAdminAccessFromEvent (packages/core/server/lib/request-roles.ts)
+ * FIRST and return 401 immediately when no Authorization header/token is
+ * present — getAdminStateFromEvent (admin-auth.ts) short-circuits on no
+ * bearer token without any network or store call — so an unauthenticated
+ * POST warms the function's bundle/runtime without touching real data or
+ * making the identity round trip. A 401 on these probes is therefore the
+ * EXPECTED, successful outcome; anything else (2xx, 5xx, network failure) is
+ * an anomaly worth flagging in the logs.
+ *
  * Scheduled functions run only on the published production deploy. Set
  * MCP_KEEPALIVE_DISABLED=true to turn probing off without a code change;
  * MCP_KEEPALIVE_TARGET_URL overrides the probed site URL (defaults to the
  * Netlify-provided URL env).
+ *
+ * Admin-warming scope (deliberate, not an oversight): this handler is fleet
+ * law — every other site under sites/* wires the SAME `createHandler` with
+ * its own SiteBinding, its own every-5-minutes netlify.toml schedule, and
+ * (for at least two of them, checked at the time of writing) structurally
+ * identical admin-object/admin-audit functions, so a naive unconditional
+ * change here would have silently started warming every site's admin path
+ * too. Only one site was profiled (the 1.61s/0.33s numbers), so admin
+ * warming is gated on `binding.warmAdminKeepalive` — a plain per-site data
+ * field a site opts into from its OWN `config/site-binding.ts` (see
+ * SiteBinding in ../lib/site-binding.js) — rather than this fleet-law file
+ * branching on a site's identity. packages/core carries zero site-name
+ * literals by lint (tests/scripts/core-no-site-literals.test.mjs); this seam
+ * keeps that true while still letting one site opt in unilaterally.
  */
 import type { SiteBinding } from '../lib/site-binding.js';
 
 const PROBE_TIMEOUT_MS = 8_000;
+
+/** Admin functions warmed alongside /mcp — the read path behind /admin/content. */
+const ADMIN_KEEPALIVE_TARGETS = ['admin-object', 'admin-audit'] as const;
+type AdminKeepaliveTarget = (typeof ADMIN_KEEPALIVE_TARGETS)[number];
 
 type ProbeResult = {
   ok: boolean;
@@ -114,17 +145,95 @@ export const runKeepaliveProbe = async (
   }
 };
 
-const handlerImpl = async () => {
-  const result = await runKeepaliveProbe();
+type AdminProbeResult = {
+  ok: boolean;
+  target: AdminKeepaliveTarget;
+  mode: 'skipped' | 'unauthenticated_probe';
+  httpStatus?: number;
+  latencyMs?: number;
+  error?: string;
+  reason?: string;
+};
 
-  console.log(JSON.stringify({ ts: new Date().toISOString(), event: 'mcp_keepalive_probe', ...result }));
+/**
+ * Warms one admin read function via a deliberately unauthenticated POST. No
+ * Authorization header is sent, so resolveAdminAccessFromEvent rejects the
+ * request in getAdminStateFromEvent before any blob-store call — see the
+ * file header for the full trace. 401 is success (bundle/runtime warmed,
+ * cheaply); anything else is logged as an anomaly rather than thrown.
+ */
+export const runAdminKeepaliveProbe = async (
+  target: AdminKeepaliveTarget,
+  fetchImpl: typeof fetch = fetch,
+  env: NodeJS.ProcessEnv = process.env
+): Promise<AdminProbeResult> => {
+  if ((env.MCP_KEEPALIVE_DISABLED ?? '').trim().toLowerCase() === 'true') {
+    return { ok: true, target, mode: 'skipped', reason: 'MCP_KEEPALIVE_DISABLED' };
+  }
+
+  const base = (env.MCP_KEEPALIVE_TARGET_URL ?? env.URL ?? '').trim().replace(/\/+$/, '');
+  if (!base) {
+    return { ok: false, target, mode: 'skipped', reason: 'no target URL (URL / MCP_KEEPALIVE_TARGET_URL unset)' };
+  }
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
+  const startedAt = Date.now();
+
+  try {
+    const probeResponse = await fetchImpl(`${base}/.netlify/functions/${target}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: '{}',
+      signal: controller.signal,
+    });
+
+    return {
+      // No Authorization header was sent, so 401 is the expected, healthy
+      // outcome — it means the function warmed and the auth gate ran.
+      ok: probeResponse.status === 401,
+      target,
+      mode: 'unauthenticated_probe',
+      httpStatus: probeResponse.status,
+      latencyMs: Date.now() - startedAt,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      target,
+      mode: 'unauthenticated_probe',
+      latencyMs: Date.now() - startedAt,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  } finally {
+    clearTimeout(timer);
+  }
+};
+
+const buildHandlerImpl = (binding: SiteBinding) => async () => {
+  // Gated per "Admin-warming scope" in the file header — opt-in per site.
+  const adminTargets = binding.warmAdminKeepalive ? ADMIN_KEEPALIVE_TARGETS : [];
+
+  const [mcpResult, ...adminResults] = await Promise.all([
+    runKeepaliveProbe(),
+    ...adminTargets.map((target) => runAdminKeepaliveProbe(target)),
+  ]);
+
+  console.log(JSON.stringify({ ts: new Date().toISOString(), event: 'mcp_keepalive_probe', ...mcpResult }));
+  for (const adminResult of adminResults) {
+    console.log(
+      JSON.stringify({ ts: new Date().toISOString(), event: 'admin_keepalive_probe', ...adminResult })
+    );
+  }
+
+  const ok = mcpResult.ok && adminResults.every((result) => result.ok);
 
   return {
-    statusCode: result.ok ? 200 : 502,
+    statusCode: ok ? 200 : 502,
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(result),
+    body: JSON.stringify({ ok, mcp: mcpResult, admin: adminResults }),
   };
 };
 
 /** W11 T11.4: per-site factory — the site shim instantiates this with its binding. */
-export const createHandler = (_binding: SiteBinding) => handlerImpl;
+export const createHandler = (binding: SiteBinding) => buildHandlerImpl(binding);
