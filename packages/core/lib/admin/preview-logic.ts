@@ -69,7 +69,7 @@ export function contentItemPreview(
   };
 }
 
-// ─── theme / site token swatches (public brand tokens only) ────────────────────
+// ─── theme / site token swatches (public brand tokens only) ────────────────────────────────
 
 export interface Swatch {
   name: string;
@@ -92,7 +92,7 @@ export function tokenFonts(tokens: unknown): Swatch[] {
     .map(([name, value]) => ({ name, value: value as string }));
 }
 
-// ─── product commerce summary (display fields only) ────────────────────────────
+// ─── product commerce summary (display fields only) ────────────────────────────────
 
 export interface ProductPreview {
   title: string;
@@ -137,4 +137,33 @@ export function productPreview(record: Pick<ObjectRecord, 'object_id' | 'object_
     priceLabel,
     gate: gateLabel,
   };
+}
+
+// ─── page "Section order" label (D3-sharedref) ──────────────────────────────────────
+
+/**
+ * Label for one entry in a page body's `sections[]` list, as shown in the
+ * workspace's "Section order" panel (ObjectPreview.tsx). Every section type
+ * used its own `type` literal as a readable-enough label EXCEPT `shared_ref`,
+ * whose `type` is always the literal string "shared_ref" — that's the target
+ * pointer's WRAPPER type, not a name, so falling through to it renders the
+ * internal type tag verbatim. `shared_ref` reads its denormalized
+ * `data.sectionName` instead (stamped at write time by object-verbs.ts's
+ * `stampSharedRefSectionNames` — see section-v1.ts's shared_ref field
+ * comment for when it's present vs. absent).
+ *
+ * Degrades in order: the stamped name → the (structurally dead today, kept
+ * for shape compatibility) `section.type` a wrapped-section bag would carry
+ * → the raw `ref` field some other shape might use → `Section <n>`. A
+ * `shared_ref` with no `sectionName` — written before this field existed, or
+ * whose target didn't resolve at write time — lands on that SAME fallback
+ * chain non-shared_ref sections always used, never on the internal
+ * "shared_ref" type tag and never on `undefined`.
+ */
+export function pageSectionLabel(raw: unknown, index: number): string {
+  const s = asBag(raw);
+  const inner = asBag(s.section);
+  const fallback = () => str(inner.type) ?? str(s.ref) ?? `Section ${index + 1}`;
+  if (s.type === 'shared_ref') return str(asBag(s.data).sectionName) ?? fallback();
+  return str(s.type) ?? fallback();
 }
