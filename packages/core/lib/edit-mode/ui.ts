@@ -1957,6 +1957,22 @@ export const mountEditMode = (options: MountOptions): void => {
       } fields on this section type.</div>`;
       return;
     }
+    // Reported as "Save draft produces concatenated text": a pre-filled field
+    // (below, every branch sets `value="${...}"` on render) is never
+    // selected or focused, so the caret lands wherever a click happened to
+    // land — typically the end — and the first character typed is INSERTED
+    // there instead of replacing anything. Auto-selecting the FORM'S FIRST
+    // field on render fixes the common "panel opens, I immediately start
+    // typing" path outright (the field is already focused+selected, so
+    // typing replaces). Only the first field: exactly one element can hold
+    // focus/selection at a time, so selecting every field would just have
+    // each one steal it back from the last, leaving only the final field
+    // selected — worse than picking one deliberately. `.focus()`/`.select()`
+    // fire neither `input` nor `change`, so this does not touch
+    // `serializeForm()`'s output and cannot mark the form dirty against
+    // `saveBaseline` (captured after this loop, from the DOM values, which
+    // selection does not alter either way).
+    let firstFieldSelected = false;
     for (const field of fields) {
       const row = document.createElement('div');
       row.className = 'dl-em-formrow';
@@ -1989,6 +2005,12 @@ export const mountEditMode = (options: MountOptions): void => {
           label + `<input type="text" data-em-field="${escapeHtml(field.key)}" value="${escapeHtml(value)}">`;
       }
       formEl.append(row);
+      if (!firstFieldSelected) {
+        firstFieldSelected = true;
+        const firstControl = row.querySelector<HTMLInputElement | HTMLTextAreaElement>('[data-em-field]');
+        firstControl?.focus();
+        firstControl?.select();
+      }
       if (field.kind === 'image-src') {
         // The thumbnail must never show the browser's broken-image glyph: it
         // stays hidden until the image actually loads; empty/unloadable srcs
