@@ -46,7 +46,7 @@ const createMemoryStore = () => {
 };
 type Store = ReturnType<typeof createMemoryStore>;
 
-// ═══ (a) the predicate itself ══════════════════════════════════════════════════════════════════════
+// ═══ (a) the predicate itself ════════════════════════════════════════════════════════════════════
 
 test('verbNeedsValidationContext: false for pure reads and lock-only verbs', () => {
   const noContextNeeded: ObjectVerbAction[] = [
@@ -91,7 +91,7 @@ test('verbNeedsValidationContext: unrecognized future actions fail closed (defau
   assert.equal(verbNeedsValidationContext('some_future_verb' as ObjectVerbAction), true);
 });
 
-// ═══ (b) the write path keeps its teeth ══════════════════════════════════════════════
+// ═══ (b) the write path keeps its teeth ══════════════════════════════════════════════════
 
 const validPageBody = () => ({
   route: '/',
