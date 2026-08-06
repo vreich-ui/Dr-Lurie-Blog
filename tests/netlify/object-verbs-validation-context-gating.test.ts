@@ -46,7 +46,7 @@ const createMemoryStore = () => {
 };
 type Store = ReturnType<typeof createMemoryStore>;
 
-// ═══ (a) the predicate itself ══════════════════════════════════════════════════════════════════════
+SEPARATOR_LINE_A
 
 test('verbNeedsValidationContext: false for pure reads and lock-only verbs', () => {
   const noContextNeeded: ObjectVerbAction[] = [
@@ -91,7 +91,7 @@ test('verbNeedsValidationContext: unrecognized future actions fail closed (defau
   assert.equal(verbNeedsValidationContext('some_future_verb' as ObjectVerbAction), true);
 });
 
-// ═══ (b) the write path keeps its teeth ══════════════════════════════════════════════
+SEPARATOR_LINE_B
 
 const validPageBody = () => ({
   route: '/',
@@ -187,7 +187,7 @@ test('an inventory request never needs (and, per the predicate, never gets) a va
   assert.ok(objects.some((o) => o.object_id === 'page_seed'));
 });
 
-// ═══ (c) D3-sharedref composed with the gating (integration-branch merge, 59ca018 + D3) ═══
+SEPARATOR_LINE_C
 //
 // object-verbs-shared-ref-stamp.test.ts proves resolveSharedSectionName works
 // when handed a real buildStoreValidationContext(...) result directly. It
