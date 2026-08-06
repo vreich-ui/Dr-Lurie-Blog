@@ -26,10 +26,23 @@ const {
     <button type="button" class={className} aria-label={label} data-aw-toggle-color-scheme>
       {/* Two icons, swapped by the SAME `.dark` class the click handler in
           BasicScripts.astro already toggles on <html> — no extra JS needed.
-          Previously only the sun rendered, so the button never visibly
-          reflected the theme it had just switched to. */}
-      <Icon name={iconName} class={`${iconClass} dark:hidden`} />
-      <Icon name={iconNameDark} class={`${iconClass} hidden dark:inline-block`} />
+
+          The dark:/hidden toggle classes live on a WRAPPING span, not mixed
+          into iconClass itself. Header.astro passes
+          iconClass="w-6 h-6 md:w-5 md:h-5 md:inline-block" — that md:inline-block
+          is a responsive utility, and Tailwind emits responsive variants
+          after plain ones in the stylesheet, so at md+ widths it silently
+          beat a same-element `hidden` (both icons stayed visible in light
+          mode; only dark mode's `dark:hidden` on the sun happened to still
+          win). Putting the toggle on a plain wrapping span sidesteps that:
+          display:none on the span hides its child regardless of what
+          display value iconClass gives the <Icon> inside it. */}
+      <span class="dark:hidden">
+        <Icon name={iconName} class={iconClass} />
+      </span>
+      <span class="hidden dark:inline-block">
+        <Icon name={iconNameDark} class={iconClass} />
+      </span>
     </button>
   )
 }
