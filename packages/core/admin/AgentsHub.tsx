@@ -87,7 +87,7 @@ const STATUS_TONE: Record<ChatStatus, 'success' | 'info' | 'warning' | 'neutral'
   cancelled: 'neutral',
 };
 
-// ─── T9.26: agent roster & assignment (Owner manage, Admin read) ─────────────────────────────
+// ─── T9.26: agent roster & assignment (Owner manage, Admin read) ─────────────
 
 const OBJECT_TYPES = [
   'page',
