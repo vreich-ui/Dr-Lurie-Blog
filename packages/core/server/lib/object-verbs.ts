@@ -1831,7 +1831,7 @@ export const handleObjectVerb = async (
 
       const result = decideReview(record, {
         actor: principal,
-        actorRoles: resolveRolesForPrincipal(principal),
+        actorRoles: options.roles ?? resolveRolesForPrincipal(principal),
         at: timestamp,
         decision: request.decision,
         note: request.note,

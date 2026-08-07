@@ -30,6 +30,7 @@ import {
 import type { CandidateOptionView, CandidateSetView } from '@core/lib/admin/candidate-choice';
 import type { GetToken } from '@core/lib/edit-mode/verbs-client';
 import { groupChatEvents, toolLabel } from '@core/lib/admin/chat-logic';
+import { isRunSafeApproval } from '@core/lib/admin/approval-mode';
 
 // ─── useChat: since_seq polling over get_chat ────────────────────────────────
 
@@ -63,6 +64,11 @@ const WRITE_TOOLS = new Set([
   'submit_review',
   'discard',
   'apply_theme',
+  'create_pdf_template',
+  'publish_pdf_template',
+  'delete_pdf_template',
+  'create_agent_artifact_job',
+  'get_agent_artifact_job_status',
 ]);
 
 export function useChat(getToken: GetToken, chatId: string | undefined): UseChatState {
@@ -243,7 +249,11 @@ export function CandidateSetCard({
   const [reason, setReason] = useState('');
   const selected = set.candidates.find((candidate) => candidate.candidate_id === selectedId);
   return (
-    <Card kicker="Compare" title={`${set.candidates.length} versions — pick the one that reads best`}>
+    <Card
+      kicker="Compare"
+      title={`${set.candidates.length} versions — pick the one that reads best`}
+      className="bg-[var(--adm-surface-sunken)] shadow-none"
+    >
       <div className="mb-3 flex gap-1.5" role="group" aria-label="Preview a version">
         {set.candidates.map((candidate) => (
           <button
@@ -431,12 +441,16 @@ export function ApprovalCard({
   onApprove,
   onDeny,
   showActions = true,
+  approvalMode = 'ask',
+  onApprovalModeChange,
 }: {
   pending: PendingView;
   busy: boolean;
   onApprove: (editedArgs?: Record<string, unknown>) => void;
   onDeny: (reason?: string) => void;
   showActions?: boolean;
+  approvalMode?: 'ask' | 'safe-run';
+  onApprovalModeChange?: (mode: 'ask' | 'safe-run') => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
@@ -470,21 +484,24 @@ export function ApprovalCard({
     }
   };
 
+  const runSafe = isRunSafeApproval(pending.tool);
+  const title = String((pending as unknown as { summary?: string }).summary ?? `Run ${pending.tool}`);
+
   return (
-    <Card
-      kicker="Approval needed"
-      title={String((pending as unknown as { summary?: string }).summary ?? `The agent wants to run ${pending.tool}`)}
-      className="border-[var(--adm-warning)]"
-    >
+    <div className="rounded-[var(--adm-radius-lg)] border border-[var(--adm-border-strong)] bg-[var(--adm-surface-sunken)] p-3 shadow-[var(--adm-shadow-sm)]">
       <div className="flex flex-col gap-3">
-        <div className="flex items-center gap-2 text-[length:var(--adm-text-sm)] text-[var(--adm-text)]">
-          <span className="text-[var(--adm-warning)]">
-            <IconAlertTriangle size={16} />
+        <div className="flex items-start gap-2">
+          <span className="mt-0.5 text-[var(--adm-accent)]">
+            <IconAlertTriangle size={15} />
           </span>
-          <span>
-            Tool <code className="rounded bg-[var(--adm-surface-sunken)] px-1">{pending.tool}</code> pauses for your
-            decision. Nothing runs until you approve.
-          </span>
+          <div className="min-w-0">
+            <p className="text-[length:var(--adm-text-xs)] font-semibold uppercase tracking-wide text-[var(--adm-text-muted)]">
+              Approval needed
+            </p>
+            <p className="mt-0.5 text-[length:var(--adm-text-sm)] font-medium text-[var(--adm-text-heading)]">
+              {title}
+            </p>
+          </div>
         </div>
         {dryRunSummary ? (
           <p
@@ -499,8 +516,50 @@ export function ApprovalCard({
             {dryRunSummary.text}
           </p>
         ) : null}
-        <JsonDisclosure label="Proposed arguments" value={pending.args} />
-        {pending.dry_run ? <JsonDisclosure label="Dry-run details" value={pending.dry_run} /> : null}
+        <details>
+          <summary className="adm-focusable cursor-pointer rounded text-[length:var(--adm-text-xs)] font-medium text-[var(--adm-text-muted)]">
+            Review details
+          </summary>
+          <div className="mt-2 flex flex-col gap-2 border-l border-[var(--adm-border)] pl-3">
+            <p className="text-[length:var(--adm-text-xs)] text-[var(--adm-text-muted)]">
+              Action: <code>{pending.tool}</code>
+            </p>
+            <JsonDisclosure label="Proposed arguments" value={pending.args} />
+            {pending.dry_run ? <JsonDisclosure label="Dry-run details" value={pending.dry_run} /> : null}
+          </div>
+        </details>
+
+        {showActions && onApprovalModeChange ? (
+          <div className="rounded-[var(--adm-radius-md)] border border-[var(--adm-border)] bg-[var(--adm-surface)] p-1">
+            <div className="grid grid-cols-2 gap-1" role="group" aria-label="Approval mode">
+              <button
+                type="button"
+                aria-pressed={approvalMode === 'ask'}
+                onClick={() => onApprovalModeChange('ask')}
+                className={`adm-focusable rounded px-2 py-1.5 text-[length:var(--adm-text-xs)] font-medium ${approvalMode === 'ask' ? 'bg-[var(--adm-surface-raised)] text-[var(--adm-text-heading)] shadow-[var(--adm-shadow-sm)]' : 'text-[var(--adm-text-muted)]'}`}
+              >
+                Ask each time
+              </button>
+              <button
+                type="button"
+                aria-pressed={approvalMode === 'safe-run'}
+                onClick={() => onApprovalModeChange('safe-run')}
+                disabled={!runSafe || busy}
+                title={
+                  runSafe
+                    ? 'Approve remaining safe actions in this run'
+                    : 'This action always needs a separate approval'
+                }
+                className={`adm-focusable rounded px-2 py-1.5 text-[length:var(--adm-text-xs)] font-medium disabled:cursor-not-allowed disabled:opacity-45 ${approvalMode === 'safe-run' ? 'bg-[var(--adm-accent-soft)] text-[var(--adm-accent)]' : 'text-[var(--adm-text-muted)]'}`}
+              >
+                Approve safe actions
+              </button>
+            </div>
+            <p className="px-2 pb-1 pt-1.5 text-[length:var(--adm-text-xs)] text-[var(--adm-text-muted)]">
+              Applies to this run only. Publishing and high-impact actions still ask.
+            </p>
+          </div>
+        ) : null}
 
         {!showActions ? (
           <p className="text-[length:var(--adm-text-sm)] font-medium text-[var(--adm-text-muted)]">
@@ -543,20 +602,25 @@ export function ApprovalCard({
             </div>
           </div>
         ) : (
-          <div className="flex flex-wrap gap-2">
+          <div className="flex items-center gap-2">
             <Button size="sm" onClick={() => onApprove()} loading={busy}>
               Approve
             </Button>
-            <Button size="sm" variant="secondary" onClick={startEdit} disabled={busy}>
-              Edit &amp; approve
+            <Button size="sm" variant="secondary" onClick={() => setDenying(true)} disabled={busy}>
+              Decline
             </Button>
-            <Button size="sm" variant="danger" onClick={() => setDenying(true)} disabled={busy}>
-              Deny
-            </Button>
+            <button
+              type="button"
+              onClick={startEdit}
+              disabled={busy}
+              className="adm-focusable ml-auto rounded px-1.5 py-1 text-[length:var(--adm-text-xs)] text-[var(--adm-text-muted)] hover:text-[var(--adm-text)] disabled:opacity-50"
+            >
+              Edit request
+            </button>
           </div>
         )}
       </div>
-    </Card>
+    </div>
   );
 }
 
@@ -579,6 +643,8 @@ export function ChatThread({
   emptyHint,
   preferenceScope,
   approvalInStage = false,
+  approvalMode = 'ask',
+  onApprovalModeChange,
 }: {
   events: ChatEventView[];
   status: ChatStatus | undefined;
@@ -594,6 +660,8 @@ export function ChatThread({
   emptyHint?: React.ReactNode;
   preferenceScope?: string;
   approvalInStage?: boolean;
+  approvalMode?: 'ask' | 'safe-run';
+  onApprovalModeChange?: (mode: 'ask' | 'safe-run') => void;
 }) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -683,6 +751,8 @@ export function ChatThread({
           onApprove={onApprove}
           onDeny={onDeny}
           showActions={!approvalInStage}
+          approvalMode={approvalMode}
+          onApprovalModeChange={onApprovalModeChange}
         />
       ) : null}
       {status === 'queued' || status === 'running' ? (

@@ -16,7 +16,12 @@ export interface LibraryRow {
   updated_at: string;
   status: 'active' | 'archived';
   review_state: 'none' | 'open' | 'changes_requested' | 'approved';
+  approval_state?: 'none' | 'open' | 'changes_requested' | 'approved_stale' | 'approved_current';
+  requires_approval?: boolean;
   published_time: string | null;
+  published_content_revision?: number | null;
+  content_revision?: number;
+  publish_commit?: string | null;
   unpublished_changes: boolean;
 }
 

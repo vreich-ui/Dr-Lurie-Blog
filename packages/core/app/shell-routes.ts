@@ -43,6 +43,7 @@ export const SHELL_ROUTES: ReadonlyArray<{ pattern: string; entry: string }> = [
   { pattern: '/admin/profile', entry: 'admin/profile.astro' },
   { pattern: '/admin/settings/admins', entry: 'admin/settings/admins.astro' },
   { pattern: '/admin/settings/guardrails', entry: 'admin/settings/guardrails.astro' },
+  { pattern: '/admin/settings/visual-identity', entry: 'admin/settings/visual-identity.astro' },
   { pattern: '/admin/studio', entry: 'admin/studio.astro' },
 ];
 

@@ -317,6 +317,29 @@ export class EditSession {
     return result;
   }
 
+  /** Open review on the current revision under this session's lock. */
+  async submitReview(): Promise<VerbResult> {
+    if (!this.lockState.held) return { status: 423, body: { error: 'Lock not held' } };
+    return callObjectVerb(this.getToken, {
+      action: 'submit_review',
+      object_type: this.objectType,
+      object_id: this.objectId,
+      lock_token: this.lockState.held ? this.lockState.lockToken : '',
+      requested_publish_action: { published_time: 'immediate' },
+    });
+  }
+
+  /** Approve the open review through the existing human decision verb. */
+  async approveReview(): Promise<VerbResult> {
+    return callObjectVerb(this.getToken, {
+      action: 'review_decide',
+      object_type: this.objectType,
+      object_id: this.objectId,
+      decision: 'approve',
+      publish_action: { published_time: 'immediate' },
+    });
+  }
+
   async checkin(): Promise<void> {
     await this.lockManager.checkin();
     this.recordVersion = undefined;

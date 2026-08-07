@@ -1,4 +1,4 @@
-export type ObjectFocusKind = 'object' | 'section' | 'new-section' | 'navigation-item';
+export type ObjectFocusKind = 'object' | 'section' | 'new-section' | 'navigation-item' | 'pdf-template' | 'image';
 
 export interface ObjectActionContext {
   focusKind: ObjectFocusKind;
@@ -74,9 +74,83 @@ export const SECTION_CONTEXT_ACTIONS: ObjectContextAction[] = [
   },
 ];
 
+const focusedAsset = (context: ObjectActionContext): string => `“${context.focusLabel}”`;
+
+export const PDF_TEMPLATE_CONTEXT_ACTIONS: ObjectContextAction[] = [
+  {
+    id: 'pdf-more-visual',
+    label: 'More visual',
+    appliesTo: ['pdf-template'],
+    buildContext: (context) => `Make ${focusedAsset(context)} more visual while keeping the information clear.`,
+  },
+  {
+    id: 'pdf-more-text',
+    label: 'More text',
+    appliesTo: ['pdf-template'],
+    buildContext: (context) => `Give ${focusedAsset(context)} more room for useful explanatory text.`,
+  },
+  {
+    id: 'pdf-stronger-branding',
+    label: 'Stronger branding',
+    appliesTo: ['pdf-template'],
+    buildContext: (context) => `Strengthen the publication’s visual identity in ${focusedAsset(context)}.`,
+  },
+  {
+    id: 'pdf-softer-branding',
+    label: 'Softer branding',
+    appliesTo: ['pdf-template'],
+    buildContext: (context) => `Make the branding in ${focusedAsset(context)} quieter and more restrained.`,
+  },
+  {
+    id: 'pdf-more-whitespace',
+    label: 'More whitespace',
+    appliesTo: ['pdf-template'],
+    buildContext: (context) => `Add more whitespace to ${focusedAsset(context)} without losing essential content.`,
+  },
+  {
+    id: 'pdf-shorten',
+    label: 'Shorten',
+    appliesTo: ['pdf-template'],
+    buildContext: (context) => `Shorten ${focusedAsset(context)} and keep the strongest material.`,
+  },
+];
+
+export const IMAGE_CONTEXT_ACTIONS: ObjectContextAction[] = [
+  {
+    id: 'image-editorial',
+    label: 'More editorial',
+    appliesTo: ['image'],
+    buildContext: (context) => `Make ${focusedAsset(context)} feel more editorial and publication-led.`,
+  },
+  {
+    id: 'image-product',
+    label: 'More product-focused',
+    appliesTo: ['image'],
+    buildContext: (context) => `Make the product the clearer focus in ${focusedAsset(context)}.`,
+  },
+  {
+    id: 'image-clinical',
+    label: 'More clinical',
+    appliesTo: ['image'],
+    buildContext: (context) => `Make ${focusedAsset(context)} feel more clinical, credible, and restrained.`,
+  },
+  {
+    id: 'image-lifestyle',
+    label: 'More lifestyle',
+    appliesTo: ['image'],
+    buildContext: (context) => `Make ${focusedAsset(context)} feel more natural and lifestyle-oriented.`,
+  },
+];
+
+export const OBJECT_CONTEXT_ACTIONS: ObjectContextAction[] = [
+  ...SECTION_CONTEXT_ACTIONS,
+  ...PDF_TEMPLATE_CONTEXT_ACTIONS,
+  ...IMAGE_CONTEXT_ACTIONS,
+];
+
 export const contextActionsFor = (
   context: ObjectActionContext,
-  registry: readonly ObjectContextAction[] = SECTION_CONTEXT_ACTIONS
+  registry: readonly ObjectContextAction[] = OBJECT_CONTEXT_ACTIONS
 ): ObjectContextAction[] =>
   registry.filter(
     (action) => action.appliesTo.includes(context.focusKind) && (action.visible ? action.visible(context) : true)

@@ -42,6 +42,8 @@ import { objectTypeLabel } from '@core/lib/admin/display-name';
 import type { LibraryRow } from '@core/lib/admin/library-logic';
 import { avatarSrc } from '@core/lib/admin/users-client';
 import { useCurrentUser } from '@core/lib/admin/use-current-user';
+import { listChats } from '@core/lib/admin/chat-client';
+import { getWorkSummary } from '@core/lib/admin/work-summary';
 
 async function shellToken(): Promise<string> {
   const m = await import('@core/lib/admin/goTrueClient');
@@ -77,6 +79,7 @@ export const NAV: NavGroup[] = [
     label: 'Settings · Platform',
     ownerOnly: true,
     items: [
+      { label: 'Visual identity', href: '/admin/settings/visual-identity', icon: IconPalette },
       { label: 'Guardrails', href: '/admin/settings/guardrails', icon: IconSettings },
       { label: 'Admins', href: '/admin/settings/admins', icon: IconUser },
       { label: 'Profile', href: '/admin/profile', icon: IconUser },
@@ -170,6 +173,7 @@ export function AdminShell({ currentPath, title, identity, children, wide = fals
   const [mobileNav, setMobileNav] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [objectRows, setObjectRows] = useState<LibraryRow[]>([]);
+  const [workCounts, setWorkCounts] = useState({ working: 0, needsYou: 0 });
   const objectsAttempted = useRef(false);
 
   useEffect(() => {
@@ -203,6 +207,29 @@ export function AdminShell({ currentPath, title, identity, children, wide = fals
     };
   }, [paletteOpen]);
 
+  useEffect(() => {
+    let alive = true;
+    const load = async () => {
+      try {
+        const [{ fetchInventoryRows }, chatResult] = await Promise.all([
+          import('@core/lib/admin/library-client'),
+          listChats(shellToken),
+        ]);
+        const rows = await fetchInventoryRows(shellToken);
+        const summary = getWorkSummary(rows, chatResult.chats);
+        if (alive) setWorkCounts({ working: summary.workingCount, needsYou: summary.needsYouCount });
+      } catch {
+        // Global utilities are progressive enhancement; page work remains usable.
+      }
+    };
+    void load();
+    const timer = window.setInterval(load, 15_000);
+    return () => {
+      alive = false;
+      window.clearInterval(timer);
+    };
+  }, []);
+
   const onLogout = () => {
     import('@core/lib/admin/goTrueClient')
       .then((m) => m.logout())
@@ -229,14 +256,6 @@ export function AdminShell({ currentPath, title, identity, children, wide = fals
       group: 'Actions',
       icon: <IconRocket size={16} />,
       onSelect: () => window.location.assign('/admin/release'),
-    },
-    {
-      id: 'action-new-chat',
-      label: 'New chat',
-      group: 'Actions',
-      icon: <IconSparkles size={16} />,
-      keywords: ['agent', 'ai'],
-      onSelect: () => window.location.assign('/admin/agents'),
     },
   ];
 
@@ -288,6 +307,22 @@ export function AdminShell({ currentPath, title, identity, children, wide = fals
             <h1 className="flex-1 truncate text-[length:var(--adm-text-lg)] font-semibold text-[var(--adm-text-heading)]">
               {title ?? 'Workspace'}
             </h1>
+            {workCounts.working > 0 ? (
+              <a
+                href="/admin/release"
+                className="adm-focusable hidden rounded-[var(--adm-radius-pill)] bg-[var(--adm-info-soft)] px-2.5 py-1 text-[length:var(--adm-text-xs)] font-medium text-[var(--adm-info-text)] sm:inline-flex"
+              >
+                Working · {workCounts.working}
+              </a>
+            ) : null}
+            {workCounts.needsYou > 0 ? (
+              <a
+                href="/admin/release"
+                className="adm-focusable hidden rounded-[var(--adm-radius-pill)] bg-[var(--adm-warning-soft)] px-2.5 py-1 text-[length:var(--adm-text-xs)] font-medium text-[var(--adm-warning-text)] sm:inline-flex"
+              >
+                Needs you · {workCounts.needsYou}
+              </a>
+            ) : null}
             <button
               type="button"
               onClick={() => setPaletteOpen(true)}
