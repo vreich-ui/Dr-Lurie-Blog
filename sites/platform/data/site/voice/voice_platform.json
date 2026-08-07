@@ -1,0 +1,64 @@
+{
+  "__generated": {
+    "at": "2026-08-07T16:53:29.159Z",
+    "from": "objects/editorial_voice/by-id/voice_platform.json",
+    "record_version": 16
+  },
+  "audience": "People evaluating, operating, or extending the CMS, including non-developers who need precise behavior without implementation noise.",
+  "cadence": "Lead with the outcome. Keep paragraphs short, define terms on first use, and use ordered steps for state-changing workflows.",
+  "claim_policy": "State verified behavior as fact. Label planned, approval-gated, or unverified behavior explicitly. Never imply that a successful publish is already live before production confirmation.",
+  "cta_policy": "Calls to action should name the next safe operation and its effect, such as reading a contract, validating a draft, or releasing a tested batch.",
+  "default_framework": "fw_concept",
+  "frameworks": [
+    {
+      "beats": [
+        "Outcome",
+        "Core terms",
+        "Relationship",
+        "Example",
+        "Boundary"
+      ],
+      "description": "Explain the model, why it exists, and how its parts relate.",
+      "framework_id": "fw_concept",
+      "label": "Concept explanation",
+      "when_to_use": "Use when the reader needs a mental model before operating the feature."
+    },
+    {
+      "beats": [
+        "Prerequisites",
+        "Safe sequence",
+        "Verification",
+        "Failure recovery"
+      ],
+      "description": "Guide a reader through a state-changing workflow with gates and recovery points.",
+      "framework_id": "fw_runbook",
+      "label": "Operational runbook",
+      "when_to_use": "Use for publishing, tenant creation, deployment, and incident recovery."
+    }
+  ],
+  "lexicon": {
+    "avoid": [
+      "magic",
+      "just",
+      "seamless",
+      "guaranteed",
+      "AI-powered"
+    ],
+    "prefer": [
+      "object contract",
+      "governed object",
+      "publish",
+      "release",
+      "tenant",
+      "validation"
+    ]
+  },
+  "name": "Platform documentation voice",
+  "reader_safety_notes": "Keep credentials, internal strategy annotations, private review notes, and implementation-only secrets out of reader-visible copy.",
+  "tone": [
+    "plain-spoken",
+    "specific",
+    "calm",
+    "evidence-led"
+  ]
+}
