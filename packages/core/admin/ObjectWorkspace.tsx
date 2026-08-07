@@ -1,11 +1,8 @@
 /**
- * ObjectWorkspace (T9.9) — the chat-first single-object surface's forms-parity
- * floor. v1 focuses on the human-centered read + action surface that replaces
- * the machine-centered /admin/objects page: header (display name, badges,
- * unpublished pill), a generated inspector VIEW, readiness (from validate),
- * history (human phrasing), lock banner with an Owner take-over, a read-only
- * Raw tab, and the action bar (publish / submit / discard / edit-on-site /
- * new variant). Chat collapses this into a Details drawer in T9.14.
+ * ObjectWorkspace (T9.9) — the object-first editorial surface that replaces
+ * the machine-centered /admin/objects page. The selected object stays visible
+ * in a unified stage while its agent remains scoped alongside it; operational
+ * details, readiness, history, and raw data live in the Details drawer.
  *
  * Field-level WRITE editing across the ten discriminated-union schemas is
  * wired through the tested op-builder (inspector-ops.ts, with the trap #2
@@ -22,7 +19,7 @@ import { DropdownMenu, Tabs } from './menus';
 import { Input, Select, Textarea } from './forms';
 import { ConfirmDialog, Drawer, useToast } from './overlays';
 import { LockBanner, HistoryTimeline, ReadinessList } from './data';
-import { ObjectLens } from './ObjectLensRegistry';
+import { ObjectLens, objectLensMode } from './ObjectLensRegistry';
 import { ObjectBrowser } from './ObjectBrowser';
 import { AgentRail } from './AgentRail';
 import { useChat } from './chat';
@@ -34,6 +31,18 @@ import { resolveWorkspaceObjectType } from '@core/lib/admin/object-type-resolve'
 import type { ObjectType, ObjectRecord, HistoryEntry } from '@core/schema/object-record-v1';
 import type { ReadinessGroup, CriterionStatus } from '@core/lib/admin/readiness-criteria';
 import { useCurrentUser } from '@core/lib/admin/use-current-user';
+import { objectStageModeClass } from '@core/lib/admin/object-stage';
+import { pageSectionLabel } from '@core/lib/admin/preview-logic';
+import {
+  NEW_NAV_ITEM_COMPOSER_SEED,
+  NEW_SECTION_COMPOSER_SEED,
+  contextActionsFor,
+  createApprovalClaim,
+  isNewPageSectionProposal,
+  repeatableItemCount,
+  type ObjectActionContext,
+  type ObjectFocusKind,
+} from '@core/lib/admin/object-context-actions';
 
 async function getToken(): Promise<string> {
   const m = await import('@core/lib/admin/goTrueClient');
@@ -50,6 +59,24 @@ async function invalidateLibraryCache(): Promise<void> {
 }
 
 type Rec = ObjectRecord<Record<string, unknown>>;
+
+type WorkspaceFocus = {
+  kind: ObjectFocusKind;
+  label: string;
+  sectionId?: string;
+};
+
+const asBag = (value: unknown): Record<string, unknown> =>
+  value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
+
+function pageSectionFocuses(record: Rec): Array<{ id: string; label: string; section: Record<string, unknown> }> {
+  if (record.object_type !== 'page') return [];
+  const sections = Array.isArray(record.body?.sections) ? record.body.sections : [];
+  return sections.flatMap((raw, index) => {
+    const section = asBag(raw);
+    return typeof section.id === 'string' ? [{ id: section.id, label: pageSectionLabel(section, index), section }] : [];
+  });
+}
 
 function parseLocation(): { id: string; type: ObjectType | undefined } {
   const segment = decodeURIComponent(window.location.pathname.split('/').filter(Boolean).at(-1) ?? '');
@@ -412,6 +439,10 @@ function WorkspaceBody({ identity }: { identity: SiteIdentity }) {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [now, setNow] = useState(0);
   const [chatId, setChatId] = useState<string | undefined>(undefined);
+  const [focus, setFocus] = useState<WorkspaceFocus>({ kind: 'object', label: '' });
+  const [composerSeed, setComposerSeed] = useState<{ key: string; text: string } | undefined>(undefined);
+  const seedSequence = useRef(0);
+  const approvalClaim = useRef(createApprovalClaim());
   const [loc] = useState(() => (typeof window === 'undefined' ? { id: '', type: undefined } : parseLocation()));
   // The resolved object type: `?type=` when the library link supplied it,
   // otherwise derived from the id (prefix map + inventory fallback, W15 S1).
@@ -629,12 +660,82 @@ function WorkspaceBody({ identity }: { identity: SiteIdentity }) {
   const url = liveUrl(record);
   const lockHeld = Boolean(record.lock && record.lock.token);
   const isContentItem = record.object_type === 'content_item';
+  const stageMode = objectLensMode(record.object_type);
+  const displayName = objectDisplayName(record);
+  const pageSections = pageSectionFocuses(record);
+  const existingSectionIds = new Set(pageSections.map((section) => section.id));
+  const selectedPageSection = focus.sectionId
+    ? pageSections.find((section) => section.id === focus.sectionId)
+    : undefined;
+  const focusedSection = record.object_type === 'section' ? asBag(record.body?.section) : selectedPageSection?.section;
+  const sectionItemCount = focusedSection ? repeatableItemCount(focusedSection) : undefined;
+  const quickContext: ObjectActionContext | undefined = focusedSection
+    ? {
+        focusKind: 'section',
+        focusLabel: focus.kind === 'section' && focus.label ? focus.label : displayName,
+        ...(record.object_type === 'page' ? { parentLabel: displayName } : {}),
+        itemCount: sectionItemCount,
+        repeatable: sectionItemCount !== undefined,
+      }
+    : undefined;
+  const quickActions = quickContext
+    ? contextActionsFor(quickContext).map((action) => ({
+        id: action.id,
+        label: action.label,
+        text: action.buildContext(quickContext),
+      }))
+    : undefined;
+  const focusLabel = focus.kind === 'object' || !focus.label ? displayName : `${displayName} → ${focus.label}`;
+  const sequentialProposal =
+    focus.kind === 'new-section' && isNewPageSectionProposal(chat.pending, record.object_id, existingSectionIds);
+  const workState =
+    chat.status === 'awaiting_approval'
+      ? 'Needs you'
+      : chat.status === 'queued' || chat.status === 'running'
+        ? 'Working'
+        : undefined;
+  const agentOccupied = chat.busy || workState !== undefined;
+
+  const beginAdd = (kind: 'new-section' | 'navigation-item') => {
+    const isSection = kind === 'new-section';
+    setFocus({ kind, label: isSection ? 'New section' : 'New navigation item' });
+    setComposerSeed({
+      key: `${kind}-${++seedSequence.current}`,
+      text: isSection ? NEW_SECTION_COMPOSER_SEED : NEW_NAV_ITEM_COMPOSER_SEED,
+    });
+  };
+
+  const saveSequentialProposal = async (addNext: boolean) => {
+    const pending = chat.pending;
+    if (!pending || !approvalClaim.current.claim(pending.call_id)) return;
+    const outcome = await chat.approve(pending.call_id);
+    if (!outcome.approved) {
+      approvalClaim.current.release(pending.call_id);
+      return;
+    }
+    if (!outcome.saved) {
+      toast({ title: 'The proposal ran but was not saved', tone: 'danger' });
+      return;
+    }
+    toast({ title: 'Section saved', tone: 'success' });
+    if (addNext) beginAdd('new-section');
+    else {
+      setFocus({ kind: 'object', label: '' });
+      setComposerSeed(undefined);
+    }
+  };
 
   return (
     <div className="flex min-h-0 flex-col gap-4">
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
+          <a
+            href="/admin"
+            className="adm-focusable mb-2 inline-flex rounded text-[length:var(--adm-text-sm)] font-medium text-[var(--adm-accent)] hover:underline"
+          >
+            ← Publication
+          </a>
           <Breadcrumbs
             items={[{ label: 'Editorial', href: '/admin' }, { label: objectTypeLabel(record.object_type) }]}
           />
@@ -648,20 +749,15 @@ function WorkspaceBody({ identity }: { identity: SiteIdentity }) {
           </div>
           <div className="mt-1 flex flex-wrap items-center gap-2">
             <StatusPill status={status.label} tone={status.tone} label={status.label} />
+            {workState ? (
+              <Badge tone={workState === 'Needs you' ? 'warning' : 'info'}>
+                {workState === 'Working' ? <span className="mr-1 inline-block animate-pulse">●</span> : null}
+                {workState}
+              </Badge>
+            ) : null}
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {url ? (
-            <a
-              href={`${url}?edit=1`}
-              className="adm-focusable inline-flex items-center gap-1.5 rounded-[var(--adm-radius-md)] border border-[var(--adm-border-strong)] px-3 py-1.5 text-[length:var(--adm-text-sm)] font-medium text-[var(--adm-text)] hover:bg-[var(--adm-surface-sunken)]"
-            >
-              <IconExternalLink size={16} /> Edit on site
-            </a>
-          ) : null}
-          <Button size="sm" leftIcon={<IconRocket size={16} />} onClick={doPublish} loading={busy}>
-            Publish
-          </Button>
           <DropdownMenu
             align="end"
             trigger={({ ref, onToggle, open }) => (
@@ -708,16 +804,123 @@ function WorkspaceBody({ identity }: { identity: SiteIdentity }) {
       <div className="grid min-h-0 gap-4 lg:grid-cols-[minmax(12rem,20%)_minmax(0,52%)_minmax(18rem,28%)]">
         <ObjectBrowser activeId={record.object_id} />
         <section
-          className="min-h-0 overflow-y-auto rounded-[var(--adm-radius-lg)] border border-[var(--adm-border)] bg-[var(--adm-surface)] p-5 lg:h-[calc(100dvh-8rem)]"
+          className="flex min-h-0 flex-col overflow-hidden rounded-[var(--adm-radius-lg)] border border-[var(--adm-border)] bg-[var(--adm-surface-sunken)] lg:h-[calc(100dvh-8rem)]"
           aria-label={`${objectTypeLabel(record.object_type)} workspace`}
+          data-stage-mode={stageMode}
         >
-          <ObjectLens record={record} />
+          <div className="border-b border-[var(--adm-border)] bg-[var(--adm-surface)] px-4 py-2">
+            <div>
+              <p className="text-[length:var(--adm-text-xs)] font-semibold uppercase tracking-wide text-[var(--adm-text-muted)]">
+                Object Stage
+              </p>
+              <p className="text-[length:var(--adm-text-xs)] text-[var(--adm-text-muted)]">
+                {objectTypeLabel(record.object_type)}
+              </p>
+            </div>
+            {record.object_type === 'page' ? (
+              <div className="mt-2 flex flex-wrap items-center gap-1.5" aria-label="Page section focus">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFocus({ kind: 'object', label: '' });
+                    setComposerSeed(undefined);
+                  }}
+                  className={`adm-focusable rounded-full border px-2.5 py-1 text-[length:var(--adm-text-xs)] ${focus.kind === 'object' ? 'border-[var(--adm-accent)] bg-[var(--adm-accent-soft)] text-[var(--adm-accent)]' : 'border-[var(--adm-border)] text-[var(--adm-text-muted)] hover:text-[var(--adm-text)]'}`}
+                >
+                  Page
+                </button>
+                {pageSections.map((section) => (
+                  <button
+                    key={section.id}
+                    type="button"
+                    onClick={() => {
+                      setFocus({ kind: 'section', label: section.label, sectionId: section.id });
+                      setComposerSeed(undefined);
+                    }}
+                    className={`adm-focusable rounded-full border px-2.5 py-1 text-[length:var(--adm-text-xs)] ${focus.sectionId === section.id ? 'border-[var(--adm-accent)] bg-[var(--adm-accent-soft)] text-[var(--adm-accent)]' : 'border-[var(--adm-border)] text-[var(--adm-text-muted)] hover:text-[var(--adm-text)]'}`}
+                  >
+                    {section.label}
+                  </button>
+                ))}
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  leftIcon={<IconPlus size={14} />}
+                  onClick={() => beginAdd('new-section')}
+                  disabled={agentOccupied}
+                >
+                  Add section
+                </Button>
+              </div>
+            ) : record.object_type === 'navigation' ? (
+              <div className="mt-2">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  leftIcon={<IconPlus size={14} />}
+                  onClick={() => beginAdd('navigation-item')}
+                  disabled={agentOccupied}
+                >
+                  Add item
+                </Button>
+              </div>
+            ) : null}
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto p-5">
+            <div className={objectStageModeClass(stageMode)}>
+              <ObjectLens record={record} focusId={focus.sectionId} />
+            </div>
+          </div>
+          <div className="sticky bottom-0 flex shrink-0 items-center justify-end gap-2 border-t border-[var(--adm-border)] bg-[var(--adm-surface)] px-4 py-3">
+            {sequentialProposal ? (
+              <>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() =>
+                    chat.pending && void chat.deny(chat.pending.call_id, 'Please revise this proposal before saving.')
+                  }
+                  disabled={chat.busy}
+                >
+                  Ask for changes
+                </Button>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => void saveSequentialProposal(false)}
+                  loading={chat.busy}
+                >
+                  Save
+                </Button>
+                <Button size="sm" onClick={() => void saveSequentialProposal(true)} loading={chat.busy}>
+                  Save &amp; Add Next
+                </Button>
+              </>
+            ) : (
+              <>
+                {url ? (
+                  <a
+                    href={`${url}?edit=1`}
+                    className="adm-focusable inline-flex items-center gap-1.5 rounded-[var(--adm-radius-md)] border border-[var(--adm-border-strong)] px-3 py-1.5 text-[length:var(--adm-text-sm)] font-medium text-[var(--adm-text)] hover:bg-[var(--adm-surface-sunken)]"
+                  >
+                    <IconExternalLink size={16} /> Edit on site
+                  </a>
+                ) : null}
+                <Button size="sm" leftIcon={<IconRocket size={16} />} onClick={doPublish} loading={busy}>
+                  Publish
+                </Button>
+              </>
+            )}
+          </div>
         </section>
         <AgentRail
           chat={chat}
-          focus={objectDisplayName(record)}
+          focus={focusLabel}
           preferenceScope={`${currentUser.user?.email ?? 'anonymous'}:${record.object_id}`}
-          suggestions={suggestions}
+          suggestions={focus.kind === 'object' ? suggestions : undefined}
+          contextActions={quickActions}
+          draftSeed={composerSeed}
+          approvalInStage={sequentialProposal}
           aboveComposer={
             readiness && readinessOpenItems > 0 ? (
               <details className="rounded-[var(--adm-radius-md)] border border-[var(--adm-border)] bg-[var(--adm-surface-sunken)] px-3 py-2">

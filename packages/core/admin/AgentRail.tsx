@@ -7,12 +7,18 @@ export function AgentRail({
   suggestions,
   preferenceScope,
   aboveComposer,
+  contextActions,
+  draftSeed,
+  approvalInStage = false,
 }: {
   chat: UseChatState;
   focus: string;
   suggestions?: string[];
   preferenceScope?: string;
   aboveComposer?: React.ReactNode;
+  contextActions?: Array<{ id: string; label: string; text: string }>;
+  draftSeed?: { key: string; text: string };
+  approvalInStage?: boolean;
 }) {
   return (
     <section
@@ -35,6 +41,7 @@ export function AgentRail({
         onApprove={(editedArgs) => chat.pending && void chat.approve(chat.pending.call_id, editedArgs)}
         onDeny={(reason) => chat.pending && void chat.deny(chat.pending.call_id, reason)}
         preferenceScope={preferenceScope}
+        approvalInStage={approvalInStage}
         emptyHint={
           <EmptyState
             title="Ready when you are"
@@ -52,6 +59,8 @@ export function AgentRail({
           onSend={(text) => void chat.send(text)}
           onCancel={() => void chat.cancel()}
           suggestions={suggestions}
+          contextActions={contextActions}
+          draftSeed={draftSeed}
           above={aboveComposer}
         />
       </div>

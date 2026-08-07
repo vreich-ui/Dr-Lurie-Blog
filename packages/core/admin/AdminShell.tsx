@@ -35,6 +35,7 @@ import {
   IconLogout,
   IconSearch,
   IconRocket,
+  IconExternalLink,
   type IconProps,
 } from './icons';
 import { objectTypeLabel } from '@core/lib/admin/display-name';
@@ -264,6 +265,15 @@ export function AdminShell({ currentPath, title, identity, children, wide = fals
             </span>
           </a>
           <NavList currentPath={currentPath} owner={owner} />
+          <a
+            href="/"
+            target="_blank"
+            rel="noreferrer"
+            className="adm-focusable mt-auto flex items-center gap-2 rounded-[var(--adm-radius-md)] border border-[var(--adm-border)] px-3 py-2 text-[length:var(--adm-text-sm)] font-medium text-[var(--adm-text)] hover:bg-[var(--adm-surface-sunken)]"
+          >
+            <IconExternalLink size={16} />
+            View publication
+          </a>
         </aside>
 
         <div className="flex min-w-0 flex-1 flex-col">
@@ -287,6 +297,14 @@ export function AdminShell({ currentPath, title, identity, children, wide = fals
               Search
               <kbd className="rounded bg-[var(--adm-surface-sunken)] px-1 text-[length:var(--adm-text-xs)]">⌘K</kbd>
             </button>
+            <a
+              href="/"
+              target="_blank"
+              rel="noreferrer"
+              className="adm-focusable hidden items-center gap-1.5 rounded-[var(--adm-radius-md)] border border-[var(--adm-border-strong)] px-2.5 py-1.5 text-[length:var(--adm-text-sm)] font-medium text-[var(--adm-text)] hover:bg-[var(--adm-surface-sunken)] lg:flex"
+            >
+              View publication <IconExternalLink size={14} />
+            </a>
             {user ? (
               <DropdownMenu
                 align="end"

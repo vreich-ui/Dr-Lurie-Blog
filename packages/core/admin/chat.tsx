@@ -38,7 +38,7 @@ export interface UseChatState {
   error: string | undefined;
   busy: boolean;
   send: (text: string) => Promise<void>;
-  approve: (callId: string, editedArgs?: Record<string, unknown>) => Promise<void>;
+  approve: (callId: string, editedArgs?: Record<string, unknown>) => Promise<{ approved: boolean; saved: boolean }>;
   deny: (callId: string, reason?: string) => Promise<void>;
   cancel: () => Promise<void>;
   /** Bumps whenever an executed (non-error) write tool result arrives — preview refresh signal. */
@@ -136,6 +136,25 @@ export function useChat(getToken: GetToken, chatId: string | undefined): UseChat
     [kick]
   );
 
+  const approve = useCallback(
+    async (callId: string, editedArgs?: Record<string, unknown>): Promise<{ approved: boolean; saved: boolean }> => {
+      if (!chatId) return { approved: false, saved: false };
+      setBusy(true);
+      try {
+        const result = await approveTool(getToken, chatId, callId, editedArgs);
+        setError(undefined);
+        return { approved: result.approved, saved: !result.is_error };
+      } catch (actionError) {
+        setError(actionError instanceof Error ? actionError.message : 'Action failed.');
+        return { approved: false, saved: false };
+      } finally {
+        setBusy(false);
+        kick();
+      }
+    },
+    [chatId, getToken, kick]
+  );
+
   return {
     status,
     events,
@@ -145,7 +164,7 @@ export function useChat(getToken: GetToken, chatId: string | undefined): UseChat
     busy,
     writeStamp,
     send: (text) => wrap(() => sendChatMessage(getToken, chatId!, text)),
-    approve: (callId, editedArgs) => wrap(() => approveTool(getToken, chatId!, callId, editedArgs)),
+    approve,
     deny: (callId, reason) => wrap(() => denyTool(getToken, chatId!, callId, reason)),
     cancel: () => wrap(() => cancelChatRun(getToken, chatId!)),
   };
@@ -298,11 +317,13 @@ export function ApprovalCard({
   busy,
   onApprove,
   onDeny,
+  showActions = true,
 }: {
   pending: PendingView;
   busy: boolean;
   onApprove: (editedArgs?: Record<string, unknown>) => void;
   onDeny: (reason?: string) => void;
+  showActions?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
@@ -368,7 +389,11 @@ export function ApprovalCard({
         <JsonDisclosure label="Proposed arguments" value={pending.args} />
         {pending.dry_run ? <JsonDisclosure label="Dry-run details" value={pending.dry_run} /> : null}
 
-        {editing ? (
+        {!showActions ? (
+          <p className="text-[length:var(--adm-text-sm)] font-medium text-[var(--adm-text-muted)]">
+            Review the proposal here, then save it from the Object Stage.
+          </p>
+        ) : editing ? (
           <div className="flex flex-col gap-2">
             <Textarea
               value={draft}
@@ -435,6 +460,7 @@ export function ChatThread({
   onDeny,
   emptyHint,
   preferenceScope,
+  approvalInStage = false,
 }: {
   events: ChatEventView[];
   status: ChatStatus | undefined;
@@ -444,6 +470,7 @@ export function ChatThread({
   onDeny: (reason?: string) => void;
   emptyHint?: React.ReactNode;
   preferenceScope?: string;
+  approvalInStage?: boolean;
 }) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -501,7 +528,15 @@ export function ChatThread({
         if (event.type === 'tool_approval_required') return null; // rendered live via `pending`
         return <ToolCallCard key={event.seq} event={event} />;
       })}
-      {pending ? <ApprovalCard pending={pending} busy={busy} onApprove={onApprove} onDeny={onDeny} /> : null}
+      {pending ? (
+        <ApprovalCard
+          pending={pending}
+          busy={busy}
+          onApprove={onApprove}
+          onDeny={onDeny}
+          showActions={!approvalInStage}
+        />
+      ) : null}
       {status === 'queued' || status === 'running' ? (
         <p className="text-[length:var(--adm-text-xs)] text-[var(--adm-text-muted)]">
           <span className="mr-1 inline-block animate-pulse">●</span>
@@ -535,6 +570,8 @@ export function ChatComposer({
   onSend,
   onCancel,
   suggestions,
+  contextActions,
+  draftSeed,
   above,
 }: {
   status: ChatStatus | undefined;
@@ -542,11 +579,16 @@ export function ChatComposer({
   onSend: (text: string) => void;
   onCancel?: () => void;
   suggestions?: string[];
+  contextActions?: Array<{ id: string; label: string; text: string }>;
+  draftSeed?: { key: string; text: string };
   /** The readiness strip mounts directly above the composer (plan §4). */
   above?: React.ReactNode;
 }) {
   const [text, setText] = useState('');
   const live = status === 'queued' || status === 'running' || status === 'awaiting_approval';
+  useEffect(() => {
+    if (draftSeed) setText(draftSeed.text);
+  }, [draftSeed]);
   const submit = () => {
     const trimmed = text.trim();
     if (!trimmed || live || busy) return;
@@ -556,6 +598,25 @@ export function ChatComposer({
   return (
     <div className="flex flex-col gap-2">
       {above}
+      {!live && contextActions && contextActions.length > 0 ? (
+        <div>
+          <p className="mb-1.5 text-[length:var(--adm-text-xs)] font-medium text-[var(--adm-text-muted)]">
+            Quick context
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {contextActions.map((action) => (
+              <button
+                key={action.id}
+                type="button"
+                className="adm-focusable rounded-full border border-[var(--adm-border)] bg-[var(--adm-surface)] px-2.5 py-1 text-[length:var(--adm-text-xs)] text-[var(--adm-text-muted)] hover:border-[var(--adm-accent)] hover:text-[var(--adm-text)]"
+                onClick={() => setText(action.text)}
+              >
+                {action.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
       {!live && suggestions && suggestions.length > 0 ? (
         <div className="flex flex-wrap gap-1.5">
           {suggestions.slice(0, 4).map((suggestion) => (
