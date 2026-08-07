@@ -33,6 +33,8 @@ async function getToken(): Promise<string> {
 
 type Confirm = { kind: 'role'; user: UserView; role: UserRole } | { kind: 'disable'; user: UserView } | null;
 
+const roleLabel = (role: UserView['role']) => role.charAt(0).toUpperCase() + role.slice(1);
+
 function AdminUsersBody() {
   const { toast } = useToast();
   const [meEmail, setMeEmail] = useState<string>('');
@@ -159,6 +161,11 @@ function AdminUsersBody() {
                 {u.email === meEmail ? (
                   <span className="ml-1 text-[length:var(--adm-text-xs)] text-[var(--adm-text-muted)]">(you)</span>
                 ) : null}
+                {u.source === 'environment' ? (
+                  <Badge tone="neutral" className="ml-2 align-middle" title="Configured in site environment variables">
+                    From environment
+                  </Badge>
+                ) : null}
               </div>
               <div className="truncate text-[length:var(--adm-text-xs)] text-[var(--adm-text-muted)]">{u.email}</div>
             </div>
@@ -171,9 +178,7 @@ function AdminUsersBody() {
       header: 'Role',
       sortable: true,
       accessor: (u) => u.role,
-      render: (u) => (
-        <Badge tone={u.role === 'owner' ? 'accent' : 'neutral'}>{u.role === 'owner' ? 'Owner' : 'Admin'}</Badge>
-      ),
+      render: (u) => <Badge tone={u.role === 'owner' ? 'accent' : 'neutral'}>{roleLabel(u.role)}</Badge>,
     },
     { key: 'status', header: 'Status', render: (u) => <StatusPill status={u.status} /> },
     {
@@ -193,6 +198,10 @@ function AdminUsersBody() {
       align: 'right',
       render: (u) => {
         const self = u.email === meEmail;
+        const fromEnvironment = u.source === 'environment';
+        const environmentTitle = fromEnvironment
+          ? 'Configured in site environment variables; change it in the site configuration.'
+          : undefined;
         return (
           <DropdownMenu
             align="end"
@@ -209,7 +218,8 @@ function AdminUsersBody() {
               {
                 id: 'role',
                 label: u.role === 'owner' ? 'Make admin' : 'Make owner',
-                disabled: self,
+                disabled: self || fromEnvironment,
+                title: environmentTitle,
                 onSelect: () => setConfirm({ kind: 'role', user: u, role: u.role === 'owner' ? 'admin' : 'owner' }),
               },
               { id: 'audit', label: 'View audit trail', onSelect: () => setAuditUser(u) },
@@ -217,7 +227,8 @@ function AdminUsersBody() {
                 id: 'disable',
                 label: 'Disable',
                 tone: 'danger',
-                disabled: self || u.status === 'disabled',
+                disabled: self || fromEnvironment || u.status === 'disabled',
+                title: environmentTitle,
                 onSelect: () => setConfirm({ kind: 'disable', user: u }),
               },
             ]}
@@ -242,7 +253,7 @@ function AdminUsersBody() {
         <EmptyState
           icon={<IconUser size={26} />}
           title="No members yet"
-          message="Invite your first admin to get started. Owners listed in ADMIN_EMAILS always have access."
+          message="Invite your first admin to start managing this publication."
         />
       ) : (
         <DataTable

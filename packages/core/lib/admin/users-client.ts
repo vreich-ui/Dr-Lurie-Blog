@@ -8,6 +8,7 @@ import type { GetToken } from '../edit-mode/verbs-client.js';
 const ENDPOINT = '/.netlify/functions/admin-users';
 
 export type UserRole = 'owner' | 'admin';
+export type UserViewRole = UserRole | 'publisher' | 'editor';
 export type UserStatus = 'invited' | 'active' | 'disabled';
 
 export interface UserAuditEntry {
@@ -21,8 +22,9 @@ export interface UserView {
   email: string;
   display_name: string;
   avatar_artifact?: string;
-  role: UserRole;
+  role: UserViewRole;
   status: UserStatus;
+  source?: 'stored' | 'environment';
   invited_by?: string;
   created_at?: string;
   updated_at?: string;

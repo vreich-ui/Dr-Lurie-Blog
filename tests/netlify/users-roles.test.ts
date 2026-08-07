@@ -10,6 +10,8 @@ import test from 'node:test';
 import {
   resolveRolesForPrincipalAsync,
   resolveRolesForPrincipal,
+  environmentRoleEntries,
+  environmentRoleForEmail,
   expandRole,
   isOwner,
   type Role,
@@ -143,6 +145,23 @@ test('the sync resolver still exists and never returns owner (owner is store/boo
   const roles: Role[] = resolveRolesForPrincipal(human('envadmin@x.com'), { ROLE_EMAILS_ADMIN: 'envadmin@x.com' });
   assert.deepEqual(roles, ['admin']);
   assert.equal(roles.includes('owner'), false);
+});
+
+test('environment principal rows are normalized, deduplicated, and ordered by authority', () => {
+  const env = {
+    ADMIN_EMAILS: ' Boss@x.com ',
+    ROLE_EMAILS_ADMIN: 'boss@x.com, admin@x.com',
+    ROLE_EMAILS_PUBLISHER: 'multi@x.com',
+    ROLE_EMAILS_EDITOR: 'MULTI@x.com, editor@x.com',
+  };
+  assert.deepEqual(environmentRoleEntries(env), [
+    ['boss@x.com', 'owner'],
+    ['admin@x.com', 'admin'],
+    ['multi@x.com', 'publisher'],
+    ['editor@x.com', 'editor'],
+  ]);
+  assert.equal(environmentRoleForEmail(' BOSS@x.com ', env), 'owner');
+  assert.equal(environmentRoleForEmail('missing@x.com', env), undefined);
 });
 
 // ─── users store ──────────────────────────────────────────────────────────────

@@ -113,6 +113,7 @@ export interface MenuItem {
   icon?: ReactNode;
   onSelect?: () => void;
   disabled?: boolean;
+  title?: string;
   tone?: 'default' | 'danger';
 }
 
@@ -218,6 +219,7 @@ export function DropdownMenu({ trigger, items, align = 'start', className }: Dro
               type="button"
               tabIndex={index === activeIndex ? 0 : -1}
               disabled={item.disabled}
+              title={item.title}
               onClick={() => select(item)}
               onMouseEnter={() => !item.disabled && setActiveIndex(index)}
               className={cn(
