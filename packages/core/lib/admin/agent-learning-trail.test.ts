@@ -4,6 +4,8 @@ import assert from 'node:assert';
 import {
   AGENT_LEARNING_TRAIL_OP,
   buildLearningTrailOpIfAny,
+  buildLearningEvidenceOp,
+  buildManualRichTextEdits,
   isAgentLearningTrailOp,
   resolveUsedProposal,
   scopeKeyFor,
@@ -147,6 +149,44 @@ describe('buildLearningTrailOpIfAny', () => {
     assert.ok(op);
     assert.strictEqual(op.op, AGENT_LEARNING_TRAIL_OP);
     assert.deepStrictEqual(op.proposals, [{ ...proposals[0], disposition: 'accepted_verbatim' }]);
+  });
+});
+
+describe('manual rich-text learning evidence', () => {
+  it('captures exact before/after only for explicitly allowlisted public text fields', () => {
+    const edits = buildManualRichTextEdits(
+      { objectType: 'content_item', objectId: 'ci_1', nodeId: 'node_1' },
+      { body: 'Before', private: 'hidden' },
+      { body: 'After', private: 'changed hidden' },
+      ['body'],
+      '2026-08-07T12:00:00.000Z'
+    );
+    assert.strictEqual(edits.length, 1);
+    assert.strictEqual(edits[0]?.original_text, 'Before');
+    assert.strictEqual(edits[0]?.replacement_text, 'After');
+    assert.strictEqual(edits[0]?.focus, 'node:node_1/field:body');
+    assert.doesNotMatch(JSON.stringify(edits), /hidden/);
+  });
+
+  it('keeps repeated corrections as separate additive events and never mutates a profile', () => {
+    const first = buildManualRichTextEdits(
+      { objectType: 'page', objectId: 'page_1', sectionId: 's_1' },
+      { heading: 'One' },
+      { heading: 'Two' },
+      ['heading'],
+      '2026-08-07T12:00:00.000Z'
+    );
+    const second = buildManualRichTextEdits(
+      { objectType: 'page', objectId: 'page_1', sectionId: 's_1' },
+      { heading: 'Two' },
+      { heading: 'Three' },
+      ['heading'],
+      '2026-08-07T12:01:00.000Z'
+    );
+    const op = buildLearningEvidenceOp(undefined, { heading: 'Three' }, [...first, ...second]);
+    assert.strictEqual(op?.manual_edits?.length, 2);
+    assert.deepStrictEqual(op?.proposals, []);
+    assert.ok(!('profile' in (op ?? {})));
   });
 });
 

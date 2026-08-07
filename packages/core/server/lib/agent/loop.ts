@@ -32,6 +32,13 @@ import {
 } from './chat-store.js';
 import { chatToolByName, CHAT_TOOLS, type ToolContext } from './tools.js';
 import type { ProviderAdapter, WireTool } from './provider.js';
+import {
+  candidateSetView,
+  isPresentCandidatesCall,
+  parseCandidateSet,
+  PRESENT_CANDIDATES_WIRE_TOOL,
+} from './candidates.js';
+import { addPostEditDelta, createPreferenceEvent, type LearningEvidenceStore } from './preferences.js';
 
 export const RUN_CAPS = {
   maxProviderTurns: 12,
@@ -65,17 +72,19 @@ export interface LoopDeps {
 const now = (deps: { nowIso?: () => string }) => (deps.nowIso ?? (() => new Date().toISOString()))();
 
 /** The wire tool list for a run: everything not 'off'. */
-const wireTools = (autonomy: Record<string, ToolAutonomy>): WireTool[] =>
-  CHAT_TOOLS.filter((tool) => autonomy[tool.name] !== 'off').map((tool) => ({
+const wireTools = (autonomy: Record<string, ToolAutonomy>, learningMode: boolean): WireTool[] => [
+  ...CHAT_TOOLS.filter((tool) => autonomy[tool.name] !== 'off').map((tool) => ({
     name: tool.name,
     description: tool.description,
     input_schema: tool.input_schema,
-  }));
+  })),
+  ...(learningMode ? [PRESENT_CANDIDATES_WIRE_TOOL] : []),
+];
 
 /** System prompt: profile prompt + object binding + identity rules. Compact —
  *  the model pulls detail via get_contract/get_object. */
-const systemPrompt = (doc: ChatDoc, profile: RunProfile): string => {
-  const lines = [profile.system_prompt];
+const systemPrompt = (doc: ChatDoc, run: ChatRun): string => {
+  const lines = [run.profile.system_prompt];
   if (doc.kind === 'object' && doc.object_type && doc.object_id) {
     lines.push(
       `This conversation is bound to the ${doc.object_type} object "${doc.object_id}". ` +
@@ -87,6 +96,14 @@ const systemPrompt = (doc: ChatDoc, profile: RunProfile): string => {
     'Every write pauses for human approval unless configured autonomous; propose one coherent change at a time. ' +
       'When a proposal is denied, adjust or ask — never re-submit the same call.'
   );
+  if (run.learning_mode) {
+    lines.push(
+      'Learning mode is on. For a substantive drafting or rewriting decision, call present_candidates with 2–3 ' +
+        'genuinely distinct editor-visible versions. Each candidate must carry the exact governed write tool and ' +
+        'arguments that would apply it. Do not use candidates for reads, validation, lookups, or small mechanical ' +
+        'fixes. Never expose private strategy, hidden prompts, credentials, provider names, or model names in candidate content.'
+    );
+  }
   return lines.join('\n\n');
 };
 
@@ -134,6 +151,8 @@ const finishRun = (
     delete doc.run.trigger_token;
     doc.run.call_queue = [];
     delete doc.run.pending;
+    delete doc.run.candidate_selection;
+    delete doc.run.preference_context;
   }
   doc.status = outcome === 'completed' || outcome === 'caps' ? 'idle' : outcome;
 };
@@ -179,8 +198,8 @@ export const runAgentLoop = async (
   await saveChatDoc(deps.chatStore, doc);
 
   const run = doc.run;
-  const tools = wireTools(run.autonomy);
-  const system = systemPrompt(doc, run.profile);
+  const tools = wireTools(run.autonomy, run.learning_mode);
+  const system = systemPrompt(doc, run);
 
   const persist = () => saveChatDoc(deps.chatStore, doc);
   const cancelledCheck = async (): Promise<boolean> => {
@@ -198,8 +217,58 @@ export const runAgentLoop = async (
       // Drain queued tool calls from the current assistant turn.
       while (run.call_queue.length > 0) {
         const call = run.call_queue[0]!;
-        const tool = chatToolByName(call.name);
         const at = now(deps);
+
+        if (isPresentCandidatesCall(call)) {
+          run.call_queue.shift();
+          if (!run.learning_mode) {
+            run.transcript.push({
+              role: 'tool',
+              tool_call_id: call.id,
+              content: 'Candidate presentation is unavailable because learning mode is off.',
+              is_error: true,
+            });
+            await persist();
+            continue;
+          }
+          if (run.call_queue.length > 0) {
+            run.transcript.push({
+              role: 'tool',
+              tool_call_id: call.id,
+              content: 'present_candidates must be the only tool call in its turn.',
+              is_error: true,
+            });
+            await persist();
+            continue;
+          }
+          const parsedCandidates = parseCandidateSet(call, run.run_id, deps.toolContext);
+          if (!parsedCandidates.ok) {
+            run.transcript.push({
+              role: 'tool',
+              tool_call_id: call.id,
+              content: parsedCandidates.error,
+              is_error: true,
+            });
+            appendChatEvent(doc, at, 'tool_result', {
+              run_id: run.run_id,
+              call_id: call.id,
+              tool: call.name,
+              is_error: true,
+            });
+            await persist();
+            continue;
+          }
+          run.candidate_selection = parsedCandidates.value;
+          doc.status = 'awaiting_candidate';
+          appendChatEvent(doc, at, 'candidate_set', {
+            run_id: run.run_id,
+            candidates: candidateSetView(parsedCandidates.value).candidates,
+          });
+          await persist();
+          return { ok: true, status: doc.status };
+        }
+
+        const tool = chatToolByName(call.name);
 
         if (!tool || run.autonomy[call.name] === 'off') {
           run.call_queue.shift();
@@ -345,6 +414,8 @@ export type ProtocolResult = {
 export interface ProtocolDeps {
   chatStore: AgentChatStore;
   toolContext: ToolContext;
+  learningStore?: LearningEvidenceStore;
+  siteId?: string;
   nowIso?: () => string;
   nowMs?: () => number;
 }
@@ -410,6 +481,15 @@ export const approvePendingTool = async (
     is_error: result.is_error,
     ...(created ?? {}),
   });
+  if (!result.is_error && edited && deps.learningStore && doc.run.preference_context?.target_call_id === callId) {
+    await addPostEditDelta(
+      deps.learningStore,
+      doc.run.preference_context.event_key,
+      doc.run.preference_context.chosen_args,
+      args
+    );
+  }
+  delete doc.run.preference_context;
   delete doc.run.pending;
 
   const triggerToken = randomUUID();
@@ -463,12 +543,19 @@ export const startRun = async (
   text: string,
   principal: { id: string; email: string },
   profile: RunProfile,
-  autonomy: Record<string, ToolAutonomy>
+  autonomy: Record<string, ToolAutonomy>,
+  learningMode = false,
+  focus?: string
 ): Promise<ProtocolResult> => {
   const at = () => (deps.nowIso ?? (() => new Date().toISOString()))();
   const nowMs = (deps.nowMs ?? Date.now)();
-  if (doc.status === 'queued' || doc.status === 'running' || doc.status === 'awaiting_approval') {
-    if (doc.status === 'awaiting_approval' || !isRunStale(doc, nowMs)) {
+  if (
+    doc.status === 'queued' ||
+    doc.status === 'running' ||
+    doc.status === 'awaiting_approval' ||
+    doc.status === 'awaiting_candidate'
+  ) {
+    if (doc.status === 'awaiting_approval' || doc.status === 'awaiting_candidate' || !isRunStale(doc, nowMs)) {
       return { status: 409, body: { error: `a run is already ${doc.status}`, status_detail: doc.status } };
     }
     // Stale takeover: close the wedged run honestly, then continue below.
@@ -496,6 +583,8 @@ export const startRun = async (
     principal: { kind: 'human', ...principal },
     profile,
     autonomy,
+    learning_mode: learningMode,
+    ...(focus ? { focus } : {}),
     trigger_token: triggerToken,
     transcript: [...priorTranscript, { role: 'user', text }],
     call_queue: [],
@@ -509,6 +598,123 @@ export const startRun = async (
   return { status: 200, body: { chat_id: doc.chat_id, run_id: doc.run.run_id }, resume: { triggerToken } };
 };
 
+const preferenceEventId = (runId: string, callId: string): string =>
+  `pref_${`${runId}_${callId}`.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 96)}`;
+
+const lastUserPrompt = (run: ChatRun): string =>
+  [...run.transcript].reverse().find((message) => message.role === 'user')?.text ?? '';
+
+export const choosePendingCandidate = async (
+  deps: ProtocolDeps,
+  chatId: string,
+  callId: string,
+  candidateId: string,
+  editor: { id: string; email: string }
+): Promise<ProtocolResult> => {
+  const at = () => (deps.nowIso ?? (() => new Date().toISOString()))();
+  const doc = await loadChatDoc(deps.chatStore, chatId);
+  const run = doc?.run;
+  const set = run?.candidate_selection;
+  if (!doc || !run || doc.status !== 'awaiting_candidate' || !set || set.call_id !== callId) {
+    return { status: 409, body: { error: 'no matching candidate choice is pending' } };
+  }
+  const chosen = set.candidates.find((candidate) => candidate.candidate_id === candidateId);
+  if (!chosen) return { status: 400, body: { error: 'unknown candidate' } };
+  if (!deps.learningStore || !deps.siteId) {
+    return { status: 500, body: { error: 'learning evidence store is not configured' } };
+  }
+  const saved = await createPreferenceEvent(deps.learningStore, {
+    event_id: preferenceEventId(run.run_id, callId),
+    at: at(),
+    site: deps.siteId,
+    chat_id: chatId,
+    run_id: run.run_id,
+    ...(doc.object_id ? { object_id: doc.object_id } : {}),
+    ...(doc.object_type ? { object_type: doc.object_type } : {}),
+    ...(run.focus ? { focus: run.focus } : {}),
+    prompt_context: lastUserPrompt(run),
+    candidates: set.candidates,
+    chosen_id: chosen.candidate_id,
+    editor_email: editor.email,
+    profile_id: run.profile.profile_id,
+    model: run.profile.model,
+  });
+  run.transcript.push({
+    role: 'tool',
+    tool_call_id: set.call_id,
+    content: `The editor chose version ${chosen.label}. Continue with its governed write call.`,
+  });
+  run.transcript.push({ role: 'assistant', tool_calls: [chosen.target] });
+  run.call_queue = [chosen.target];
+  run.preference_context = {
+    event_key: saved.key,
+    chosen_candidate_id: chosen.candidate_id,
+    target_call_id: chosen.target.id,
+    chosen_args: chosen.target.args,
+  };
+  delete run.candidate_selection;
+  appendChatEvent(doc, at(), 'candidate_selected', {
+    run_id: run.run_id,
+    candidate_id: chosen.candidate_id,
+    label: chosen.label,
+    by: editor.email,
+  });
+  const triggerToken = randomUUID();
+  run.trigger_token = triggerToken;
+  doc.status = 'queued';
+  await saveChatDoc(deps.chatStore, doc);
+  return { status: 200, body: { selected: true }, resume: { triggerToken } };
+};
+
+export const rejectPendingCandidates = async (
+  deps: ProtocolDeps,
+  chatId: string,
+  callId: string,
+  reason: string,
+  editor: { id: string; email: string }
+): Promise<ProtocolResult> => {
+  const at = () => (deps.nowIso ?? (() => new Date().toISOString()))();
+  const doc = await loadChatDoc(deps.chatStore, chatId);
+  const run = doc?.run;
+  const set = run?.candidate_selection;
+  if (!doc || !run || doc.status !== 'awaiting_candidate' || !set || set.call_id !== callId) {
+    return { status: 409, body: { error: 'no matching candidate choice is pending' } };
+  }
+  if (!deps.learningStore || !deps.siteId) {
+    return { status: 500, body: { error: 'learning evidence store is not configured' } };
+  }
+  await createPreferenceEvent(deps.learningStore, {
+    event_id: preferenceEventId(run.run_id, callId),
+    at: at(),
+    site: deps.siteId,
+    chat_id: chatId,
+    run_id: run.run_id,
+    ...(doc.object_id ? { object_id: doc.object_id } : {}),
+    ...(doc.object_type ? { object_type: doc.object_type } : {}),
+    ...(run.focus ? { focus: run.focus } : {}),
+    prompt_context: lastUserPrompt(run),
+    candidates: set.candidates,
+    chosen_id: null,
+    none_reason: reason,
+    editor_email: editor.email,
+    profile_id: run.profile.profile_id,
+    model: run.profile.model,
+  });
+  run.transcript.push({
+    role: 'tool',
+    tool_call_id: set.call_id,
+    content: `The editor rejected every version: ${reason}. Produce a genuinely different round or ask a focused question.`,
+    is_error: true,
+  });
+  delete run.candidate_selection;
+  appendChatEvent(doc, at(), 'candidate_rejected', { run_id: run.run_id, reason, by: editor.email });
+  const triggerToken = randomUUID();
+  run.trigger_token = triggerToken;
+  doc.status = 'queued';
+  await saveChatDoc(deps.chatStore, doc);
+  return { status: 200, body: { rejected: true }, resume: { triggerToken } };
+};
+
 /** Cooperative cancel; force-closes a stale (crashed/lost) run immediately. */
 export const cancelRun = async (deps: ProtocolDeps, chatId: string): Promise<ProtocolResult> => {
   const at = () => (deps.nowIso ?? (() => new Date().toISOString()))();
@@ -518,7 +724,7 @@ export const cancelRun = async (deps: ProtocolDeps, chatId: string): Promise<Pro
   if (doc.status === 'idle' || doc.status === 'error' || doc.status === 'cancelled') {
     return { status: 409, body: { error: 'no live run to cancel' } };
   }
-  if (doc.status === 'awaiting_approval' || isRunStale(doc, nowMs)) {
+  if (doc.status === 'awaiting_approval' || doc.status === 'awaiting_candidate' || isRunStale(doc, nowMs)) {
     appendChatEvent(doc, at(), 'run_cancelled', { run_id: doc.run.run_id });
     doc.runs.push({
       run_id: doc.run.run_id,
@@ -528,6 +734,8 @@ export const cancelRun = async (deps: ProtocolDeps, chatId: string): Promise<Pro
       chips: ['cancelled'],
     });
     delete doc.run.pending;
+    delete doc.run.candidate_selection;
+    delete doc.run.preference_context;
     delete doc.run.trigger_token;
     doc.run.call_queue = [];
     doc.status = 'cancelled';

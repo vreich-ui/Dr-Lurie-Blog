@@ -63,6 +63,9 @@ export const chatEventTypeSchema = z.enum([
   'user_message',
   'run_started',
   'assistant_text',
+  'candidate_set',
+  'candidate_selected',
+  'candidate_rejected',
   'tool_call',
   'tool_result',
   'tool_approval_required',
@@ -109,6 +112,24 @@ export type RunProfile = z.infer<typeof runProfileSchema>;
 export const toolAutonomySchema = z.enum(['auto', 'ask', 'off']);
 export type ToolAutonomy = z.infer<typeof toolAutonomySchema>;
 
+export const pendingCandidateSetSchema = z.object({
+  call_id: z.string(),
+  run_id: z.string(),
+  candidates: z
+    .array(
+      z.object({
+        candidate_id: z.string(),
+        label: z.string(),
+        content: z.string(),
+        self_description: z.string(),
+        target: chatToolCallSchema,
+      })
+    )
+    .min(2)
+    .max(3),
+});
+export type PendingCandidateSet = z.infer<typeof pendingCandidateSetSchema>;
+
 export const chatRunSchema = z.object({
   run_id: z.string(),
   started_at: z.string(),
@@ -117,10 +138,23 @@ export const chatRunSchema = z.object({
   profile: runProfileSchema,
   /** Autonomy resolved at run start (defaults + governance chat_tools override), frozen for the run. */
   autonomy: z.record(z.string(), toolAutonomySchema),
+  /** M2b governance is frozen at send time, exactly like autonomy/profile. */
+  learning_mode: z.boolean().default(false),
+  /** Human-readable object/section focus supplied by the workspace at send time. */
+  focus: z.string().max(500).optional(),
   trigger_token: z.string().optional(),
   transcript: z.array(chatMsgSchema),
   call_queue: z.array(chatToolCallSchema),
   pending: pendingCallSchema.optional(),
+  candidate_selection: pendingCandidateSetSchema.optional(),
+  preference_context: z
+    .object({
+      event_key: z.string(),
+      chosen_candidate_id: z.string(),
+      target_call_id: z.string(),
+      chosen_args: z.record(z.string(), z.unknown()),
+    })
+    .optional(),
   cancel_requested: z.boolean().optional(),
   provider_turns: z.number().int().nonnegative(),
   tool_calls_used: z.number().int().nonnegative(),
@@ -150,7 +184,7 @@ export const chatDocSchema = z.object({
   created_by: z.string(),
   created_at: z.string(),
   updated_at: z.string(),
-  status: z.enum(['idle', 'queued', 'running', 'awaiting_approval', 'error', 'cancelled']),
+  status: z.enum(['idle', 'queued', 'running', 'awaiting_approval', 'awaiting_candidate', 'error', 'cancelled']),
   seq: z.number().int().nonnegative(),
   events: z.array(chatEventSchema),
   run: chatRunSchema.optional(),

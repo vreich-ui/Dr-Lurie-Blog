@@ -51,6 +51,12 @@ describe('admin-governance requestSchema — agent_keys_* verbs', () => {
     assert.strictEqual(requestSchema.safeParse({ verb: 'get' }).success, true);
     assert.strictEqual(requestSchema.safeParse({ verb: 'revert', target: 'all' }).success, true);
   });
+
+  it('accepts an explicit learning-mode toggle and its dedicated revert target', () => {
+    assert.strictEqual(requestSchema.safeParse({ verb: 'set', learning_mode: true }).success, true);
+    assert.strictEqual(requestSchema.safeParse({ verb: 'set', learning_mode: false }).success, true);
+    assert.strictEqual(requestSchema.safeParse({ verb: 'revert', target: 'learning_mode' }).success, true);
+  });
 });
 
 describe('admin-governance source wiring — agent_keys_create/revoke are Owner-gated, agent_keys_list is not', () => {

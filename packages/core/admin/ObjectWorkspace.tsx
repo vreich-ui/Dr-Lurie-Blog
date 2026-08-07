@@ -22,8 +22,10 @@ import { LockBanner, HistoryTimeline, ReadinessList } from './data';
 import { ObjectLens, objectLensMode } from './ObjectLensRegistry';
 import { ObjectBrowser } from './ObjectBrowser';
 import { AgentRail } from './AgentRail';
+import { CandidateStage } from './CandidateStage';
 import { useChat } from './chat';
 import { createObjectChat } from '@core/lib/admin/chat-client';
+import { candidateAtShortcut, currentCandidateText } from '@core/lib/admin/candidate-choice';
 import { MarginaliaThreadList } from './MarginaliaThreadList';
 import { IconAlertTriangle, IconDots, IconExternalLink, IconPlus, IconRocket, IconWrench } from './icons';
 import { objectDisplayName, objectTypeLabel, idTooltip } from '@core/lib/admin/display-name';
@@ -515,6 +517,32 @@ function WorkspaceBody({ identity }: { identity: SiteIdentity }) {
     }
   }, [chat.writeStamp]);
 
+  useEffect(() => {
+    if (!chat.candidateSet) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (
+        target?.matches('input, textarea, select') ||
+        target?.isContentEditable ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.altKey
+      ) {
+        return;
+      }
+      const shortcut = candidateAtShortcut(chat.candidateSet!.candidates, event.key);
+      if (shortcut) {
+        event.preventDefault();
+        chat.preview(shortcut.candidate_id);
+      } else if (event.key === 'Enter' && chat.previewCandidate) {
+        event.preventDefault();
+        void chat.chooseCandidate(chat.previewCandidate.candidate_id);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [chat.candidateSet, chat.previewCandidate]);
+
   const runAction = async (fn: () => Promise<void>) => {
     setBusy(true);
     try {
@@ -689,7 +717,7 @@ function WorkspaceBody({ identity }: { identity: SiteIdentity }) {
   const sequentialProposal =
     focus.kind === 'new-section' && isNewPageSectionProposal(chat.pending, record.object_id, existingSectionIds);
   const workState =
-    chat.status === 'awaiting_approval'
+    chat.status === 'awaiting_approval' || chat.status === 'awaiting_candidate'
       ? 'Needs you'
       : chat.status === 'queued' || chat.status === 'running'
         ? 'Working'
@@ -814,7 +842,9 @@ function WorkspaceBody({ identity }: { identity: SiteIdentity }) {
                 Object Stage
               </p>
               <p className="text-[length:var(--adm-text-xs)] text-[var(--adm-text-muted)]">
-                {objectTypeLabel(record.object_type)}
+                {chat.previewCandidate
+                  ? `Comparing version ${chat.previewCandidate.label}`
+                  : objectTypeLabel(record.object_type)}
               </p>
             </div>
             {record.object_type === 'page' ? (
@@ -867,12 +897,27 @@ function WorkspaceBody({ identity }: { identity: SiteIdentity }) {
             ) : null}
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto p-5">
-            <div className={objectStageModeClass(stageMode)}>
-              <ObjectLens record={record} focusId={focus.sectionId} />
-            </div>
+            {chat.candidateSet && chat.previewCandidate ? (
+              <CandidateStage
+                set={chat.candidateSet}
+                selected={chat.previewCandidate}
+                currentText={currentCandidateText(record, focus.sectionId)}
+                busy={chat.busy}
+                onPreview={chat.preview}
+                onChoose={(candidateId) => void chat.chooseCandidate(candidateId)}
+              />
+            ) : (
+              <div className={objectStageModeClass(stageMode)}>
+                <ObjectLens record={record} focusId={focus.sectionId} />
+              </div>
+            )}
           </div>
           <div className="sticky bottom-0 flex shrink-0 items-center justify-end gap-2 border-t border-[var(--adm-border)] bg-[var(--adm-surface)] px-4 py-3">
-            {sequentialProposal ? (
+            {chat.candidateSet ? (
+              <p className="text-[length:var(--adm-text-sm)] text-[var(--adm-text-muted)]">
+                Preview a version, then pick it here or in the agent rail.
+              </p>
+            ) : sequentialProposal ? (
               <>
                 <Button
                   size="sm"

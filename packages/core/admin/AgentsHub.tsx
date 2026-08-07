@@ -83,6 +83,7 @@ const STATUS_TONE: Record<ChatStatus, 'success' | 'info' | 'warning' | 'neutral'
   queued: 'info',
   running: 'info',
   awaiting_approval: 'warning',
+  awaiting_candidate: 'warning',
   error: 'warning',
   cancelled: 'neutral',
 };

@@ -37,9 +37,14 @@ export function AgentRail({
         events={chat.events}
         status={chat.status}
         pending={chat.pending}
+        candidateSet={chat.candidateSet}
+        previewCandidateId={chat.previewCandidate?.candidate_id}
         busy={chat.busy}
         onApprove={(editedArgs) => chat.pending && void chat.approve(chat.pending.call_id, editedArgs)}
         onDeny={(reason) => chat.pending && void chat.deny(chat.pending.call_id, reason)}
+        onPreviewCandidate={(candidateId) => chat.preview(candidateId)}
+        onChooseCandidate={(candidateId) => void chat.chooseCandidate(candidateId)}
+        onRejectCandidates={(reason) => void chat.rejectCandidates(reason)}
         preferenceScope={preferenceScope}
         approvalInStage={approvalInStage}
         emptyHint={
@@ -56,7 +61,7 @@ export function AgentRail({
         <ChatComposer
           status={chat.status}
           busy={chat.busy}
-          onSend={(text) => void chat.send(text)}
+          onSend={(text) => void chat.send(text, focus)}
           onCancel={() => void chat.cancel()}
           suggestions={suggestions}
           contextActions={contextActions}

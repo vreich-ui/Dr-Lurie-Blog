@@ -54,13 +54,68 @@ export const AGENT_LEARNING_TRAIL_OP = '__agent_learning_trail__' as const;
 export type AgentLearningTrailOp = {
   op: typeof AGENT_LEARNING_TRAIL_OP;
   proposals: TaggedProposal[];
+  manual_edits?: ManualRichTextEdit[];
 };
 
 export const isAgentLearningTrailOp = (value: unknown): value is AgentLearningTrailOp => {
   if (!value || typeof value !== 'object') return false;
-  const record = value as { op?: unknown; proposals?: unknown };
-  return record.op === AGENT_LEARNING_TRAIL_OP && Array.isArray(record.proposals);
+  const record = value as { op?: unknown; proposals?: unknown; manual_edits?: unknown };
+  return (
+    record.op === AGENT_LEARNING_TRAIL_OP &&
+    Array.isArray(record.proposals) &&
+    (record.manual_edits === undefined || Array.isArray(record.manual_edits))
+  );
 };
+
+export type ManualRichTextEdit = {
+  source: 'manual_rich_text_edit';
+  focus: string;
+  field: string;
+  original_text: string;
+  replacement_text: string;
+  surrounding_context: string;
+  at: string;
+};
+
+const CONTEXT_LIMIT = 360;
+
+/**
+ * Direct public-copy corrections are preference evidence too. Callers supply
+ * the allowlisted text fields from the visible form; this helper never walks
+ * the record and therefore cannot scoop up private strategy or auth data.
+ */
+export const buildManualRichTextEdits = (
+  target: ProposalScopeTarget,
+  before: Record<string, unknown>,
+  after: Record<string, unknown>,
+  textFields: readonly string[],
+  at: string
+): ManualRichTextEdit[] =>
+  textFields.flatMap((field) => {
+    const original = before[field];
+    const replacement = after[field];
+    if (typeof replacement !== 'string') return [];
+    const originalText = typeof original === 'string' ? original : '';
+    if (originalText === replacement) return [];
+    const focus = [
+      target.sectionId ? `section:${target.sectionId}` : undefined,
+      target.nodeId ? `node:${target.nodeId}` : undefined,
+      `field:${field}`,
+    ]
+      .filter(Boolean)
+      .join('/');
+    return [
+      {
+        source: 'manual_rich_text_edit' as const,
+        focus,
+        field,
+        original_text: originalText,
+        replacement_text: replacement,
+        surrounding_context: originalText.slice(0, CONTEXT_LIMIT),
+        at,
+      },
+    ];
+  });
 
 /** Plain-JSON structural equality — proposal suggestions are always JSON-safe AI tool-call output. */
 const deepEqualJson = (a: unknown, b: unknown): boolean => {
@@ -136,6 +191,20 @@ export const buildLearningTrailOpIfAny = (
   return { op: AGENT_LEARNING_TRAIL_OP, proposals: tagProposalTrail(proposals, used) };
 };
 
+export const buildLearningEvidenceOp = (
+  proposals: readonly AccumulatedProposal[] | undefined,
+  savedFields: Record<string, unknown> | undefined,
+  manualEdits: readonly ManualRichTextEdit[] = []
+): AgentLearningTrailOp | undefined => {
+  const proposalOp = buildLearningTrailOpIfAny(proposals, savedFields);
+  if (!proposalOp && manualEdits.length === 0) return undefined;
+  return {
+    op: AGENT_LEARNING_TRAIL_OP,
+    proposals: proposalOp?.proposals ?? [],
+    ...(manualEdits.length > 0 ? { manual_edits: [...manualEdits] } : {}),
+  };
+};
+
 /**
  * The record object-verbs.ts writes to the `agent-learning` blob store —
  * one per save that carried a trail. Never read by the object substrate;
@@ -149,4 +218,5 @@ export type AgentLearningRecord = {
   saved_at: string;
   editor?: Principal;
   proposals: TaggedProposal[];
+  manual_edits?: ManualRichTextEdit[];
 };

@@ -11,9 +11,10 @@ import { useEffect, useMemo, useState } from 'react';
 import { AdminShell } from './AdminShell';
 import type { SiteIdentity } from '@core/lib/site-identity';
 import { Badge, Button, Card, EmptyState, Skeleton } from './primitives';
-import { Select } from './forms';
+import { Select, Switch } from './forms';
 import { useToast } from './overlays';
 import { IconAlertTriangle } from './icons';
+import { exportPreferences } from '@core/lib/admin/chat-client';
 import { objectTypeLabel } from '@core/lib/admin/display-name';
 import { governedObjectTypes } from '@core/lib/approval-policy';
 import type { ObjectType } from '@core/schema/object-record-v1';
@@ -21,6 +22,7 @@ import {
   fetchGovernance,
   setApprovalOverride,
   setChatToolsOverride,
+  setLearningMode,
   revertGovernance,
   effectiveApprovalMode,
   type GovernanceState,
@@ -227,7 +229,109 @@ function GovernanceBody({ identity }: { identity: SiteIdentity }) {
         owner={owner}
         onSaved={refresh}
       />
+      <LearningModeCard gov={gov} owner={owner} onSaved={refresh} />
     </div>
+  );
+}
+
+function LearningModeCard({
+  gov,
+  owner,
+  onSaved,
+}: {
+  gov: GovernanceState;
+  owner: boolean;
+  onSaved: () => Promise<void>;
+}) {
+  const { toast } = useToast();
+  const [draft, setDraft] = useState(gov.active.learning_mode);
+  const [saving, setSaving] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const active = gov.active.learning_mode;
+  const overridden = gov.active.provenance.learning_mode === 'override';
+
+  useEffect(() => setDraft(active), [active]);
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      await setLearningMode(getToken, draft);
+      await onSaved();
+      toast({ title: draft ? 'Learning mode enabled' : 'Learning mode disabled', tone: 'success' });
+    } catch (err) {
+      toast({ title: 'Save failed', description: err instanceof Error ? err.message : undefined, tone: 'danger' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const revert = async () => {
+    setSaving(true);
+    try {
+      await revertGovernance(getToken, 'learning_mode');
+      await onSaved();
+      toast({ title: 'Learning mode returned to the off default', tone: 'success' });
+    } catch (err) {
+      toast({ title: 'Revert failed', description: err instanceof Error ? err.message : undefined, tone: 'danger' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const downloadPreferences = async () => {
+    setExporting(true);
+    try {
+      const result = await exportPreferences(getToken);
+      const blob = new Blob([result.jsonl], { type: 'application/x-ndjson;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `cms-agent-preferences-${new Date().toISOString().slice(0, 10)}.jsonl`;
+      link.click();
+      URL.revokeObjectURL(url);
+      toast({
+        title: `${result.count} preference pair${result.count === 1 ? '' : 's'} exported`,
+        description: `${result.candidate_events} candidate choices · ${result.manual_edits} manual edits · ${result.hard_negatives} hard negatives retained`,
+        tone: 'success',
+      });
+    } catch (err) {
+      toast({ title: 'Export failed', description: err instanceof Error ? err.message : undefined, tone: 'danger' });
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  return (
+    <Card
+      kicker="Learning"
+      title="Candidate learning mode"
+      actions={<Badge tone={active ? 'accent' : 'neutral'}>{active ? 'On' : 'Off'}</Badge>}
+    >
+      <Switch
+        checked={draft}
+        onCheckedChange={setDraft}
+        disabled={!owner || saving}
+        label="Offer 2–3 versions for substantive writing decisions"
+        hint="Choices and later corrections become Owner-readable preference evidence. Lookups and mechanical changes remain single-version. Candidate generation costs more, so this is off by default."
+      />
+      {owner ? (
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Button onClick={save} loading={saving} disabled={saving || draft === active}>
+            Save setting
+          </Button>
+          <Button variant="secondary" onClick={revert} disabled={saving || !overridden}>
+            Revert to off
+          </Button>
+          <Button variant="secondary" onClick={downloadPreferences} loading={exporting} disabled={saving || exporting}>
+            Export preference pairs
+          </Button>
+        </div>
+      ) : (
+        <p className="mt-4 text-[length:var(--adm-text-xs)] text-[var(--adm-text-muted)]">
+          Only Owners can change learning mode.
+        </p>
+      )}
+    </Card>
   );
 }
 
@@ -282,9 +386,9 @@ function TrackingGovernanceCard({
       }
     >
       <p className="mb-4 text-[length:var(--adm-text-sm)] text-[var(--adm-text-muted)]">
-        Publishing <code>{identity.trackingProjectId}</code> changes which third-party scripts run on every
-        page. This card answers &ldquo;who may publish it right now?&rdquo; and flips the posture;{' '}
-        <strong>Product</strong> is shown beside it as the other pinned type. The full per-type matrix sits below.
+        Publishing <code>{identity.trackingProjectId}</code> changes which third-party scripts run on every page. This
+        card answers &ldquo;who may publish it right now?&rdquo; and flips the posture; <strong>Product</strong> is
+        shown beside it as the other pinned type. The full per-type matrix sits below.
       </p>
 
       <div className="overflow-hidden rounded-[var(--adm-radius-lg)] border border-[var(--adm-border)]">

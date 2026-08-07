@@ -7,7 +7,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { Avatar, Badge, Button, Card } from './primitives';
+import { Avatar, Button, Card } from './primitives';
 import { Markdown } from './Markdown';
 import { Textarea } from './forms';
 import { useToast } from './overlays';
@@ -15,9 +15,11 @@ import { IconAlertTriangle, IconCheck, IconRobot, IconSend, IconX } from './icon
 import {
   approveTool,
   cancelChatRun,
+  chooseCandidate as chooseCandidateRequest,
   denyTool,
   getChat,
   pollIntervalFor,
+  rejectCandidates as rejectCandidatesRequest,
   sendChatMessage,
   type AgentView,
   type ChatEventView,
@@ -25,6 +27,7 @@ import {
   type ChatView,
   type PendingView,
 } from '@core/lib/admin/chat-client';
+import type { CandidateOptionView, CandidateSetView } from '@core/lib/admin/candidate-choice';
 import type { GetToken } from '@core/lib/edit-mode/verbs-client';
 import { groupChatEvents, toolLabel } from '@core/lib/admin/chat-logic';
 
@@ -34,10 +37,15 @@ export interface UseChatState {
   status: ChatStatus | undefined;
   events: ChatEventView[];
   pending: PendingView | undefined;
+  candidateSet: CandidateSetView | undefined;
+  previewCandidate: CandidateOptionView | undefined;
   agent: AgentView | undefined;
   error: string | undefined;
   busy: boolean;
-  send: (text: string) => Promise<void>;
+  send: (text: string, focus?: string) => Promise<void>;
+  preview: (candidateId: string | undefined) => void;
+  chooseCandidate: (candidateId: string) => Promise<void>;
+  rejectCandidates: (reason: string) => Promise<void>;
   approve: (callId: string, editedArgs?: Record<string, unknown>) => Promise<{ approved: boolean; saved: boolean }>;
   deny: (callId: string, reason?: string) => Promise<void>;
   cancel: () => Promise<void>;
@@ -61,6 +69,8 @@ export function useChat(getToken: GetToken, chatId: string | undefined): UseChat
   const [status, setStatus] = useState<ChatStatus | undefined>(undefined);
   const [events, setEvents] = useState<ChatEventView[]>([]);
   const [pending, setPending] = useState<PendingView | undefined>(undefined);
+  const [candidateSet, setCandidateSet] = useState<CandidateSetView | undefined>(undefined);
+  const [previewCandidateId, setPreviewCandidateId] = useState<string | undefined>(undefined);
   const [agent, setAgent] = useState<AgentView | undefined>(undefined);
   const [error, setError] = useState<string | undefined>(undefined);
   const [busy, setBusy] = useState(false);
@@ -72,6 +82,12 @@ export function useChat(getToken: GetToken, chatId: string | undefined): UseChat
   const ingest = useCallback((view: ChatView) => {
     setStatus(view.status);
     setPending(view.pending);
+    setCandidateSet(view.candidate_set);
+    setPreviewCandidateId((current) =>
+      current && view.candidate_set?.candidates.some((candidate) => candidate.candidate_id === current)
+        ? current
+        : undefined
+    );
     if (view.agent) setAgent(view.agent);
     if (view.events.length > 0) {
       seqRef.current = Math.max(seqRef.current, ...view.events.map((event) => event.seq));
@@ -108,6 +124,8 @@ export function useChat(getToken: GetToken, chatId: string | undefined): UseChat
     setEvents([]);
     setStatus(undefined);
     setPending(undefined);
+    setCandidateSet(undefined);
+    setPreviewCandidateId(undefined);
     if (chatId) void poll();
     return () => {
       liveRef.current = false;
@@ -159,11 +177,28 @@ export function useChat(getToken: GetToken, chatId: string | undefined): UseChat
     status,
     events,
     pending,
+    candidateSet,
+    previewCandidate: candidateSet?.candidates.find((candidate) => candidate.candidate_id === previewCandidateId),
     agent,
     error,
     busy,
     writeStamp,
-    send: (text) => wrap(() => sendChatMessage(getToken, chatId!, text)),
+    send: (text, focus) => wrap(() => sendChatMessage(getToken, chatId!, text, focus)),
+    preview: setPreviewCandidateId,
+    chooseCandidate: (candidateId) =>
+      wrap(async () => {
+        if (!candidateSet) return;
+        await chooseCandidateRequest(getToken, chatId!, candidateSet.call_id, candidateId);
+        setCandidateSet(undefined);
+        setPreviewCandidateId(undefined);
+      }),
+    rejectCandidates: (reason) =>
+      wrap(async () => {
+        if (!candidateSet) return;
+        await rejectCandidatesRequest(getToken, chatId!, candidateSet.call_id, reason);
+        setCandidateSet(undefined);
+        setPreviewCandidateId(undefined);
+      }),
     approve,
     deny: (callId, reason) => wrap(() => denyTool(getToken, chatId!, callId, reason)),
     cancel: () => wrap(() => cancelChatRun(getToken, chatId!)),
@@ -185,12 +220,90 @@ export function AgentChip({ agent }: { agent: AgentView | undefined }) {
       <span className="text-[length:var(--adm-text-sm)] font-medium text-[var(--adm-text)]">
         {agent?.name ?? 'Site Agent'}
       </span>
-      {agent ? (
-        <Badge tone="neutral">
-          {agent.provider === 'anthropic' ? 'Claude' : 'GPT'} · {agent.model}
-        </Badge>
-      ) : null}
     </span>
+  );
+}
+
+export function CandidateSetCard({
+  set,
+  selectedId,
+  busy,
+  onPreview,
+  onChoose,
+  onReject,
+}: {
+  set: CandidateSetView;
+  selectedId?: string;
+  busy: boolean;
+  onPreview: (candidateId: string) => void;
+  onChoose: (candidateId: string) => void;
+  onReject: (reason: string) => void;
+}) {
+  const [rejecting, setRejecting] = useState(false);
+  const [reason, setReason] = useState('');
+  const selected = set.candidates.find((candidate) => candidate.candidate_id === selectedId);
+  return (
+    <Card kicker="Compare" title={`${set.candidates.length} versions — pick the one that reads best`}>
+      <div className="mb-3 flex gap-1.5" role="group" aria-label="Preview a version">
+        {set.candidates.map((candidate) => (
+          <button
+            key={candidate.candidate_id}
+            type="button"
+            aria-pressed={candidate.candidate_id === selectedId}
+            onClick={() => onPreview(candidate.candidate_id)}
+            className={`adm-focusable h-8 min-w-8 rounded-full border px-2 text-[length:var(--adm-text-sm)] font-semibold ${candidate.candidate_id === selectedId ? 'border-[var(--adm-accent)] bg-[var(--adm-accent-soft)] text-[var(--adm-accent)]' : 'border-[var(--adm-border)] text-[var(--adm-text-muted)]'}`}
+          >
+            {candidate.label}
+          </button>
+        ))}
+      </div>
+      <div className="flex flex-col gap-2">
+        {set.candidates.map((candidate) => (
+          <button
+            key={candidate.candidate_id}
+            type="button"
+            onClick={() => onPreview(candidate.candidate_id)}
+            className="adm-focusable flex gap-2 rounded-[var(--adm-radius-md)] p-2 text-left hover:bg-[var(--adm-surface-sunken)]"
+          >
+            <strong className="text-[length:var(--adm-text-sm)] text-[var(--adm-text)]">{candidate.label}</strong>
+            <span className="text-[length:var(--adm-text-xs)] text-[var(--adm-text-muted)]">
+              {candidate.self_description}
+            </span>
+          </button>
+        ))}
+      </div>
+      {selected ? (
+        <Button className="mt-3 w-full" size="sm" onClick={() => onChoose(selected.candidate_id)} disabled={busy}>
+          Pick version {selected.label}
+        </Button>
+      ) : (
+        <p className="mt-3 text-[length:var(--adm-text-xs)] text-[var(--adm-text-muted)]">
+          Preview a version on the Object Stage before picking it.
+        </p>
+      )}
+      {rejecting ? (
+        <div className="mt-3 flex flex-col gap-2">
+          <Textarea
+            value={reason}
+            onChange={(event) => setReason(event.target.value)}
+            rows={2}
+            label="What should change in the next round?"
+          />
+          <div className="flex gap-2">
+            <Button size="sm" variant="secondary" onClick={() => setRejecting(false)} disabled={busy}>
+              Cancel
+            </Button>
+            <Button size="sm" onClick={() => onReject(reason.trim())} disabled={busy || !reason.trim()}>
+              Try another round
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <Button className="mt-2" size="sm" variant="ghost" onClick={() => setRejecting(true)} disabled={busy}>
+          None of these
+        </Button>
+      )}
+    </Card>
   );
 }
 
@@ -455,9 +568,14 @@ export function ChatThread({
   events,
   status,
   pending,
+  candidateSet,
+  previewCandidateId,
   busy,
   onApprove,
   onDeny,
+  onPreviewCandidate,
+  onChooseCandidate,
+  onRejectCandidates,
   emptyHint,
   preferenceScope,
   approvalInStage = false,
@@ -465,9 +583,14 @@ export function ChatThread({
   events: ChatEventView[];
   status: ChatStatus | undefined;
   pending: PendingView | undefined;
+  candidateSet?: CandidateSetView;
+  previewCandidateId?: string;
   busy: boolean;
   onApprove: (editedArgs?: Record<string, unknown>) => void;
   onDeny: (reason?: string) => void;
+  onPreviewCandidate?: (candidateId: string) => void;
+  onChooseCandidate?: (candidateId: string) => void;
+  onRejectCandidates?: (reason: string) => void;
   emptyHint?: React.ReactNode;
   preferenceScope?: string;
   approvalInStage?: boolean;
@@ -479,7 +602,7 @@ export function ChatThread({
   useEffect(() => {
     if (atBottom.current) bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
     else setShowLatest(true);
-  }, [events.length, pending, status]);
+  }, [events.length, pending, candidateSet, status]);
 
   const timeline = groupChatEvents(events.filter((event) => !HIDDEN_EVENTS.has(event.type)));
 
@@ -526,8 +649,33 @@ export function ChatThread({
           );
         }
         if (event.type === 'tool_approval_required') return null; // rendered live via `pending`
+        if (event.type === 'candidate_set') return null; // rendered live via `candidateSet`
+        if (event.type === 'candidate_selected') {
+          return (
+            <p key={event.seq} className="text-center text-[length:var(--adm-text-xs)] text-[var(--adm-text-muted)]">
+              Version {String(event.detail?.label ?? '').toUpperCase()} selected — preparing the governed change.
+            </p>
+          );
+        }
+        if (event.type === 'candidate_rejected') {
+          return (
+            <p key={event.seq} className="text-center text-[length:var(--adm-text-xs)] text-[var(--adm-text-muted)]">
+              All versions declined — trying a new direction.
+            </p>
+          );
+        }
         return <ToolCallCard key={event.seq} event={event} />;
       })}
+      {candidateSet && onPreviewCandidate && onChooseCandidate && onRejectCandidates ? (
+        <CandidateSetCard
+          set={candidateSet}
+          selectedId={previewCandidateId}
+          busy={busy}
+          onPreview={onPreviewCandidate}
+          onChoose={onChooseCandidate}
+          onReject={onRejectCandidates}
+        />
+      ) : null}
       {pending ? (
         <ApprovalCard
           pending={pending}
@@ -585,7 +733,8 @@ export function ChatComposer({
   above?: React.ReactNode;
 }) {
   const [text, setText] = useState('');
-  const live = status === 'queued' || status === 'running' || status === 'awaiting_approval';
+  const live =
+    status === 'queued' || status === 'running' || status === 'awaiting_approval' || status === 'awaiting_candidate';
   useEffect(() => {
     if (draftSeed) setText(draftSeed.text);
   }, [draftSeed]);
@@ -643,7 +792,11 @@ export function ChatComposer({
           }}
           rows={2}
           placeholder={
-            live ? 'The agent is working — approve, deny, or wait…' : 'Ask for a change or describe what you need…'
+            status === 'awaiting_candidate'
+              ? 'Preview and pick a version above…'
+              : live
+                ? 'The agent is working — approve, deny, or wait…'
+                : 'Ask for a change or describe what you need…'
           }
           aria-label="Message the agent"
           disabled={busy && !live}

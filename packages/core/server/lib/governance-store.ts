@@ -14,16 +14,8 @@
  */
 import { z } from 'zod';
 
-import {
-  approvalPolicyConfigSchema,
-  activeApprovalPolicy,
-  type ApprovalPolicy,
-} from '../../lib/approval-policy.js';
-import {
-  creationPolicyConfigSchema,
-  activeCreationPolicy,
-  type CreationPolicy,
-} from '../../lib/creation-policy.js';
+import { approvalPolicyConfigSchema, activeApprovalPolicy, type ApprovalPolicy } from '../../lib/approval-policy.js';
+import { creationPolicyConfigSchema, activeCreationPolicy, type CreationPolicy } from '../../lib/creation-policy.js';
 import { getNetlifyBlobStore } from './blob-store.js';
 
 export const GOVERNANCE_DOC_KEY = 'overrides.v1';
@@ -43,6 +35,8 @@ export const governanceDocSchema = z.object({
   creation: creationPolicyConfigSchema.optional(),
   /** Per chat-tool autonomy (auto/ask/off). Stored now; consumed by the chat loop in T9.13. */
   chat_tools: chatToolAutonomySchema.optional(),
+  /** M2b: expensive candidate generation is explicitly Owner-governed and off by default. */
+  learning_mode: z.boolean().optional(),
   updated_by: z.string(),
   updated_at: z.string(),
   history: z.array(governanceHistoryEntrySchema),
@@ -75,7 +69,8 @@ export interface ActivePolicies {
   approval: ApprovalPolicy;
   creation: CreationPolicy;
   chat_tools?: GovernanceDoc['chat_tools'];
-  provenance: { approval: PolicyProvenance; creation: PolicyProvenance };
+  learning_mode: boolean;
+  provenance: { approval: PolicyProvenance; creation: PolicyProvenance; learning_mode: PolicyProvenance };
 }
 
 /**
@@ -96,9 +91,11 @@ export const resolveActivePolicies = async (store: GovernanceBlobStore | undefin
     approval: doc?.approval ?? activeApprovalPolicy(),
     creation: doc?.creation ?? activeCreationPolicy(),
     chat_tools: doc?.chat_tools,
+    learning_mode: doc?.learning_mode ?? false,
     provenance: {
       approval: doc?.approval ? 'override' : 'committed',
       creation: doc?.creation ? 'override' : 'committed',
+      learning_mode: doc?.learning_mode !== undefined ? 'override' : 'committed',
     },
   };
 };
