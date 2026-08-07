@@ -1,5 +1,8 @@
+import { useEffect, useRef, useState } from 'react';
+
 import { EmptyState } from './primitives';
 import { ChatComposer, ChatThread, type UseChatState } from './chat';
+import { isRunSafeApproval } from '@core/lib/admin/approval-mode';
 
 export function AgentRail({
   chat,
@@ -22,9 +25,45 @@ export function AgentRail({
   draftSeed?: { key: string; text: string };
   approvalInStage?: boolean;
 }) {
+  const [approvalMode, setApprovalMode] = useState<'ask' | 'safe-run'>('ask');
+  const autoApproved = useRef(new Set<string>());
+
+  useEffect(() => {
+    setApprovalMode('ask');
+    autoApproved.current.clear();
+  }, [preferenceScope]);
+
+  useEffect(() => {
+    if (!chat.pending && ['idle', 'error', 'cancelled'].includes(chat.status ?? '')) {
+      setApprovalMode('ask');
+      autoApproved.current.clear();
+    }
+  }, [chat.pending, chat.status]);
+
+  useEffect(() => {
+    const pending = chat.pending;
+    if (
+      approvalMode !== 'safe-run' ||
+      approvalInStage ||
+      chat.busy ||
+      !pending ||
+      !isRunSafeApproval(pending.tool) ||
+      autoApproved.current.has(pending.call_id)
+    ) {
+      return;
+    }
+    autoApproved.current.add(pending.call_id);
+    void chat.approve(pending.call_id).then((result) => {
+      if (!result.approved) {
+        autoApproved.current.delete(pending.call_id);
+        setApprovalMode('ask');
+      }
+    });
+  }, [approvalInStage, approvalMode, chat.busy, chat.pending]);
+
   return (
     <section
-      className="flex h-[calc(100dvh-8rem)] min-h-[30rem] min-w-0 flex-col border-l border-[var(--adm-border)] bg-[var(--adm-surface)] pl-4"
+      className="flex h-[calc(100dvh-8rem)] min-h-[30rem] min-w-0 flex-col border-l border-[var(--adm-border)] bg-[var(--adm-surface-sunken)] pl-4"
       aria-label="Publishing Agent"
     >
       <header className="shrink-0 border-b border-[var(--adm-border)] pb-3">
@@ -49,6 +88,8 @@ export function AgentRail({
         onRejectCandidates={(reason) => void chat.rejectCandidates(reason)}
         preferenceScope={preferenceScope}
         approvalInStage={approvalInStage}
+        approvalMode={approvalMode}
+        onApprovalModeChange={setApprovalMode}
         emptyHint={
           <EmptyState
             title="Ready when you are"

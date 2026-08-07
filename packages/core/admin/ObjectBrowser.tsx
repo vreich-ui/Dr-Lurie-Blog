@@ -6,6 +6,10 @@ import { Tree, type TreeNode } from './Tree';
 import { objectTypeLabel } from '@core/lib/admin/display-name';
 import { fetchInventoryRows } from '@core/lib/admin/library-client';
 import { filterRows, rowStatus, type LibraryRow } from '@core/lib/admin/library-logic';
+import { fetchReleaseOverview } from '@core/lib/admin/release-client';
+import { listChats, type ChatSummaryView } from '@core/lib/admin/chat-client';
+import { EDITORIAL_STATE_PRESENTATION, type EditorialObjectState } from '@core/lib/admin/editorial-state';
+import { chatWorkLabel } from '@core/lib/admin/work-summary';
 import type { ObjectType } from '@core/schema/object-record-v1';
 
 async function token(): Promise<string> {
@@ -20,7 +24,11 @@ const FAMILIES: Array<{ id: string; label: string; types: ObjectType[] }> = [
   { id: 'content', label: 'Content', types: ['content_item', 'product'] },
 ];
 
-export function buildObjectTree(rows: readonly LibraryRow[]): TreeNode[] {
+export function buildObjectTree(
+  rows: readonly LibraryRow[],
+  states: Record<string, EditorialObjectState> = {},
+  workByObject: Record<string, ChatSummaryView> = {}
+): TreeNode[] {
   return FAMILIES.map((family) => {
     const familyRows = rows.filter((row) => family.types.includes(row.object_type));
     const typeNodes = family.types.reduce<TreeNode[]>((nodes, type) => {
@@ -35,12 +43,17 @@ export function buildObjectTree(rows: readonly LibraryRow[]): TreeNode[] {
           </span>
         ),
         children: typeRows.map((row) => {
-          const state = rowStatus(row);
+          const state = states[row.object_id] ? EDITORIAL_STATE_PRESENTATION[states[row.object_id]] : rowStatus(row);
+          const work = workByObject[row.object_id];
           return {
             id: row.object_id,
             label: row.display_name,
             href: `/admin/content/${encodeURIComponent(row.object_id)}?type=${row.object_type}`,
-            badge: (
+            badge: work ? (
+              <span className="text-[length:var(--adm-text-xs)] font-medium text-[var(--adm-info-text)]">
+                {chatWorkLabel(work)}
+              </span>
+            ) : (
               <span
                 title={state.label}
                 className={`h-1.5 w-1.5 shrink-0 rounded-full ${state.tone === 'success' ? 'bg-[var(--adm-success)]' : state.tone === 'warning' ? 'bg-[var(--adm-warning)]' : state.tone === 'info' ? 'bg-[var(--adm-info)]' : 'bg-[var(--adm-border-strong)]'}`}
@@ -64,12 +77,30 @@ export function ObjectBrowser({ activeId }: { activeId?: string }) {
   const [rows, setRows] = useState<LibraryRow[]>([]);
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(true);
+  const [states, setStates] = useState<Record<string, EditorialObjectState>>({});
+  const [workByObject, setWorkByObject] = useState<Record<string, ChatSummaryView>>({});
 
   useEffect(() => {
     let live = true;
-    fetchInventoryRows(token)
-      .then((next) => {
-        if (live) setRows(next);
+    Promise.all([
+      fetchInventoryRows(token),
+      fetchReleaseOverview(token).catch(() => undefined),
+      listChats(token).catch((): { chats: ChatSummaryView[] } => ({ chats: [] })),
+    ])
+      .then(([next, overview, chatResult]) => {
+        if (!live) return;
+        setRows(next);
+        setStates(Object.fromEntries((overview?.objects ?? []).map((object) => [object.object_id, object.state])));
+        setWorkByObject(
+          Object.fromEntries(
+            chatResult.chats
+              .filter((chat) =>
+                ['queued', 'running', 'awaiting_approval', 'awaiting_candidate', 'error'].includes(chat.status)
+              )
+              .filter((chat): chat is ChatSummaryView & { object_id: string } => Boolean(chat.object_id))
+              .map((chat) => [chat.object_id, chat])
+          )
+        );
       })
       .catch(() => {})
       .finally(() => {
@@ -103,7 +134,7 @@ export function ObjectBrowser({ activeId }: { activeId?: string }) {
           <Skeleton variant="rect" height={240} />
         ) : (
           <Tree
-            nodes={buildObjectTree(filtered)}
+            nodes={buildObjectTree(filtered, states, workByObject)}
             activeId={activeId}
             ariaLabel="Publication objects"
             storageKey="object-browser-v2"

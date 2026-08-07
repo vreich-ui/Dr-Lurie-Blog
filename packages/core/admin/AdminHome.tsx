@@ -4,9 +4,12 @@ import { AdminShell } from './AdminShell';
 import { Badge, Button, Card, EmptyState, Skeleton } from './primitives';
 import { IconExternalLink, IconFilePlus, IconLibrary, IconPalette, IconSparkles } from './icons';
 import type { SiteIdentity } from '@core/lib/site-identity';
-import { createFreeChat, sendChatMessage } from '@core/lib/admin/chat-client';
+import { createFreeChat, listChats, sendChatMessage, type ChatSummaryView } from '@core/lib/admin/chat-client';
 import { fetchInventoryRows } from '@core/lib/admin/library-client';
 import { rowStatus, type LibraryRow } from '@core/lib/admin/library-logic';
+import { fetchReleaseOverview } from '@core/lib/admin/release-client';
+import { EDITORIAL_STATE_PRESENTATION, type EditorialObjectState } from '@core/lib/admin/editorial-state';
+import { chatWorkLabel } from '@core/lib/admin/work-summary';
 import type { ObjectType } from '@core/schema/object-record-v1';
 
 async function token(): Promise<string> {
@@ -21,13 +24,18 @@ function FoundationSlot({
   description,
   rows,
   prompt,
+  lifecycle,
+  work,
 }: {
   label: string;
   description: string;
   rows: LibraryRow[];
   prompt: string;
+  lifecycle?: EditorialObjectState;
+  work?: ChatSummaryView;
 }) {
   const primary = rows[0];
+  const status = primary ? (lifecycle ? EDITORIAL_STATE_PRESENTATION[lifecycle] : rowStatus(primary)) : undefined;
   const create = async () => {
     const { chat } = await createFreeChat(token, `Create ${label}`);
     await sendChatMessage(token, chat.chat_id, prompt);
@@ -40,12 +48,13 @@ function FoundationSlot({
           <h3 className="font-semibold text-[var(--adm-text-heading)]">{label}</h3>
           <p className="mt-1 text-[length:var(--adm-text-xs)] leading-5 text-[var(--adm-text-muted)]">{description}</p>
         </div>
-        {primary ? (
-          <Badge tone={rowStatus(primary).tone}>{rowStatus(primary).label}</Badge>
-        ) : (
-          <Badge tone="neutral">Missing</Badge>
-        )}
+        {status ? <Badge tone={status.tone}>{status.label}</Badge> : <Badge tone="neutral">Missing</Badge>}
       </div>
+      {work ? (
+        <p className="mt-3 text-[length:var(--adm-text-xs)] font-medium text-[var(--adm-info-text)]">
+          {chatWorkLabel(work)} · {work.title}
+        </p>
+      ) : null}
       <div className="mt-auto pt-4">
         {primary ? (
           <a
@@ -110,11 +119,29 @@ export default function AdminHome({ identity }: AdminHomeProps) {
   const [rows, setRows] = useState<LibraryRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>();
+  const [states, setStates] = useState<Record<string, EditorialObjectState>>({});
+  const [workByObject, setWorkByObject] = useState<Record<string, ChatSummaryView>>({});
   useEffect(() => {
     let live = true;
-    fetchInventoryRows(token)
-      .then((next) => {
-        if (live) setRows(next);
+    Promise.all([
+      fetchInventoryRows(token),
+      fetchReleaseOverview(token).catch(() => undefined),
+      listChats(token).catch((): { chats: ChatSummaryView[] } => ({ chats: [] })),
+    ])
+      .then(([next, overview, chatResult]) => {
+        if (!live) return;
+        setRows(next);
+        setStates(Object.fromEntries((overview?.objects ?? []).map((object) => [object.object_id, object.state])));
+        setWorkByObject(
+          Object.fromEntries(
+            chatResult.chats
+              .filter((chat) =>
+                ['queued', 'running', 'awaiting_approval', 'awaiting_candidate', 'error'].includes(chat.status)
+              )
+              .filter((chat): chat is ChatSummaryView & { object_id: string } => Boolean(chat.object_id))
+              .map((chat) => [chat.object_id, chat])
+          )
+        );
       })
       .catch((err) => {
         if (live) setError(err instanceof Error ? err.message : 'Could not load the publication map.');
@@ -160,18 +187,24 @@ export default function AdminHome({ identity }: AdminHomeProps) {
                   label="Publication identity"
                   description="Name, public identity, defaults, and publication-level metadata."
                   rows={byType('site')}
+                  lifecycle={byType('site')[0] ? states[byType('site')[0].object_id] : undefined}
+                  work={byType('site')[0] ? workByObject[byType('site')[0].object_id] : undefined}
                   prompt={`Create the publication identity object for ${identity.brandName}. Inspect existing objects first and propose the smallest governed change.`}
                 />
                 <FoundationSlot
                   label="Brand Voice"
                   description="Audience, tone, cadence, vocabulary, claims, safety, and article frameworks."
                   rows={byType('editorial_voice')}
+                  lifecycle={byType('editorial_voice')[0] ? states[byType('editorial_voice')[0].object_id] : undefined}
+                  work={byType('editorial_voice')[0] ? workByObject[byType('editorial_voice')[0].object_id] : undefined}
                   prompt={`Create the Brand Voice for ${identity.brandName}. Ask for any missing editorial decisions before proposing a governed object.`}
                 />
                 <FoundationSlot
                   label="Visual Identity"
                   description={`Aggregate view of ${byType('theme').length} theme object${byType('theme').length === 1 ? '' : 's'}, brand tokens, and logo configuration.`}
                   rows={visualRows}
+                  lifecycle={visualRows[0] ? states[visualRows[0].object_id] : undefined}
+                  work={visualRows[0] ? workByObject[visualRows[0].object_id] : undefined}
                   prompt={`Create the visual identity foundation for ${identity.brandName}, reusing any existing theme and site brand tokens.`}
                 />
               </div>

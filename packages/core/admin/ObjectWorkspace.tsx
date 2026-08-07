@@ -18,7 +18,7 @@ import { Badge, Breadcrumbs, Button, Card, EmptyState, StatusPill, Skeleton } fr
 import { DropdownMenu, Tabs } from './menus';
 import { Input, Select, Textarea } from './forms';
 import { ConfirmDialog, Drawer, useToast } from './overlays';
-import { LockBanner, HistoryTimeline, ReadinessList } from './data';
+import { HistoryTimeline, ReadinessList } from './data';
 import { ObjectLens, objectLensMode } from './ObjectLensRegistry';
 import { ObjectBrowser } from './ObjectBrowser';
 import { AgentRail } from './AgentRail';
@@ -27,13 +27,15 @@ import { useChat } from './chat';
 import { createObjectChat } from '@core/lib/admin/chat-client';
 import { candidateAtShortcut, currentCandidateText } from '@core/lib/admin/candidate-choice';
 import { MarginaliaThreadList } from './MarginaliaThreadList';
-import { IconAlertTriangle, IconDots, IconExternalLink, IconPlus, IconRocket, IconWrench } from './icons';
+import { IconAlertTriangle, IconDots, IconExternalLink, IconLock, IconPlus, IconRocket, IconWrench } from './icons';
 import { objectDisplayName, objectTypeLabel, idTooltip } from '@core/lib/admin/display-name';
 import { resolveWorkspaceObjectType } from '@core/lib/admin/object-type-resolve';
 import type { ObjectType, ObjectRecord, HistoryEntry } from '@core/schema/object-record-v1';
 import type { ReadinessGroup, CriterionStatus } from '@core/lib/admin/readiness-criteria';
 import { useCurrentUser } from '@core/lib/admin/use-current-user';
 import { objectStageModeClass } from '@core/lib/admin/object-stage';
+import { EDITORIAL_STATE_PRESENTATION, getEditorialObjectState } from '@core/lib/admin/editorial-state';
+import { fetchReleaseOverview, type ReleaseObjectView } from '@core/lib/admin/release-client';
 import { pageSectionLabel } from '@core/lib/admin/preview-logic';
 import {
   NEW_NAV_ITEM_COMPOSER_SEED,
@@ -94,14 +96,6 @@ function liveUrl(record: Rec): string | undefined {
   if (route) return route;
   if (record.object_type === 'content_item' && slug) return `/${slug}`;
   return undefined;
-}
-
-function statusOf(record: Rec): { label: string; tone: 'success' | 'info' | 'warning' | 'neutral' } {
-  const review = record.review?.state;
-  if (review === 'open') return { label: 'In review', tone: 'info' };
-  if (review === 'changes_requested') return { label: 'Changes requested', tone: 'warning' };
-  if (record.publication?.published_time) return { label: 'Published', tone: 'success' };
-  return { label: 'Draft', tone: 'neutral' };
 }
 
 // ─── generated inspector VIEW
@@ -433,6 +427,7 @@ function DedicatedAgentPicker({ objectId, owner }: { objectId: string; owner: bo
 function WorkspaceBody({ identity }: { identity: SiteIdentity }) {
   const { toast } = useToast();
   const [record, setRecord] = useState<Rec | null>(null);
+  const [releaseObject, setReleaseObject] = useState<ReleaseObjectView>();
   const [readiness, setReadiness] = useState<ReadinessGroup[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -468,6 +463,12 @@ function WorkspaceBody({ identity }: { identity: SiteIdentity }) {
       return;
     }
     setRecord(record as Rec);
+    try {
+      const overview = await fetchReleaseOverview(getToken);
+      setReleaseObject(overview.objects.find((object) => object.object_id === loc.id));
+    } catch {
+      setReleaseObject(undefined);
+    }
     setLoading(false);
     // readiness (best-effort)
     try {
@@ -516,6 +517,27 @@ function WorkspaceBody({ identity }: { identity: SiteIdentity }) {
       void load();
     }
   }, [chat.writeStamp]);
+
+  // Locks are short-lived coordination state. Refresh only the record while a
+  // lock is visible so an agent check-in clears the icon without a page reload.
+  useEffect(() => {
+    if (!record?.lock?.token || !typeRef.current) return;
+    let active = true;
+    const refreshLock = async () => {
+      try {
+        const { getObjectRecord } = await import('@core/lib/edit-mode/verbs-client');
+        const result = await getObjectRecord(getToken, typeRef.current!, loc.id);
+        if (active && result.record) setRecord(result.record as Rec);
+      } catch {
+        // Keep the last known state; the next interval retries quietly.
+      }
+    };
+    const timer = window.setInterval(() => void refreshLock(), 4000);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
+  }, [loc.id, record?.lock?.token]);
 
   useEffect(() => {
     if (!chat.candidateSet) return;
@@ -572,6 +594,46 @@ function WorkspaceBody({ identity }: { identity: SiteIdentity }) {
         toast({
           title: 'Publish blocked',
           description: String((res.body as { error?: string }).error ?? ''),
+          tone: 'danger',
+        });
+      }
+    });
+
+  const doApprove = () =>
+    runAction(async () => {
+      if (!record) return;
+      const { EditSession } = await import('@core/lib/edit-mode/verbs-client');
+      const session = new EditSession(record.object_type, record.object_id, getToken);
+      if (record.review?.state !== 'open') {
+        const checkout = await session.ensureCheckout();
+        if (!checkout.ok) {
+          toast({
+            title: 'Locked',
+            description: checkout.heldBy ? `Held by ${checkout.heldBy}.` : undefined,
+            tone: 'warning',
+          });
+          return;
+        }
+        const submitted = await session.submitReview();
+        await session.checkin();
+        if (submitted.status !== 200) {
+          toast({
+            title: 'Could not open review',
+            description: String((submitted.body as { error?: string }).error ?? ''),
+            tone: 'danger',
+          });
+          return;
+        }
+      }
+      const approved = await session.approveReview();
+      if (approved.status === 200) {
+        void invalidateLibraryCache();
+        toast({ title: 'Approved', tone: 'success' });
+        await load();
+      } else {
+        toast({
+          title: 'Approval blocked',
+          description: String((approved.body as { error?: string }).error ?? ''),
           tone: 'danger',
         });
       }
@@ -684,7 +746,13 @@ function WorkspaceBody({ identity }: { identity: SiteIdentity }) {
     );
   }
 
-  const status = statusOf(record);
+  const lifecycle =
+    releaseObject?.state ??
+    getEditorialObjectState(
+      { ...record, requires_approval: releaseObject?.requires_approval ?? false },
+      { production_confirmed: false }
+    );
+  const status = EDITORIAL_STATE_PRESENTATION[lifecycle];
   const url = liveUrl(record);
   const lockHeld = Boolean(record.lock && record.lock.token);
   const isContentItem = record.object_type === 'content_item';
@@ -717,11 +785,15 @@ function WorkspaceBody({ identity }: { identity: SiteIdentity }) {
   const sequentialProposal =
     focus.kind === 'new-section' && isNewPageSectionProposal(chat.pending, record.object_id, existingSectionIds);
   const workState =
-    chat.status === 'awaiting_approval' || chat.status === 'awaiting_candidate'
-      ? 'Needs you'
-      : chat.status === 'queued' || chat.status === 'running'
-        ? 'Working'
-        : undefined;
+    chat.status === 'awaiting_approval'
+      ? 'Waiting for you'
+      : chat.status === 'awaiting_candidate'
+        ? 'Ready to review'
+        : chat.status === 'queued' || chat.status === 'running'
+          ? 'Working'
+          : chat.status === 'error'
+            ? 'Failed'
+            : undefined;
   const agentOccupied = chat.busy || workState !== undefined;
 
   const beginAdd = (kind: 'new-section' | 'navigation-item') => {
@@ -778,10 +850,20 @@ function WorkspaceBody({ identity }: { identity: SiteIdentity }) {
           <div className="mt-1 flex flex-wrap items-center gap-2">
             <StatusPill status={status.label} tone={status.tone} label={status.label} />
             {workState ? (
-              <Badge tone={workState === 'Needs you' ? 'warning' : 'info'}>
+              <Badge tone={workState === 'Failed' ? 'danger' : workState === 'Working' ? 'info' : 'warning'}>
                 {workState === 'Working' ? <span className="mr-1 inline-block animate-pulse">●</span> : null}
                 {workState}
               </Badge>
+            ) : null}
+            {lockHeld ? (
+              <span
+                role="status"
+                aria-label={`Checked out by ${record.lock?.owner_label ?? 'another editor'}`}
+                title={`Checked out by ${record.lock?.owner_label ?? 'another editor'}. This status refreshes automatically.`}
+                className="inline-grid h-6 w-6 place-items-center rounded-full border border-[var(--adm-border-strong)] bg-[var(--adm-surface-sunken)] text-[var(--adm-warning-text)]"
+              >
+                <IconLock size={13} />
+              </span>
             ) : null}
           </div>
         </div>
@@ -807,6 +889,16 @@ function WorkspaceBody({ identity }: { identity: SiteIdentity }) {
               ...(isContentItem
                 ? [{ id: 'variant', label: 'New variant', icon: <IconPlus size={16} />, onSelect: doNewVariant }]
                 : []),
+              ...(lockHeld && owner
+                ? [
+                    {
+                      id: 'release-lock',
+                      label: 'Release lock',
+                      icon: <IconLock size={16} />,
+                      onSelect: doTakeOver,
+                    },
+                  ]
+                : []),
               {
                 id: 'discard',
                 label: 'Discard changes',
@@ -818,16 +910,6 @@ function WorkspaceBody({ identity }: { identity: SiteIdentity }) {
           />
         </div>
       </div>
-
-      {/* Lock */}
-      {lockHeld ? (
-        <LockBanner
-          holder={record.lock?.owner_label ?? 'another editor'}
-          since={record.lock?.acquired_at}
-          now={now || undefined}
-          onForceRelease={owner ? doTakeOver : undefined}
-        />
-      ) : null}
 
       <div className="grid min-h-0 gap-4 lg:grid-cols-[minmax(12rem,20%)_minmax(0,52%)_minmax(18rem,28%)]">
         <ObjectBrowser activeId={record.object_id} />
@@ -951,9 +1033,24 @@ function WorkspaceBody({ identity }: { identity: SiteIdentity }) {
                     <IconExternalLink size={16} /> Edit on site
                   </a>
                 ) : null}
-                <Button size="sm" leftIcon={<IconRocket size={16} />} onClick={doPublish} loading={busy}>
-                  Publish
-                </Button>
+                {lifecycle === 'published' ? (
+                  <a
+                    href="/admin/release"
+                    className="adm-focusable rounded text-[length:var(--adm-text-sm)] font-medium text-[var(--adm-warning-text)] hover:underline"
+                  >
+                    Published · waiting for release
+                  </a>
+                ) : lifecycle === 'live' ? (
+                  <Badge tone="success">Live</Badge>
+                ) : lifecycle === 'approved' || !releaseObject?.requires_approval ? (
+                  <Button size="sm" leftIcon={<IconRocket size={16} />} onClick={doPublish} loading={busy}>
+                    Publish
+                  </Button>
+                ) : (
+                  <Button size="sm" onClick={doApprove} loading={busy}>
+                    Approve
+                  </Button>
+                )}
               </>
             )}
           </div>

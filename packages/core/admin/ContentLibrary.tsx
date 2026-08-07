@@ -26,6 +26,8 @@ import {
   type ReadinessDot,
 } from '@core/lib/admin/library-logic';
 import { objectTypeLabel, idTooltip } from '@core/lib/admin/display-name';
+import { EDITORIAL_STATE_PRESENTATION, type EditorialObjectState } from '@core/lib/admin/editorial-state';
+import { fetchReleaseOverview } from '@core/lib/admin/release-client';
 import type { ObjectType } from '@core/schema/object-record-v1';
 // A pure, side-effect-free sync accessor (no network, no bundling cost worth
 // deferring) — safe to import statically so the very first render can read
@@ -48,7 +50,15 @@ const DOT_LABEL: Record<ReadinessDot, string> = {
   idle: 'Draft — not published',
 };
 
-function LibraryTable({ rows, now }: { rows: LibraryRow[]; now: number }) {
+function LibraryTable({
+  rows,
+  now,
+  states,
+}: {
+  rows: LibraryRow[];
+  now: number;
+  states: Record<string, EditorialObjectState>;
+}) {
   const columns: Column<LibraryRow>[] = [
     {
       key: 'display_name',
@@ -90,12 +100,12 @@ function LibraryTable({ rows, now }: { rows: LibraryRow[]; now: number }) {
       key: 'status',
       header: 'Status',
       render: (r) => {
-        const status = rowStatus(r);
+        const status = states[r.object_id] ? EDITORIAL_STATE_PRESENTATION[states[r.object_id]] : rowStatus(r);
         return (
           <span className="flex flex-wrap items-center gap-1.5">
             <StatusPill status={status.label} tone={status.tone} label={status.label} />
             {r.unpublished_changes && r.published_time ? (
-              <StatusPill status="unpublished" tone="warning" label="Unpublished changes" />
+              <StatusPill status="draft changes" tone="warning" label="Draft changes" />
             ) : null}
           </span>
         );
@@ -142,6 +152,7 @@ function ContentLibraryBody() {
   const [type, setType] = useState<ObjectType | 'all'>('all');
   const [query, setQuery] = useState('');
   const [now, setNow] = useState<number>(0);
+  const [states, setStates] = useState<Record<string, EditorialObjectState>>({});
 
   useEffect(() => {
     setNow(Date.now());
@@ -171,6 +182,20 @@ function ContentLibraryBody() {
         }
       }
     })();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let alive = true;
+    fetchReleaseOverview(getToken)
+      .then((overview) => {
+        if (alive) {
+          setStates(Object.fromEntries(overview.objects.map((object) => [object.object_id, object.state])));
+        }
+      })
+      .catch(() => {});
     return () => {
       alive = false;
     };
@@ -261,7 +286,7 @@ function ContentLibraryBody() {
           <p className="text-[length:var(--adm-text-xs)] text-[var(--adm-text-muted)]">
             {filtered.length} {filtered.length === 1 ? 'object' : 'objects'}
           </p>
-          <LibraryTable rows={filtered} now={now} />
+          <LibraryTable rows={filtered} now={now} states={states} />
         </>
       )}
     </div>

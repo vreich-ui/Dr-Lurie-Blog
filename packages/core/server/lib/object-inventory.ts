@@ -19,8 +19,10 @@ import {
 } from '../../lib/approval-policy.js';
 import type { ObjectRecord } from '../../schema/object-record-v1.js';
 import { objectDisplayName } from '../../lib/admin/display-name.js';
+import { effectiveApproval, type EffectiveApproval } from './review-state.js';
 
 export type InventoryReviewState = 'none' | 'open' | 'changes_requested' | 'approved';
+export type InventoryApprovalState = EffectiveApproval['state'];
 
 export type InventoryLockState =
   | { held: false }
@@ -101,10 +103,14 @@ export type InventoryRow = {
   version: number;
   content_revision: number;
   review_state: InventoryReviewState;
+  /** Current approval currency, derived from the pinned decision revision. */
+  approval_state: InventoryApprovalState;
   lock: InventoryLockState;
   published_time: string | null;
   /** The content_revision the last publish materialized (from the receipt), or null if never published / receipt lacks it. */
   published_content_revision: number | null;
+  /** Safe export commit identifier used only for production-live comparison. */
+  publish_commit: string | null;
   /**
    * True when the live site has not seen the current body: never published,
    * or content_revision has moved past the receipt's. A published record
@@ -161,6 +167,7 @@ export const inventoryRowFromRecord = (
     version: record.version,
     content_revision: record.content_revision,
     review_state: record.review?.state ?? 'none',
+    approval_state: effectiveApproval(record).state,
     lock: sanitized
       ? {
           held: true,
@@ -172,6 +179,7 @@ export const inventoryRowFromRecord = (
       : { held: false },
     published_time: publishedTime,
     published_content_revision: receiptRevision,
+    publish_commit: record.publication.publish_receipt?.commit_sha ?? null,
     unpublished_changes:
       publishedTime === null || publishedTime === undefined
         ? true
