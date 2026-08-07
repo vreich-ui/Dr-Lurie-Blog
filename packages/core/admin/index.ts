@@ -15,3 +15,4 @@ export { AdminShell } from './AdminShell';
 export type { AdminShellProps } from './AdminShell';
 export { AdminErrorBoundary } from './ErrorBoundary';
 export type { AdminErrorBoundaryProps } from './ErrorBoundary';
+export { Markdown } from './Markdown';

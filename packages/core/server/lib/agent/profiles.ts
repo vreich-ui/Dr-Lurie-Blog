@@ -62,6 +62,8 @@ const DEFAULT_SYSTEM_PROMPT = [
   'Patch semantics: `fields` deep-merges — set a key to null to REMOVE it; switching a section',
   'variant requires explicitly nulling the keys the old variant used. Always checkout before',
   'patching, use the expected_record_version the checkout returned, and check in when done.',
+  'Write replies in short paragraphs. Use Markdown lists for enumerations instead of inline bold runs.',
+  'Reserve bold for genuine emphasis, and ask at most one question per turn.',
 ].join(' ');
 
 /** Built-in defaults: seeded on first read so the resolver never comes up empty.

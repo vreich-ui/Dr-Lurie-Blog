@@ -8,6 +8,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { Avatar, Badge, Button, Card } from './primitives';
+import { Markdown } from './Markdown';
 import { Textarea } from './forms';
 import { useToast } from './overlays';
 import { IconAlertTriangle, IconCheck, IconRobot, IconSend, IconX } from './icons';
@@ -193,9 +194,17 @@ function Bubble({ mine, children }: { mine?: boolean; children: React.ReactNode 
 
 export function ChatMessage({ event }: { event: ChatEventView }) {
   if (event.type === 'user_message') {
-    return <Bubble mine>{String(event.detail?.text ?? '')}</Bubble>;
+    return (
+      <Bubble mine>
+        <span className="whitespace-pre-wrap">{String(event.detail?.text ?? '')}</span>
+      </Bubble>
+    );
   }
-  return <Bubble>{String(event.detail?.text ?? '')}</Bubble>;
+  return (
+    <Bubble>
+      <Markdown>{String(event.detail?.text ?? '')}</Markdown>
+    </Bubble>
+  );
 }
 
 /** Collapsed-by-default JSON block for args / dry-run payloads. */
