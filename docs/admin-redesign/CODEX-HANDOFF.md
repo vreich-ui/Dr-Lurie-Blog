@@ -108,6 +108,192 @@ Parallel tracks (any time after M0, independent of the milestones): **Track O** 
 - **Preserve working machinery.** Per-object chat creation, checkout/patch/checkin, validation, approval cards, write-refresh, locking — all work today. The redesign is a recomposition, not a rewrite.
 - **When uncertain, ask the spec's question:** can the Publishing Agent handle this while the editor simply sees the object and supplies intent? If yes, it belongs in the agentic flow, not in a new control.
 
+## 9. Product-law clarifications for M1–M4 — unified Object Stage
+
+These are **additive product decisions**, dated 2026-08-07. They do not change M0, the branch strategy, the repo law, or the milestone order. Before M1 begins, fold the same decisions into `master-spec.md` and the affected milestone prompts in `roadmap.md`. `admin-plan.md` remains a bug register and does not need product-law edits. `sonnet-prompts.md` remains unchanged unless one of its parallel-track prompts directly conflicts.
+
+### 9.1 One center surface: the Object Stage
+
+The center of the admin is not a generic “preview.” It is the **Object Stage**: the persistent visual place where the current target object or focus target is represented while the Publishing Agent works beside it.
+
+The outer spatial grammar should change as little as possible from object to object:
+
+1. publication/admin navigation on the far left;
+2. the Object Stage in the center;
+3. the Publishing Agent in the persistent right rail.
+
+The **frame is stable; the representation inside the stage changes according to the object**.
+
+Use three stage display modes:
+
+- **Document mode** — Letter/A4-like portrait surface for PDFs, PDF templates, articles, newsletters, guides, briefs, and other document-shaped objects. This is the preferred default whenever the content naturally maps to pages.
+- **Wide mode** — horizontal surface for website sections, navigation, banners, page fragments, and other wide rendered objects.
+- **Media mode** — fit-to-stage surface for images, logos, illustrations, product media, and generated visual candidates.
+
+Do not force every object into A4. Use A4/Letter as a strong common visual convention for document-like work, while letting sections and images use their natural shape inside the same stage.
+
+No manual graphics suite is part of the MVP. Images, PDFs, layouts, and visual templates change through the Publishing Agent and the governed manufacturing tools. The stage exists so the editor can **see, point, compare, and decide**.
+
+### 9.2 The Publishing Agent remains visually separate from the object
+
+The right rail is always the contextual **Publishing Agent**.
+
+It must:
+
+- remain visibly attached to the current object/focus target;
+- have an independently scrolling conversation;
+- keep the composer reachable;
+- keep long-running process messages understandable;
+- keep object history in the conversation without forcing the object off-screen.
+
+Visual candidates, PDF pages, image alternatives, section renderings, and other references that require inspection belong on the Object Stage. Chat may explain or refer to them, but should not make the editor inspect important visual material inside small message attachments.
+
+The simplest mental model is:
+
+> **Right rail: what are we trying to do?**
+> **Center stage: what are we doing it to, and do I accept the result?**
+
+### 9.3 Separate object lifecycle from running work
+
+Do not collapse editorial lifecycle and agent/process activity into one state machine.
+
+**Object lifecycle** remains:
+
+`Draft → Approved → Published → Live`
+
+**Work/process state** is transient and may coexist with any lifecycle state:
+
+- Working
+- Researching
+- Writing
+- Generating
+- Rendering
+- Validating
+- Waiting for you
+- Ready to review
+- Failed
+
+Examples:
+
+- `Draft · Writing article`
+- `Draft · Rendering PDF sample`
+- `Published · Waiting for release`
+- `Draft · Ready to review`
+
+A working operation must not blank the last usable object representation. Keep the current version visible and show that a new result is being produced.
+
+### 9.4 Publication Map is also a quiet work map
+
+Where the publication lists the objects being built, show transient work status inline:
+
+```text
+Brand Voice          Ready
+Homepage             Ready
+Retinoid Article     ⟳ Writing
+Late Starter PDF     ⟳ Rendering
+Welcome Newsletter   • Ready to review
+```
+
+Do not reintroduce a general activity feed to solve this.
+
+Add a small global work affordance such as **Working · N**. Opening it may show the currently running operations and their objects. It is a utility, not a new primary navigation destination.
+
+Also support one universal human-attention affordance:
+
+**Needs you · N**
+
+It may include:
+
+- agent question;
+- candidate selection required;
+- factual/expert judgment required;
+- validation issue requiring a decision;
+- proposal ready;
+- approval required.
+
+`Needs you` is not an analytics dashboard and not gamification. It is a low-friction way to tell an editor where their expertise is currently required.
+
+### 9.5 Put state-changing actions next to the Object Stage
+
+Save/approve/publish decisions belong to the object, not to distant global chrome.
+
+Use a small sticky action area attached to the stage. Show only the current meaningful decision.
+
+Examples:
+
+```text
+Proposal ready        [Ask for changes] [Save] [Save & Add Next]
+Draft saved                                      [Approve]
+Approved                                          [Publish]
+Published · waiting for release
+```
+
+Rules:
+
+- Do not duplicate these actions in the agent rail.
+- `Save & Add Next` appears only in a sequential creation context.
+- Release stays in the Release workspace; publishing an object does not trigger a build.
+- The action area must not become a permanent status-control cockpit.
+
+### 9.6 Return to Publication is an explicit escape hatch
+
+Every focused Object Room needs a visually obvious **← Publication** action. Do not make the editor interpret breadcrumbs to escape a focused object.
+
+Behavior depends on what is actually at risk:
+
+1. **No local unsaved state** → return immediately.
+2. **Local rich-text edits not yet saved** → prompt:
+   - Save draft
+   - Discard changes
+   - Keep editing
+3. **Publishing Agent is still running** → allow immediate return and say that work continues. The Publication Map/Working list carries the process state.
+4. **Persisted agent proposal is waiting for review** → allow return without forcing Save/Discard. Show the object as `Ready to review`.
+5. Do not use an unsaved-changes modal for server-persisted agent jobs or proposals.
+
+### 9.7 Rich text is the narrow direct-editing exception
+
+Most object manipulation remains agentic.
+
+A lightweight direct rich-text mode is allowed where typing a small textual correction is faster than asking the agent. This is an **input convenience**, not a second CMS editing paradigm.
+
+Every manual direct edit must produce a potential learning signal that can be consumed by M2b:
+
+- publication/site identity;
+- governed object ID and type;
+- focus target;
+- original text;
+- replacement text;
+- limited surrounding context;
+- timestamp;
+- editor identity/role where already available;
+- source (`manual_rich_text_edit`).
+
+Do **not** automatically rewrite the global agent profile, system prompt, brand voice, or model behavior from one edit.
+
+Treat manual corrections as candidate preference evidence. M2b may turn repeated or explicitly accepted signals into preference pairs. A future UI may ask something like “Use changes like this as a writing preference?” but that confirmation interaction is **not required in the current MVP**.
+
+Do not log secrets, hidden strategy prompts, unrelated full-document content, or sensitive authentication data as learning context.
+
+### 9.8 Engagement is reserved, not part of this implementation
+
+A future **Engagement** destination may join the far-left navigation when engagement/behavioral data is real and useful.
+
+Do not add a dead Engagement nav item in M1–M4.
+
+When eventually introduced, it should open an object through the same Object Room rather than creating a separate editing paradigm. Engagement data should become context the Publishing Agent can use, not a reason to rebuild the admin UI.
+
+### 9.9 Milestone ownership of these clarifications
+
+Keep the existing milestone order. Fold the decisions in without creating a new program.
+
+- **M1** — Object Stage spatial grammar, A4/Letter document convention, Wide/Media modes, permanent Publishing Agent rail, obvious Return to Publication, stage-local action area, visual slots for `Working`/`Needs you`.
+- **M2** — quick context, Add, Save, Save & Add Next, and navigation-away behavior while creation work is active.
+- **M2b** — candidate-choice learning plus manual rich-text edit deltas as preference evidence; no automatic model/profile mutation.
+- **M3** — real document/media implementations: PDF and PDF-template page surfaces, image/media candidates, template samples, long-running manufacturing state on the stage.
+- **M4** — authoritative separation of lifecycle state from transient work state, global Working/Needs-you summaries, release state, and the final simplification pass.
+
+If an existing milestone prompt conflicts with this section on product intent, update that prompt before executing the milestone rather than quietly implementing the older interaction.
+
 ---
 
 ## First message to paste into Codex

@@ -138,6 +138,67 @@ Do not label an object "Live" merely because it has previously been published if
 
 **No chat-only workflow.** Visual references, generated candidates, PDF pages, images, theme samples and previews belong in the object workspace, not buried as tiny chat attachments. The chat may reference them. The object area displays them.
 
+### Unified Object Stage
+
+The center of the Editorial admin is the **Object Stage**: the persistent visual place where the current object or focus target remains visible while the Publishing Agent works beside it.
+
+The admin uses one stable spatial grammar:
+
+1. publication/admin navigation on the far left;
+2. Object Stage in the center;
+3. Publishing Agent in the persistent right rail.
+
+The frame changes as little as possible from object to object. The representation inside the stage adapts to the target.
+
+**Stage display modes**
+
+- **Document mode** — use an A4/Letter-like portrait surface for PDFs, PDF templates, articles, newsletters, guides, briefs, and other document-shaped work.
+- **Wide mode** — use a wide responsive surface for website sections, page fragments, navigation, banners, and other horizontal rendered objects.
+- **Media mode** — use fit-to-stage presentation for images, logos, illustrations, product media, and generated visual candidates.
+
+A4/Letter is a strong common convention for document work, not a rule imposed on every object. The Object Stage is primarily a thinking and review surface. In the MVP, there is no manual PDF, image, or graphics editor. The editor sees the object, points or focuses, asks for changes, compares agent-created candidates, and decides.
+
+**Publishing Agent rail**
+
+The right rail is always the contextual Publishing Agent. It is bound to the current object/focus, retains the object conversation, scrolls independently, keeps its composer reachable, and does not replace the central visual representation. Important visual results stay on the Object Stage; chat explains them but does not become the only place to see them.
+
+> **Right rail: what are we trying to do?**
+> **Center stage: what are we doing it to, and do I accept the result?**
+
+**Lifecycle status and work status are different**
+
+Do not collapse stable editorial lifecycle and transient process activity.
+
+- Object lifecycle: `Draft → Approved → Published → Live`.
+- Transient work: Working, Researching, Writing, Generating, Rendering, Validating, Waiting for you, Ready to review, Failed.
+
+The last usable object remains visible while new work is being produced. The Publication Map should quietly expose current work inline on its objects rather than reintroducing an activity feed. Provide compact global utilities such as **Working · N** and **Needs you · N** only when data exists; they are not primary navigation destinations. `Needs you` may include agent questions, candidate selection, expert judgment, validation decisions, proposals, and approvals.
+
+**Object-local actions**
+
+State-changing actions stay physically close to the Object Stage. Show only the meaningful next decision: proposal actions such as Ask for changes / Save / Save & Add Next; Approve for a saved Draft; Publish for an Approved object; or a quiet waiting-for-release state after publishing. Do not duplicate these actions in the agent rail. `Save & Add Next` appears only in a real sequential creation context. Release remains a separate batch operation and never becomes an object-level Publish side effect.
+
+**Return to Publication**
+
+Every focused Object Room has an obvious **← Publication** action.
+
+- no unsaved local work → return immediately;
+- unsaved direct rich-text edit → Save draft / Discard changes / Keep editing;
+- agent still running → allow return and state that work continues;
+- persisted proposal waiting → allow return and surface the object as Ready to review.
+
+Do not ask the editor to Save/Discard server-persisted agent jobs or proposals.
+
+**Direct rich text: limited exception**
+
+Most content/object manipulation remains agentic. Allow lightweight direct rich-text correction only when typing is clearly faster. Treat it as a convenience input method, not a parallel full CMS editor.
+
+Every direct edit should emit a candidate learning signal containing publication/site, governed object ID and type, focus target, original text, replacement text, small surrounding context, timestamp, editor identity/role when already available, and source `manual_rich_text_edit`. Do not automatically mutate the agent profile, global prompt, editorial voice, or model behavior from one edit. Manual corrections are candidate preference evidence for M2b. Do not log secrets, hidden strategy prompts, unrelated full-document content, or authentication data as learning context.
+
+**Future Engagement destination**
+
+Reserve Engagement as a future top-level destination when engagement data is real. Do not add an empty nav item in M1–M4. When introduced, it must open content through the same Object Room and supply context to the Publishing Agent rather than create a separate editing paradigm.
+
 ## 4. NEW ADMIN INFORMATION ARCHITECTURE
 
 Change primary editor navigation toward:

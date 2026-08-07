@@ -118,6 +118,15 @@ Convert chat-first `3fr:2fr` to: orientation/browser ~18–22% · **object domin
 
 `ObjectLensRegistry`: type → lens component, defaulting to the current `ObjectPreview` rendering so nothing regresses. **Every lens mounts inside the M0 `ErrorBoundary`** — a broken lens degrades to a fallback card, never a blank workspace (C1/B12). Ship one real new lens: **Brand Voice** — digestible sections for `audience`, `tone`, `cadence`, lexicon (preferred/avoided language), `claim_policy`, `cta_policy`, `safety`, and `frameworks[]` with the `default_framework` marked (schema: `packages/core/schema/bodies/editorial-voice-v1.ts:82-100`). No raw JSON, no field dumps; the agent rail sits beside it for revisions.
 
+**G. Unified Object Stage clarification**
+
+1. Name the dominant center surface the **Object Stage** and keep one stable frame: publication/admin navigation, center stage, persistent Publishing Agent rail. The rail scrolls independently and keeps its composer reachable while the object remains visible.
+2. Extend the lens contract with `document`, `wide`, and `media` display modes. Document mode uses a portrait/A4-or-Letter-like convention; website sections/navigation stay wide; visual assets fit naturally in media mode. M1 establishes the shell and contract, not every final renderer.
+3. Add an obvious **← Publication** escape. No local unsaved state, running server-persisted work, and persisted proposals may all leave immediately; running work continues and proposals remain reviewable. Do not fabricate a rich-text unsaved-state prompt before that editor exists.
+4. Attach a small sticky action region to the Object Stage for the current meaningful object decision. Do not duplicate lifecycle actions in global chrome or the agent rail, and do not implement M4's final lifecycle derivation early.
+5. Add quiet read-model/UI slots for transient work such as Writing, Rendering, Waiting for you, and Ready to review. Publication Map rows can show a spinner/label; shell utilities may show `Working · N` and `Needs you · N` when data exists. Do not add a general activity feed.
+6. Visual acceptance: a document-shaped fixture reads naturally in portrait, a section remains wide, a media object is centered/readable, long chat history cannot displace the stage, and the center remains visually dominant over the rail.
+
 **Acceptance** — spec §26 checkpoints plus: `/admin` shows the Publication Map on all three sites; an object page shows browser + dominant object + full-height rail with no nested scrollbars at 1280×800; a 6-tool-call run reads as one activity line + one formatted answer; an approval card is impossible to miss; Brand Voice renders as prose sections; legacy deep links (`/admin/agents`, `/admin/studio`, `/admin/content/<id>`) still resolve; a deliberately-thrown lens error shows a fallback card with the shell intact; a non-owner sees no Settings/Platform group and no other admin's conversations. Screenshots of `/admin`, Brand Voice, a page object, and an article object. **Stop after M1.**
 
 ---
@@ -130,6 +139,9 @@ Execute spec §10–§12 on top of the M1 spatial model.
 2. Ship the **Section** action set first (Add CTA / Remove CTA / Add another item / Reduce items / More concise / More educational / More persuasive; `Items: − n +` only where the section's schema has a repeatable collection). Then PDF/image/newsletter sets ride with M3 when those lenses exist.
 3. **Add** (§12): in parent contexts (Page → Add section; Navigation → Add item), Add establishes parent + type, opens a scoped creation conversation, asks the minimum question, and the agent creates via the governed `object_create`/patch path under existing approval semantics. No multi-field modals.
 4. **Save & Add Next** (§11): one path completely — Page → section → Save & Add Next → new sibling section focused, parent context and rail retained, composer seeded with `What should this section accomplish?`. Respect existing checkout/checkin semantics; make creation idempotent on retry (test: no duplicate sibling). Generalize only after this path passes.
+5. Keep quick-context controls in or immediately above the composer; they add context to the next agent request and never mutate settings directly. Keep Save and Save & Add Next in the Object Stage action area. `Save & Add Next` appears only in a real sequential creation context.
+6. After Save & Add Next, save exactly once, retain parent/publication context, focus the next sibling/new target, clear item-specific temporary context, and keep the Publishing Agent visible.
+7. Leaving while an agent job is running never produces an unsaved-changes modal merely because the job runs. A persisted proposal may be left and later surfaced through `Needs you` as Ready to review.
 
 **Acceptance:** §24's quick-context and Save & Add Next suites; an editor adds three sections to a page in sequence without leaving the workspace or seeing an object ID. **Stop after M2.**
 
@@ -157,6 +169,8 @@ Execute spec §10–§12 on top of the M1 spatial model.
 
 **Guardrails:** candidate content is the same governed patch material as any agent write — no new write authority. The learning-mode instruction addendum lives with the profile system prompt server-side, never client-side. No vendor/model names in the editor-facing UI (C8): the card says "3 versions", not which model made them.
 
+When direct rich-text editing exists, also capture each correction as additive preference evidence: publication/site identity, object type and ID, focus target, exact original/replacement text, limited surrounding context, timestamp, existing editor identity/role, and source `manual_rich_text_edit`. Never capture hidden/private strategy or authentication material, never auto-mutate the profile/model/editorial voice, and keep repeated edits as separate evidence until the learning layer aggregates them. Test exact before/after capture, focus association, private-context exclusion, no automatic profile mutation, and repeated-event separation.
+
 **Acceptance:** with learning mode on, a substantive request yields 2–3 candidates; previewing switches the lens; picking produces a normal approval card; the event store holds correctly-shaped pairs including a none-of-these case and a post-edit delta; with learning mode off, behavior is byte-identical to M2; export produces valid JSONL. **Stop after M2b.**
 
 ---
@@ -169,6 +183,9 @@ Execute spec §13–§14.
 2. **Templates IA:** editor-facing families (Articles, Pages, Sections, Images, PDFs, Newsletters) replacing Studio's schema taxonomy; each template workspace = visual representation + plain-language purpose (the recipe metadata trio — description/whenToUse/scope — already required to publish) + scoped agent rail + sparse context chips. `/admin/studio` aliases into this.
 3. **PDF lens:** page thumbnails, selected page large, candidates central. When the agent manufactures a PDF/image: working state in the rail; **poll the existing job, never create duplicates**; on completion the candidate becomes the main preview with accept / try-another; candidate history secondary. **Never expose storage grants, PATs, blob store names, or raw job payloads** — all bridge calls stay server-side.
 4. **Media:** family-grouped browsing (logos, product, editorial, illustrations, documents) over the existing artifact index; artifact cards (thumbnail/icon + name) — this supersedes the old "attachments in chat" item; results display in the object area per §14.
+5. Render document-like objects (PDFs, PDF templates, newsletters, articles) in Document mode; website sections and horizontal samples in Wide mode; images/logos/illustrations in Media mode. Do not force one aspect ratio across types.
+6. Keep the canonical object visible while generation/rendering runs. Promote completed visual candidates to the Object Stage for comparison/selection instead of requiring inspection inside chat. No crop/layout/color/graphics toolbox enters the MVP.
+7. Longer jobs must expose enough read state for the open Object Room, Publication Map, `Working · N`, and `Needs you · N`. Derive it from existing job/run state; do not create a second task system without evidence that the existing contracts cannot support it.
 
 **Acceptance:** template families browsable on all three sites with honest counts; the §25 PDF sequence (open template → see it prominently → request change → result appears in object area → approve) works end-to-end; a documented gap note exists for image/newsletter representation; no secret material reaches the client bundle. **Stop after M3.**
 
@@ -182,6 +199,11 @@ Execute spec §16–§17 + Tasks 12–14, correction C7 binding.
 2. **Release surface:** `N published changes waiting to go live`, batch release action (existing release verb), deploy progress, failed/stalled build state. Publish never triggers a Netlify build (already true — keep it true). This is also the "waiting on you" home: pending approvals surface here.
 3. **Retire Agents as a primary destination** (Task 13): remove from primary nav (owner Settings keeps it for diagnostics); starters and roster capabilities live on objects now. Object chats deep-link to the object workspace.
 4. **Simplification pass** (Task 14): audit every visible control against §20/§21; remove what fails; run the §25 done-criteria walkthrough on all three sites and file what fails as the next round's register.
+5. Authoritatively separate lifecycle (`Draft`, `Approved`, `Published`, `Live`) from transient work (`Working`, `Researching`, `Writing`, `Generating`, `Rendering`, `Validating`, `Waiting for you`, `Ready to review`, `Failed`). Do not persist transient UI status on governed objects when an existing job/run source is authoritative.
+6. Make `Working · N` a compact utility and `Needs you · N` the universal human-attention queue; keep quiet work indicators inline on Publication Map rows and do not restore an activity feed.
+7. Verify object-local action progression: proposal → Ask for changes / Save / Save & Add Next; Draft → Approve; Approved → Publish; Published → waiting for release. Release remains only in the Release workspace.
+8. Verify navigation-away behavior: no needless modal for ordinary object navigation; direct unsaved rich-text changes offer Save draft / Discard / Keep editing; running agent work continues; persisted proposals remain retrievable as Ready to review/Needs you.
+9. Do not add Engagement to the five-item MVP navigation. Record it only as a future destination that reuses Object Room after a real data layer exists.
 
 **Acceptance:** the four states render truthfully (including published-but-not-live); batch release of several published objects works with one build; §25 walkthrough recorded with screenshots; every §17 removal either done or moved to an owner surface. **Stop and report.**
 
