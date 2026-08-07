@@ -18,6 +18,7 @@ import test from 'node:test';
 
 import { handler } from '../../netlify/functions/mcp.js';
 import { setLocalBlobsRootForTesting } from '../../packages/core/server/lib/local-blobs.js';
+import { stubPdfToolMcp } from './pdf-tool-mcp-fetch-stub.js';
 
 const REQUEST_ID = 'req_agent_job_status_perf_test_20260806_01';
 const STORAGE_SECRET = 'storage-secret-never-expose';
@@ -91,15 +92,12 @@ const reference = {
 test('a completing poll makes exactly ONE outbound call to pdf-tool and still returns a verified materialization proof', async () => {
   await seedRequest();
   const originalFetch = globalThis.fetch;
-  const calls: Array<{ path: string; body: Record<string, unknown> }> = [];
 
-  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
-    const url = new URL(String(input));
-    const body = JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>;
-    calls.push({ path: url.pathname, body });
-
-    if (url.pathname.endsWith('/get-agent-artifact-job-status')) {
-      return Response.json({
+  const { calls, fetchImpl } = stubPdfToolMcp({
+    // A second hop (verify_agent_artifact) — or anything else — must never happen; only
+    // get_agent_artifact_job_status is registered as a route.
+    get_agent_artifact_job_status: (body) => ({
+      body: {
         jobId: body.jobId,
         status: 'complete',
         projectId: body.projectId,
@@ -107,11 +105,10 @@ test('a completing poll makes exactly ONE outbound call to pdf-tool and still re
         artifactKind: 'image',
         artifactReference: reference,
         materializationProof: PROOF_SECRET,
-      });
-    }
-    // A second hop (verify-agent-artifact) — or anything else — must never happen.
-    return Response.json({ error: `unexpected path: ${url.pathname}` }, { status: 404 });
-  }) as typeof fetch;
+      },
+    }),
+  });
+  globalThis.fetch = fetchImpl;
 
   try {
     const completed = await rpc('get_agent_artifact_job_status', {
@@ -127,9 +124,10 @@ test('a completing poll makes exactly ONE outbound call to pdf-tool and still re
     assert.deepEqual(completed.result.structuredContent?.artifactReference, reference);
 
     assert.equal(calls.length, 1, 'a completing poll must make exactly one outbound call to pdf-tool');
-    assert.equal(calls[0]?.path, '/.netlify/functions/get-agent-artifact-job-status');
+    assert.equal(calls[0]?.path, '/.netlify/functions/mcp');
+    assert.equal(calls[0]?.tool, 'get_agent_artifact_job_status');
     assert.ok(
-      !calls.some((call) => call.path.endsWith('/verify-agent-artifact')),
+      !calls.some((call) => call.tool === 'verify_agent_artifact'),
       'the redundant verify-agent-artifact hop must never be called from the status-poll path'
     );
 
@@ -143,20 +141,18 @@ test('a completing poll makes exactly ONE outbound call to pdf-tool and still re
 test('a second poll for the same jobId reuses the cached scope; a different jobId resolves scope freshly', async () => {
   await seedRequest();
   const originalFetch = globalThis.fetch;
-  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
-    const url = new URL(String(input));
-    const body = JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>;
-    if (url.pathname.endsWith('/get-agent-artifact-job-status')) {
-      return Response.json({
+  const { fetchImpl } = stubPdfToolMcp({
+    get_agent_artifact_job_status: (body) => ({
+      body: {
         jobId: body.jobId,
         status: 'pending',
         projectId: body.projectId,
         requestId: REQUEST_ID,
         artifactKind: 'image',
-      });
-    }
-    return Response.json({ error: `unexpected path: ${url.pathname}` }, { status: 404 });
-  }) as typeof fetch;
+      },
+    }),
+  });
+  globalThis.fetch = fetchImpl;
 
   try {
     const first = await rpc('get_agent_artifact_job_status', {

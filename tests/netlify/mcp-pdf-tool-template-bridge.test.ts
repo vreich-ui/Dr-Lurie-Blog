@@ -6,6 +6,7 @@ import test from 'node:test';
 
 import { handler } from '../../netlify/functions/mcp.js';
 import { setLocalBlobsRootForTesting } from '../../packages/core/server/lib/local-blobs.js';
+import { stubPdfToolMcp } from './pdf-tool-mcp-fetch-stub.js';
 
 const REQUEST_ID = 'req_agent_pdf_template_bridge_pdf_report_20260804_01';
 const STORAGE_SECRET = 'storage-secret-never-expose';
@@ -64,24 +65,6 @@ const resetAndSeedRequest = async () => {
   assert.ok(!created.result.isError, JSON.stringify(created.result.structuredContent));
 };
 
-const stubFetch = (routes: Record<string, (body: Record<string, unknown>) => Response>) => {
-  const calls: Array<{ path: string; authorization?: string; body: Record<string, unknown> }> = [];
-  const fetchImpl = (async (input: RequestInfo | URL, init?: RequestInit) => {
-    const url = new URL(String(input));
-    const body = JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>;
-    calls.push({
-      path: url.pathname,
-      authorization: new Headers(init?.headers).get('authorization') ?? undefined,
-      body,
-    });
-    for (const [suffix, respond] of Object.entries(routes)) {
-      if (url.pathname.endsWith(suffix)) return respond(body);
-    }
-    return Response.json({ error: 'unexpected path' }, { status: 404 });
-  }) as typeof fetch;
-  return { calls, fetchImpl };
-};
-
 test('tools/list exposes the pdf template bridge tools', async () => {
   const response = await handler({
     httpMethod: 'POST',
@@ -99,26 +82,26 @@ test('tools/list exposes the pdf template bridge tools', async () => {
 
 test('Platform creates then publishes a pdfme template end-to-end and never exposes the grant', async () => {
   const originalFetch = globalThis.fetch;
-  const { calls, fetchImpl } = stubFetch({
-    '/create-pdf-template': (body) =>
-      Response.json(
-        {
-          projectId: body.projectId,
-          templateId: 'tpl_report_card',
-          version: 1,
-          status: 'draft',
-          renderer: body.renderer ?? 'pdfme',
-        },
-        { status: 201 }
-      ),
-    '/publish-pdf-template': (body) =>
-      Response.json({
+  const { calls, fetchImpl } = stubPdfToolMcp({
+    create_pdf_template: (body) => ({
+      status: 201,
+      body: {
+        projectId: body.projectId,
+        templateId: 'tpl_report_card',
+        version: 1,
+        status: 'draft',
+        renderer: body.renderer ?? 'pdfme',
+      },
+    }),
+    publish_pdf_template: (body) => ({
+      body: {
         projectId: body.projectId,
         templateId: body.templateId,
         version: body.version ?? 1,
         status: 'published',
         renderer: 'pdfme',
-      }),
+      },
+    }),
   });
   globalThis.fetch = fetchImpl;
   try {
@@ -187,14 +170,15 @@ test('publish_pdf_template surfaces the upstream 409 TEMPLATE_VALIDATION_REQUIRE
 
 test('Platform deactivates a pdf template and never exposes the grant', async () => {
   const originalFetch = globalThis.fetch;
-  const { calls, fetchImpl } = stubFetch({
-    '/delete-pdf-template': (body) =>
-      Response.json({
+  const { calls, fetchImpl } = stubPdfToolMcp({
+    delete_pdf_template: (body) => ({
+      body: {
         projectId: body.projectId,
         templateId: body.templateId,
         version: body.version ?? 1,
         status: 'disabled',
-      }),
+      },
+    }),
   });
   globalThis.fetch = fetchImpl;
   try {
@@ -290,19 +274,18 @@ test('foreign site_id fails template bridge tools with template_site_mismatch an
 test('create_agent_artifact_job forwards template_id, data, and assets to pdf-tool', async () => {
   await resetAndSeedRequest();
   const originalFetch = globalThis.fetch;
-  const { calls, fetchImpl } = stubFetch({
-    '/create-agent-artifact-job': (body) =>
-      Response.json(
-        {
-          jobId: 'job-template-render',
-          status: 'pending',
-          projectId: body.projectId,
-          requestId: body.requestId,
-          artifactKind: body.artifactKind,
-          polling: { tool: 'get_agent_artifact_job_status', input: { projectId: body.projectId } },
-        },
-        { status: 202 }
-      ),
+  const { calls, fetchImpl } = stubPdfToolMcp({
+    create_agent_artifact_job: (body) => ({
+      status: 202,
+      body: {
+        jobId: 'job-template-render',
+        status: 'pending',
+        projectId: body.projectId,
+        requestId: body.requestId,
+        artifactKind: body.artifactKind,
+        polling: { tool: 'get_agent_artifact_job_status', input: { projectId: body.projectId } },
+      },
+    }),
   });
   globalThis.fetch = fetchImpl;
   try {
@@ -325,7 +308,7 @@ test('create_agent_artifact_job forwards template_id, data, and assets to pdf-to
     });
     assert.ok(!created.result.isError, JSON.stringify(created.result.structuredContent));
 
-    const jobCall = calls.find((call) => call.path.endsWith('/create-agent-artifact-job'));
+    const jobCall = calls.find((call) => call.tool === 'create_agent_artifact_job');
     assert.ok(jobCall);
     assert.equal(jobCall?.body.templateId, 'tpl_report_card');
     assert.deepEqual(jobCall?.body.data, data);
