@@ -63,6 +63,11 @@ const WRITE_TOOLS = new Set([
   'submit_review',
   'discard',
   'apply_theme',
+  'create_pdf_template',
+  'publish_pdf_template',
+  'delete_pdf_template',
+  'create_agent_artifact_job',
+  'get_agent_artifact_job_status',
 ]);
 
 export function useChat(getToken: GetToken, chatId: string | undefined): UseChatState {

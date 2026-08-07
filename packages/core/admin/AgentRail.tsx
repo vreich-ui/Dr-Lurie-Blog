@@ -4,6 +4,7 @@ import { ChatComposer, ChatThread, type UseChatState } from './chat';
 export function AgentRail({
   chat,
   focus,
+  agentFocus,
   suggestions,
   preferenceScope,
   aboveComposer,
@@ -13,6 +14,7 @@ export function AgentRail({
 }: {
   chat: UseChatState;
   focus: string;
+  agentFocus?: string;
   suggestions?: string[];
   preferenceScope?: string;
   aboveComposer?: React.ReactNode;
@@ -61,7 +63,7 @@ export function AgentRail({
         <ChatComposer
           status={chat.status}
           busy={chat.busy}
-          onSend={(text) => void chat.send(text, focus)}
+          onSend={(text) => void chat.send(text, agentFocus ?? focus)}
           onCancel={() => void chat.cancel()}
           suggestions={suggestions}
           contextActions={contextActions}

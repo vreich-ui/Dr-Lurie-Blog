@@ -2,6 +2,9 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert';
 
 import {
+  OBJECT_CONTEXT_ACTIONS,
+  PDF_TEMPLATE_CONTEXT_ACTIONS,
+  IMAGE_CONTEXT_ACTIONS,
   SECTION_CONTEXT_ACTIONS,
   contextActionsFor,
   createApprovalClaim,
@@ -29,10 +32,32 @@ describe('ObjectContextAction registry', () => {
 
   it('never exposes private strategy vocabulary in labels or generated text', () => {
     const banned = /\b(hook|agitation|offer mechanics?)\b/i;
-    for (const action of SECTION_CONTEXT_ACTIONS) {
+    for (const action of OBJECT_CONTEXT_ACTIONS) {
+      const context = action.appliesTo.includes('pdf-template')
+        ? { focusKind: 'pdf-template' as const, focusLabel: 'Evidence guide' }
+        : action.appliesTo.includes('image')
+          ? { focusKind: 'image' as const, focusLabel: 'Product portrait' }
+          : sectionContext;
       assert.doesNotMatch(action.label, banned, action.id);
-      assert.doesNotMatch(action.buildContext(sectionContext), banned, action.id);
+      assert.doesNotMatch(action.buildContext(context), banned, action.id);
     }
+  });
+
+  it('provides sparse PDF and image intent controls without direct mutation', () => {
+    const pdf = contextActionsFor({ focusKind: 'pdf-template', focusLabel: 'Evidence guide' });
+    const image = contextActionsFor({ focusKind: 'image', focusLabel: 'Product portrait' });
+    assert.deepStrictEqual(pdf, PDF_TEMPLATE_CONTEXT_ACTIONS);
+    assert.deepStrictEqual(image, IMAGE_CONTEXT_ACTIONS);
+    assert.ok(
+      pdf.every((action) =>
+        action.buildContext({ focusKind: 'pdf-template', focusLabel: 'Evidence guide' }).includes('Evidence guide')
+      )
+    );
+    assert.ok(
+      image.every((action) =>
+        action.buildContext({ focusKind: 'image', focusLabel: 'Product portrait' }).includes('Product portrait')
+      )
+    );
   });
 
   it('shows collection controls only for repeatable sections', () => {

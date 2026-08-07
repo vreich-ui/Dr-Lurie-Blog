@@ -1,0 +1,11 @@
+---
+import '@site/config/policy-bindings';
+import { getSiteIdentity } from '@core/lib/site-identity';
+import AdminLayout from '~/layouts/AdminLayout.astro';
+import StudioApp from '~/admin/Studio';
+const identity = getSiteIdentity();
+---
+
+<AdminLayout title="Admin — Visual identity">
+  <StudioApp client:load identity={identity} currentPath="/admin/settings/visual-identity" title="Visual identity" />
+</AdminLayout>

@@ -77,6 +77,7 @@ export const NAV: NavGroup[] = [
     label: 'Settings · Platform',
     ownerOnly: true,
     items: [
+      { label: 'Visual identity', href: '/admin/settings/visual-identity', icon: IconPalette },
       { label: 'Guardrails', href: '/admin/settings/guardrails', icon: IconSettings },
       { label: 'Admins', href: '/admin/settings/admins', icon: IconUser },
       { label: 'Profile', href: '/admin/profile', icon: IconUser },

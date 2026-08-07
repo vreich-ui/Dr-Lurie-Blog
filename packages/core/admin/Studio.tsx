@@ -638,11 +638,13 @@ function StudioBody({ identity }: { identity: SiteIdentity }) {
 
 export interface StudioProps {
   identity: SiteIdentity;
+  currentPath?: string;
+  title?: string;
 }
 
-export default function Studio({ identity }: StudioProps) {
+export default function Studio({ identity, currentPath = '/admin/studio', title = 'Templates & Themes' }: StudioProps) {
   return (
-    <AdminShell currentPath="/admin/studio" title="Templates & Themes" identity={identity}>
+    <AdminShell currentPath={currentPath} title={title} identity={identity}>
       <StudioBody identity={identity} />
     </AdminShell>
   );
