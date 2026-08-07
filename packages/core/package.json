@@ -3,6 +3,9 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Placeholder manifest (T11.1). LAW + MACHINERY package; populated by the T11.2-T11.6 extraction wave per docs/cms-architecture/cms-pipeline/w11-move-map.md. No source yet — scaffold only.",
-  "//": "Do NOT add real deps here until T11.2. Empty package keeps the root build byte-identical (nothing imports @drlurie/core yet)."
+  "description": "Shared LAW + MACHINERY package for fleet sites.",
+  "dependencies": {
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1"
+  }
 }
