@@ -1,0 +1,34 @@
+{
+  "__generated": {
+    "at": "2026-08-07T15:03:23.301Z",
+    "from": "objects/template/by-id/tpl_fieldtest.json",
+    "record_version": 6
+  },
+  "appliesTo": [
+    "standard"
+  ],
+  "description": "Field-test template exercising the publish pipeline on site_fieldtest; a single required, repeatable prose slot with a placeholder blueprint.",
+  "name": "Field Test Template 2026-07-08",
+  "scope": "one_off",
+  "slots": [
+    {
+      "allowed": [
+        "prose",
+        "hero",
+        "lede"
+      ],
+      "blueprint": {
+        "data": {
+          "body": "<p>Visible template blueprint field test published on 2026-07-08.</p>"
+        },
+        "id": "s_tpltest",
+        "type": "prose",
+        "visibility": "public"
+      },
+      "repeatable": true,
+      "required": true,
+      "slotId": "main"
+    }
+  ],
+  "whenToUse": "Do not use for real pages — this is a disposable smoke test of template create/publish. Prefer a production template for standard pages."
+}
