@@ -24,7 +24,13 @@
  * unit-tested modules (targets.ts, preview.ts, verbs-client.ts).
  */
 import { captureObjectSelection } from '../admin/ask-ai-object-selection.js';
-import { buildLearningTrailOpIfAny, scopeKeyFor, type AccumulatedProposal } from '../admin/agent-learning-trail.js';
+import {
+  buildLearningEvidenceOp,
+  buildManualRichTextEdits,
+  scopeKeyFor,
+  type AccumulatedProposal,
+  type ManualRichTextEdit,
+} from '../admin/agent-learning-trail.js';
 import { SECTION_PALETTE, insertPositionFor } from './sections-palette.js';
 import { NODE_PALETTE } from './nodes-palette.js';
 import {
@@ -163,9 +169,10 @@ const proposalTrails = new Map<string, AccumulatedProposal[]>();
 const attachLearningTrail = (
   target: EditTarget,
   ops: Array<Record<string, unknown>>,
-  savedFields: Record<string, unknown> | undefined
+  savedFields: Record<string, unknown> | undefined,
+  manualEdits: readonly ManualRichTextEdit[] = []
 ): void => {
-  const trailOp = buildLearningTrailOpIfAny(proposalTrails.get(scopeKeyFor(target)), savedFields);
+  const trailOp = buildLearningEvidenceOp(proposalTrails.get(scopeKeyFor(target)), savedFields, manualEdits);
   if (trailOp) ops.push(trailOp);
 };
 
@@ -2602,7 +2609,17 @@ export const mountEditMode = (options: MountOptions): void => {
       return;
     }
     const ops = suggestionToOps(state.target, changed, state.patchSectionId);
-    attachLearningTrail(state.target, ops, changed);
+    const textFields = fields
+      .filter((field) => field.kind === 'text' || field.kind === 'richtext')
+      .map((field) => field.key);
+    const manualEdits = buildManualRichTextEdits(
+      state.target,
+      state.currentData,
+      changed,
+      textFields,
+      new Date().toISOString()
+    );
+    attachLearningTrail(state.target, ops, changed, manualEdits);
     const outcome = await objectSession.patch(ops);
     working.remove();
     saveButton.done(outcome.ok);

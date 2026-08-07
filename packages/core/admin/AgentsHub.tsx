@@ -83,6 +83,7 @@ const STATUS_TONE: Record<ChatStatus, 'success' | 'info' | 'warning' | 'neutral'
   queued: 'info',
   running: 'info',
   awaiting_approval: 'warning',
+  awaiting_candidate: 'warning',
   error: 'warning',
   cancelled: 'neutral',
 };
@@ -310,14 +311,17 @@ function RosterSection({ owner }: { owner: boolean }) {
 
 function HubBody() {
   const [chats, setChats] = useState<ChatSummaryView[] | null>(null);
-  const [activeId, setActiveId] = useState<string | undefined>(undefined);
+  const [activeId, setActiveId] = useState<string | undefined>(() => {
+    if (typeof window === 'undefined') return undefined;
+    return new URLSearchParams(window.location.search).get('chat') ?? undefined;
+  });
   const [owner, setOwner] = useState(false);
   const [pendingStarter, setPendingStarter] = useState<string | undefined>(undefined);
   const chat = useChat(getToken, activeId);
 
-  const reloadList = async () => {
+  const reloadList = async (includeAll = owner) => {
     try {
-      const { chats: list } = await listChats(getToken);
+      const { chats: list } = await listChats(getToken, includeAll);
       setChats(list);
     } catch {
       setChats([]);
@@ -330,7 +334,9 @@ function HubBody() {
       try {
         const { fetchMe } = await import('@core/lib/admin/users-client');
         const me = await fetchMe(getToken);
-        setOwner(me.roles.includes('owner'));
+        const isOwner = me.roles.includes('owner');
+        setOwner(isOwner);
+        if (isOwner) await reloadList(true);
       } catch {
         /* ignore */
       }

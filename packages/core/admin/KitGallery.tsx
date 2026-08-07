@@ -9,6 +9,7 @@ import { useState } from 'react';
 import type { ReactNode } from 'react';
 
 import { AdminShell } from './AdminShell';
+import { Markdown } from './Markdown';
 import {
   Button,
   IconButton,
@@ -37,6 +38,7 @@ import {
   ReadinessList,
   LockBanner,
   HistoryTimeline,
+  Tree,
   IconPlus,
   IconTrash,
   IconPencil,
@@ -360,6 +362,39 @@ function GalleryBody({ identity }: { identity: SiteIdentity }) {
         </Row>
       </Section>
 
+      <Section title="Tree">
+        <div className="max-w-sm">
+          <Tree
+            ariaLabel="Component kit publication tree"
+            storageKey="kit-gallery"
+            activeId="page-about"
+            nodes={[
+              {
+                id: 'foundation',
+                label: 'Foundation',
+                badge: <Badge tone="neutral">2</Badge>,
+                children: [
+                  { id: 'voice', label: 'Brand Voice', href: '#brand-voice' },
+                  { id: 'identity', label: 'Publication identity', href: '#identity' },
+                ],
+              },
+              {
+                id: 'structure',
+                label: 'Structure',
+                children: [
+                  { id: 'page-about', label: 'About' },
+                  { id: 'empty-page', label: 'Empty children', children: [] },
+                  {
+                    id: 'long-label',
+                    label: 'A deliberately long object label that demonstrates truncation without layout shift',
+                  },
+                ],
+              },
+            ]}
+          />
+        </div>
+      </Section>
+
       <Section title="Overlays & toasts">
         <Row>
           <Button onClick={() => setDialogOpen(true)}>Open dialog</Button>
@@ -444,6 +479,36 @@ function GalleryBody({ identity }: { identity: SiteIdentity }) {
 
       <Section title="History timeline">
         <HistoryTimeline entries={HISTORY} now={FIXED_NOW} />
+      </Section>
+
+      <Section title="Assistant markdown">
+        <div className="max-w-2xl rounded-[var(--adm-radius-lg)] bg-[var(--adm-surface-sunken)] p-4 text-[length:var(--adm-text-sm)]">
+          <Markdown>{`## A concise answer
+
+Use a short list when several steps matter:
+
+1. Review the draft.
+2. Check the evidence.
+3. **Approve** only when it is ready.
+
+> Keep the reader's needs visible.
+
+| State | Meaning |
+| --- | --- |
+| Draft | Still being revised |
+| Published | Exported, not necessarily live |
+
+Inline \`code\` stays quiet, while fenced code scrolls instead of wrapping:
+
+\`\`\`text
+a-very-long-value-that-demonstrates-horizontal-scrolling-without-breaking-the-chat-layout
+\`\`\`
+
+[Open the documentation](https://example.com/a/very/long/documentation/link)`}</Markdown>
+        </div>
+        <p className="text-[length:var(--adm-text-xs)] text-[var(--adm-text-muted)]">
+          Use the gallery theme switch above to verify this sample in light and dark.
+        </p>
       </Section>
 
       <Section title="Identity module — objectDisplayName across all ten types">

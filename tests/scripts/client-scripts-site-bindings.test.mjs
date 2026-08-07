@@ -4,10 +4,10 @@
  * W11 T11.5 made the GoTrue localStorage keys (and the edit-mode media policy)
  * resolve through the provider seams in `packages/core/lib/site-identity.ts` /
  * `media-policy.ts`. Those seams THROW until a site registers its providers via
- * `src/config/policy-bindings`. Every consumer of `goTrueClient` wraps its
- * storage access in `try/catch`, so an unregistered provider does not surface as
- * an error — it degrades silently to "always signed out": a valid session is
- * never read, and a successful sign-in is never persisted.
+ * the active site's `config/policy-bindings`. Every consumer of `goTrueClient`
+ * wraps its storage access in `try/catch`, so an unregistered provider does not
+ * surface as an error — it degrades silently to "always signed out": a valid
+ * session is never read, and a successful sign-in is never persisted.
  *
  * Astro compiles each `<script>` block in a `.astro` file as its own client
  * entry. An entry only gets the registration if IT imports the bindings — being
@@ -22,27 +22,38 @@
  * providers.
  */
 import assert from 'node:assert/strict';
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
-const SRC = join(ROOT, 'src');
+const CORE_APP = join(ROOT, 'packages', 'core', 'app');
+const SITES = join(ROOT, 'sites');
+const ISLANDS = join(CORE_APP, 'admin');
 
 /** Core modules that resolve site identity / policy through a provider seam. */
 const IDENTITY_DEPENDENT = ['@core/lib/admin/goTrueClient', '@core/lib/edit-mode/index', '@core/lib/site-identity'];
 
-const BINDINGS = '~/config/policy-bindings';
+const BINDINGS = ['~/config/policy-bindings', '@site/config/policy-bindings'];
 
-const walk = (dir, out = []) => {
+const walk = (dir, extension, out = []) => {
+  if (!existsSync(dir)) return out;
   for (const name of readdirSync(dir)) {
     const p = join(dir, name);
-    if (statSync(p).isDirectory()) walk(p, out);
-    else if (name.endsWith('.astro')) out.push(p);
+    if (statSync(p).isDirectory()) walk(p, extension, out);
+    else if (name.endsWith(extension)) out.push(p);
   }
   return out;
 };
+
+const appRoots = () => [
+  CORE_APP,
+  ...readdirSync(SITES, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => join(SITES, entry.name, 'app'))
+    .filter(existsSync),
+];
 
 /** Everything after the closing frontmatter fence (or the whole file if none). */
 const templateBody = (source) => {
@@ -67,21 +78,55 @@ const clientScriptBlocks = (source) => {
   return blocks;
 };
 
-const importsModule = (block, specifier) => block.includes(`'${specifier}'`) || block.includes(`"${specifier}"`);
+const withoutComments = (source) => source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
 
-test('client <script> blocks that reach identity-dependent core modules import the site policy bindings', () => {
+const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const importIndex = (source, specifier) => {
+  const cleaned = withoutComments(source);
+  const escaped = escapeRegExp(specifier);
+  const patterns = [
+    new RegExp(`\\bimport\\s*\\(\\s*['"]${escaped}['"]`),
+    new RegExp(`\\bimport\\s+(?:[^;]*?\\s+from\\s+)?['"]${escaped}['"]`),
+  ];
+  const indexes = patterns.map((pattern) => cleaned.search(pattern)).filter((index) => index >= 0);
+  return indexes.length > 0 ? Math.min(...indexes) : -1;
+};
+const importsModule = (block, specifier) => importIndex(block, specifier) >= 0;
+const importsBindings = (block) => BINDINGS.some((specifier) => importsModule(block, specifier));
+
+const inspectClientScripts = (files) => {
   const offenders = [];
-  for (const file of walk(SRC)) {
+  let candidates = 0;
+  for (const file of files) {
     const source = readFileSync(file, 'utf8');
     clientScriptBlocks(source).forEach((block, index) => {
       const reached = IDENTITY_DEPENDENT.filter((specifier) => importsModule(block, specifier));
       if (reached.length === 0) return;
-      if (importsModule(block, BINDINGS)) return;
+      candidates += 1;
+      if (importsBindings(block)) return;
       offenders.push(
-        `${file.slice(ROOT.length + 1)} <script> #${index}: imports ${reached.join(', ')} without ${BINDINGS}`
+        `${file.slice(ROOT.length + 1)} <script> #${index}: imports ${reached.join(', ')} without site bindings`
       );
     });
   }
+  return { candidates, offenders };
+};
+
+const inspectIslandSource = (source, label = '<island>') => {
+  const cleaned = withoutComments(source);
+  const reExport = cleaned.match(/export\s*\{\s*default\s*\}\s*from\s*['"]@core\/admin\/[^'"]+['"]/);
+  if (!reExport || reExport.index === undefined) return null;
+  const bindingIndexes = BINDINGS.map((specifier) => importIndex(cleaned, specifier)).filter((index) => index >= 0);
+  const bindingIndex = bindingIndexes.length > 0 ? Math.min(...bindingIndexes) : -1;
+  return bindingIndex >= 0 && bindingIndex < reExport.index
+    ? null
+    : `${label}: must import site policy bindings before re-exporting its core admin component`;
+};
+
+test('client <script> blocks that reach identity-dependent core modules import the site policy bindings', () => {
+  const files = appRoots().flatMap((root) => walk(root, '.astro'));
+  const { candidates, offenders } = inspectClientScripts(files);
+  assert.ok(candidates > 0, 'site-binding guard found zero identity-dependent client <script> candidates');
   assert.deepEqual(
     offenders,
     [],
@@ -90,15 +135,44 @@ test('client <script> blocks that reach identity-dependent core modules import t
   );
 });
 
+test('every React admin island imports the site bindings before re-exporting its core component', () => {
+  const files = walk(ISLANDS, '.ts');
+  const candidates = [];
+  const offenders = [];
+  for (const file of files) {
+    const source = readFileSync(file, 'utf8');
+    if (!/export\s*\{\s*default\s*\}\s*from\s*['"]@core\/admin\//.test(withoutComments(source))) continue;
+    candidates.push(file);
+    const offender = inspectIslandSource(source, file.slice(ROOT.length + 1));
+    if (offender) offenders.push(offender);
+  }
+  assert.ok(candidates.length > 0, 'site-binding guard found zero React admin island candidates');
+  assert.deepEqual(offenders, [], `admin islands missing an early site-binding import:\n${offenders.join('\n')}`);
+});
+
 test('the rule actually fires — a script importing goTrueClient with no bindings is an offence', () => {
   const bad = `---\n---\n<script>\n  import { currentUser } from '@core/lib/admin/goTrueClient';\n  currentUser();\n</script>\n`;
   const blocks = clientScriptBlocks(bad);
   assert.equal(blocks.length, 1);
   assert.ok(importsModule(blocks[0], '@core/lib/admin/goTrueClient'));
-  assert.ok(!importsModule(blocks[0], BINDINGS));
+  assert.ok(!importsBindings(blocks[0]));
 
   const good = `---\n---\n<script>\n  import '~/config/policy-bindings';\n  import { currentUser } from '@core/lib/admin/goTrueClient';\n</script>\n`;
-  assert.ok(importsModule(clientScriptBlocks(good)[0], BINDINGS));
+  assert.ok(importsBindings(clientScriptBlocks(good)[0]));
+
+  const currentAlias = `---\n---\n<script>\n  import '@site/config/policy-bindings';\n  import { currentUser } from '@core/lib/admin/goTrueClient';\n</script>\n`;
+  assert.ok(importsBindings(clientScriptBlocks(currentAlias)[0]));
+});
+
+test('the island rule fires when bindings are missing or imported after the re-export', () => {
+  const missing = `export { default } from '@core/admin/AdminHome';\n`;
+  const late = `export { default } from '@core/admin/AdminHome';\nimport '@site/config/policy-bindings';\n`;
+  const good = `import '@site/config/policy-bindings';\nexport { default } from '@core/admin/AdminHome';\n`;
+  const commented = `// import '@site/config/policy-bindings';\nexport { default } from '@core/admin/AdminHome';\n`;
+  assert.match(inspectIslandSource(missing) ?? '', /must import/);
+  assert.match(inspectIslandSource(late) ?? '', /before re-exporting/);
+  assert.match(inspectIslandSource(commented) ?? '', /must import/);
+  assert.equal(inspectIslandSource(good), null);
 });
 
 test('frontmatter imports are out of scope (server-side render path)', () => {

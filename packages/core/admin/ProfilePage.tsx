@@ -13,7 +13,8 @@ import { Avatar, Badge, Button, Card, EmptyState, Skeleton, StatusPill } from '.
 import { Input, Select, Switch } from './forms';
 import { useToast } from './overlays';
 import { IconAlertTriangle } from './icons';
-import { fetchMe, updateMe, avatarSrc, type UserView } from '@core/lib/admin/users-client';
+import { updateMe, avatarSrc } from '@core/lib/admin/users-client';
+import { useCurrentUser } from '@core/lib/admin/use-current-user';
 
 async function getToken(): Promise<string> {
   const m = await import('@core/lib/admin/goTrueClient');
@@ -29,34 +30,14 @@ const TIER_BLURB: Record<string, string> = {
 
 function ProfileBody() {
   const { toast } = useToast();
-  const [user, setUser] = useState<UserView | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { user, loading, error, refresh } = useCurrentUser();
   const [name, setName] = useState('');
   const [saving, setSaving] = useState(false);
   const [notifyReview, setNotifyReview] = useState(true);
 
   useEffect(() => {
-    let alive = true;
-    (async () => {
-      try {
-        const { user } = await fetchMe(getToken);
-        if (alive) {
-          setUser(user);
-          setName(user.display_name);
-          setLoading(false);
-        }
-      } catch (err) {
-        if (alive) {
-          setError(err instanceof Error ? err.message : 'Could not load your profile.');
-          setLoading(false);
-        }
-      }
-    })();
-    return () => {
-      alive = false;
-    };
-  }, []);
+    if (user) setName(user.display_name);
+  }, [user]);
 
   const onSave = async () => {
     const trimmed = name.trim();
@@ -67,7 +48,8 @@ function ProfileBody() {
     setSaving(true);
     try {
       const { user: updated } = await updateMe(getToken, { display_name: trimmed });
-      setUser(updated);
+      setName(updated.display_name);
+      await refresh();
       toast({ title: 'Profile saved', tone: 'success' });
     } catch (err) {
       toast({ title: 'Save failed', description: err instanceof Error ? err.message : undefined, tone: 'danger' });
@@ -80,11 +62,7 @@ function ProfileBody() {
   if (error || !user) {
     return (
       <Card>
-        <EmptyState
-          icon={<IconAlertTriangle size={26} />}
-          title="Couldn't load your profile"
-          message={error ?? undefined}
-        />
+        <EmptyState icon={<IconAlertTriangle size={26} />} title="Couldn't load your profile" message={error} />
       </Card>
     );
   }

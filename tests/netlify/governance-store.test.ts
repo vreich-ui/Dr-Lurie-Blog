@@ -44,12 +44,13 @@ test('empty store → committed policy, provenance committed', async () => {
   const active = await resolveActivePolicies(memStore());
   assert.deepEqual(active.approval, activeApprovalPolicy());
   assert.deepEqual(active.creation, activeCreationPolicy());
-  assert.deepEqual(active.provenance, { approval: 'committed', creation: 'committed' });
+  assert.equal(active.learning_mode, false);
+  assert.deepEqual(active.provenance, { approval: 'committed', creation: 'committed', learning_mode: 'committed' });
 });
 
 test('undefined store → committed policy', async () => {
   const active = await resolveActivePolicies(undefined);
-  assert.deepEqual(active.provenance, { approval: 'committed', creation: 'committed' });
+  assert.deepEqual(active.provenance, { approval: 'committed', creation: 'committed', learning_mode: 'committed' });
 });
 
 test('a valid approval override wins; creation without an override stays committed', async () => {
@@ -65,12 +66,20 @@ test('a valid approval override wins; creation without an override stays committ
   assert.equal(active.provenance.creation, 'committed');
 });
 
+test('learning mode is an explicit override and otherwise remains off', async () => {
+  const store = memStore();
+  await putGovernanceDoc(store, doc({ learning_mode: true }));
+  const active = await resolveActivePolicies(store);
+  assert.equal(active.learning_mode, true);
+  assert.equal(active.provenance.learning_mode, 'override');
+});
+
 test('a corrupt governance doc falls back to committed (never applies)', async () => {
   const store = memStore();
   store.map.set(GOVERNANCE_DOC_KEY, '{ not json');
   assert.equal(await getGovernanceDoc(store), null);
   const active = await resolveActivePolicies(store);
-  assert.deepEqual(active.provenance, { approval: 'committed', creation: 'committed' });
+  assert.deepEqual(active.provenance, { approval: 'committed', creation: 'committed', learning_mode: 'committed' });
 });
 
 test('a doc with an INVALID override shape is rejected on read → committed stands', async () => {
@@ -96,5 +105,5 @@ test('a store read that throws degrades to committed', async () => {
     setJSON: async () => {},
   };
   const active = await resolveActivePolicies(throwing);
-  assert.deepEqual(active.provenance, { approval: 'committed', creation: 'committed' });
+  assert.deepEqual(active.provenance, { approval: 'committed', creation: 'committed', learning_mode: 'committed' });
 });

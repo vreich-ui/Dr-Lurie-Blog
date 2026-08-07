@@ -68,8 +68,12 @@ export const requestSchema = z.discriminatedUnion('verb', [
     approval: approvalPolicyConfigSchema.optional(),
     creation: creationPolicyConfigSchema.optional(),
     chat_tools: chatToolAutonomySchema.optional(),
+    learning_mode: z.boolean().optional(),
   }),
-  z.object({ verb: z.literal('revert'), target: z.enum(['approval', 'creation', 'chat_tools', 'all']) }),
+  z.object({
+    verb: z.literal('revert'),
+    target: z.enum(['approval', 'creation', 'chat_tools', 'learning_mode', 'all']),
+  }),
   z.object({ verb: z.literal('agent_keys_list') }),
   z.object({ verb: z.literal('agent_keys_create'), agent_name: z.string().min(1), site: z.string().min(1) }),
   z.object({ verb: z.literal('agent_keys_revoke'), agent_name: z.string().min(1), site: z.string().min(1) }),
@@ -177,7 +181,12 @@ const handlerImpl = async (event: LambdaEvent, context?: LambdaContext) => {
 
     let next: GovernanceDoc;
     if (req.verb === 'set') {
-      const touched = [req.approval && 'approval', req.creation && 'creation', req.chat_tools && 'chat_tools']
+      const touched = [
+        req.approval && 'approval',
+        req.creation && 'creation',
+        req.chat_tools && 'chat_tools',
+        req.learning_mode !== undefined && 'learning_mode',
+      ]
         .filter(Boolean)
         .join(', ');
       next = {
@@ -185,6 +194,7 @@ const handlerImpl = async (event: LambdaEvent, context?: LambdaContext) => {
         ...(req.approval !== undefined ? { approval: req.approval } : {}),
         ...(req.creation !== undefined ? { creation: req.creation } : {}),
         ...(req.chat_tools !== undefined ? { chat_tools: req.chat_tools } : {}),
+        ...(req.learning_mode !== undefined ? { learning_mode: req.learning_mode } : {}),
         updated_by: email,
         updated_at: nowIso(),
         history: [...existing.history, { at: nowIso(), actor_email: email, action: 'set', detail: touched || 'none' }],
@@ -195,6 +205,7 @@ const handlerImpl = async (event: LambdaEvent, context?: LambdaContext) => {
         delete next.approval;
         delete next.creation;
         delete next.chat_tools;
+        delete next.learning_mode;
       } else {
         delete next[req.target];
       }

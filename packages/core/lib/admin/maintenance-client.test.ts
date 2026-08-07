@@ -1,9 +1,16 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
 
-import { normalizeSiteIdDiagnostic } from './maintenance-client.js';
+import { getBlobStoreSourceDiagnostics } from '../../server/lib/blob-store.js';
+import { normalizeSiteIdDiagnostic, type StoreDiagnostic } from './maintenance-client.js';
 
 describe('normalizeSiteIdDiagnostic', () => {
+  it('accepts the server diagnostic type without a duplicated client declaration', () => {
+    const diagnostic: StoreDiagnostic = getBlobStoreSourceDiagnostics('workflows', {});
+
+    assert.deepStrictEqual(normalizeSiteIdDiagnostic(diagnostic.siteId), diagnostic.siteId);
+  });
+
   it('passes through the real server shape ({envVar, present, redacted})', () => {
     assert.deepStrictEqual(
       normalizeSiteIdDiagnostic({ envVar: 'NETLIFY_SITE_ID', present: true, redacted: '…ab12' }),

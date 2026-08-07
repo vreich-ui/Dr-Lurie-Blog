@@ -532,6 +532,19 @@ test('cancel: cooperative while queued-fresh is rejected only when idle; awaitin
 
 // ─── profile resolution (§4a) ────────────────────────────────────────────────
 
+test('seed profiles guide concise, readable Markdown replies', () => {
+  const prompts = Object.values(emptyProfilesDoc('2026-07-19T00:00:00.000Z').profiles).map(
+    (profile) => profile.system_prompt
+  );
+
+  for (const prompt of prompts) {
+    assert.match(prompt, /short paragraphs/i);
+    assert.match(prompt, /Markdown lists/i);
+    assert.match(prompt, /bold for genuine emphasis/i);
+    assert.match(prompt, /at most one question per turn/i);
+  }
+});
+
 test('profile resolution precedence: object beats type beats site default; disabled profiles fall through', () => {
   const doc = emptyProfilesDoc('2026-07-19T00:00:00.000Z');
   doc.profiles.prof_a = { ...doc.profiles.prof_site_default_anthropic!, profile_id: 'prof_a', name: 'A' };

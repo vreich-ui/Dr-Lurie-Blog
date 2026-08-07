@@ -28,9 +28,19 @@ export interface ChatToolCatalogEntry {
 }
 
 export interface GovernanceState {
-  doc: { approval?: ApprovalConfig; creation?: unknown; chat_tools?: Record<string, ToolAutonomy> } | null;
+  doc: {
+    approval?: ApprovalConfig;
+    creation?: unknown;
+    chat_tools?: Record<string, ToolAutonomy>;
+    learning_mode?: boolean;
+  } | null;
   committed: { approval: ApprovalConfig; creation: unknown };
-  active: { approval: ApprovalConfig; creation: unknown; provenance: { approval: string; creation: string } };
+  active: {
+    approval: ApprovalConfig;
+    creation: unknown;
+    learning_mode: boolean;
+    provenance: { approval: string; creation: string; learning_mode: string };
+  };
   chat_tools_catalog?: ChatToolCatalogEntry[];
 }
 
@@ -56,8 +66,13 @@ export const setApprovalOverride = (getToken: GetToken, approval: ApprovalConfig
 export const setChatToolsOverride = (getToken: GetToken, chatTools: Record<string, ToolAutonomy>) =>
   post<GovernanceState>(getToken, { verb: 'set', chat_tools: chatTools });
 
-export const revertGovernance = (getToken: GetToken, target: 'approval' | 'creation' | 'chat_tools' | 'all') =>
-  post<GovernanceState>(getToken, { verb: 'revert', target });
+export const setLearningMode = (getToken: GetToken, enabled: boolean) =>
+  post<GovernanceState>(getToken, { verb: 'set', learning_mode: enabled });
+
+export const revertGovernance = (
+  getToken: GetToken,
+  target: 'approval' | 'creation' | 'chat_tools' | 'learning_mode' | 'all'
+) => post<GovernanceState>(getToken, { verb: 'revert', target });
 
 /** Effective mode for a type given a config (per-type override, else master). */
 export const effectiveApprovalMode = (config: ApprovalConfig, type: string): ApprovalMode =>

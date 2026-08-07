@@ -27,7 +27,12 @@
  */
 import { z } from 'zod';
 
-import { collectBlobListItems, mapWithConcurrency, STORE_READ_CONCURRENCY, type BlobListResponse } from './blob-list.js';
+import {
+  collectBlobListItems,
+  mapWithConcurrency,
+  STORE_READ_CONCURRENCY,
+  type BlobListResponse,
+} from './blob-list.js';
 import {
   checkinObjectLock,
   checkoutObjectLock,
@@ -643,7 +648,11 @@ const stampSharedRefSectionNames = (
   return ops.map((raw) => {
     if (!isRecord(raw) || typeof raw.op !== 'string') return raw; // malformed → let the engine reject it
 
-    if (raw.op === 'upsert_section' && isSharedRefSection(raw.section) && typeof raw.section.data.section === 'string') {
+    if (
+      raw.op === 'upsert_section' &&
+      isSharedRefSection(raw.section) &&
+      typeof raw.section.data.section === 'string'
+    ) {
       const name = nameFor(raw.section.data.section);
       if (name === undefined) return raw; // unresolved — leave the payload exactly as sent
       const op = deepClone(raw) as JsonRecord;
@@ -802,9 +811,7 @@ export const listAllObjectRecords = async (
   // relies on (audit-feed.ts) — is identical to before; only the per-record
   // loads below run concurrently.
   const items = perTypeItems.flat();
-  const loaded = await mapWithConcurrency(items, STORE_READ_CONCURRENCY, (item) =>
-    loadRecordForSweep(store, item.key)
-  );
+  const loaded = await mapWithConcurrency(items, STORE_READ_CONCURRENCY, (item) => loadRecordForSweep(store, item.key));
 
   const records: ObjectRecord[] = [];
   for (const record of loaded) {
@@ -1651,6 +1658,9 @@ export const handleObjectVerb = async (
           saved_at: timestamp,
           editor: principal,
           proposals: learningOps.flatMap((op) => op.proposals),
+          ...(learningOps.some((op) => (op.manual_edits?.length ?? 0) > 0)
+            ? { manual_edits: learningOps.flatMap((op) => op.manual_edits ?? []) }
+            : {}),
         };
         await options.agentLearningStore.setJSON(
           agentLearningRecordKey(request.object_type, request.object_id, timestamp),

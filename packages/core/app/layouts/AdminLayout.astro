@@ -5,7 +5,8 @@
 // The signed-in slot holds a page island (e.g. AdminHome) mounted by the page.
 // The real wall stays server-side in each function (getAdminStateFromEvent).
 import '~/styles/admin-tokens.css';
-import Layout from '~/layouts/PageLayout.astro';
+import Layout from '~/layouts/Layout.astro';
+import LoginModal from '~/components/common/LoginModal.astro';
 
 interface Props {
   title?: string;
@@ -24,13 +25,11 @@ const metadata = {
 <Layout metadata={metadata}>
   {
     /* The /admin/* workspace is a full-viewport app: its own sidebar + topbar
-      are the chrome, and the AdminShell (min-h-screen) plus the chat panels'
-      100vh-anchored composers own the viewport. The public site footer has no
-      place here and, appended after the app, overlapped the chat composer /
-      Send (T9.16 drive finding) — suppress it by passing an empty footer slot.
-      The header stays: it hosts the login modal the signed-out gate opens. */
+      are the chrome. Mount only the shared document layout and login modal:
+      the reader-facing header/navigation and footer are deliberately absent
+      from every admin route. */
   }
-  <Fragment slot="footer"></Fragment>
+  <LoginModal />
   <div class="admin-gate adm-root">
     <p class="admin-gate-status" data-auth-status aria-live="polite" role="status"></p>
 

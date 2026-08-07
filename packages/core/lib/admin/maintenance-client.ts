@@ -5,6 +5,7 @@
  * (T9.4) — this client surfaces that as a thrown Error, same as users-client.
  */
 import type { GetToken } from '../edit-mode/verbs-client.js';
+import type { BlobStoreSourceDiagnostics } from '../../server/lib/blob-store.js';
 
 const MANAGER_ENDPOINT = '/.netlify/functions/admin-blob-manager';
 const DIAGNOSTICS_ENDPOINT = '/.netlify/functions/admin-blob-store-diagnostics';
@@ -37,30 +38,8 @@ export interface BlobDetail {
  * last-4-chars redacted preview safe to show an operator. Named so it isn't
  * re-inlined (and re-mistyped as `string`) at another call site.
  */
-export interface SiteIdDiagnostic {
-  envVar: 'NETLIFY_SITE_ID' | 'SITE_ID' | undefined;
-  present: boolean;
-  redacted: string;
-}
-
-export interface StoreDiagnostic {
-  storeName: string;
-  source: string;
-  explicitApiConfigUsed: boolean;
-  lambdaBlobContextUsed: boolean;
-  /**
-   * Was `siteId: string` — the actual server response
-   * (getBlobStoreSourceDiagnostics, blob-store.ts) has always sent the
-   * structured SiteIdDiagnostic below. The old type let TypeScript wave
-   * through `diag.siteId || '(none)'` in MaintenancePage, which rendered the
-   * raw object as a React child and crashed with error #31 the instant
-   * diagnostics loaded (QA P0). Fixed to match the real runtime shape;
-   * `normalizeSiteIdDiagnostic` below narrows a plain string too, so an
-   * older server build (or a stale cached response) still renders instead
-   * of crashing.
-   */
-  siteId: SiteIdDiagnostic;
-}
+export type StoreDiagnostic = BlobStoreSourceDiagnostics;
+export type SiteIdDiagnostic = StoreDiagnostic['siteId'];
 
 /**
  * Narrow a `siteId` diagnostic field to a renderable shape, regardless of

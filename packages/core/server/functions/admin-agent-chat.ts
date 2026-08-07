@@ -19,13 +19,20 @@
 import type { SiteBinding } from '../lib/site-binding.js';
 import { getAdminStateFromEvent, type LambdaContext } from '../lib/admin-auth.js';
 import type { ArtifactIndexStore } from '../lib/artifact-index.js';
-import { getArtifactIndexBlobStore, getSiteObjectsBlobStore } from '../lib/blob-store.js';
+import { getAgentLearningBlobStore, getArtifactIndexBlobStore, getSiteObjectsBlobStore } from '../lib/blob-store.js';
 import { getGovernanceBlobStore, resolveActivePolicies } from '../lib/governance-store.js';
 import type { ObjectVerbStore } from '../lib/object-verbs.js';
 import { resolveRolesForPrincipalAsync } from '../lib/roles.js';
 import { getUsersBlobStore, getUserRecord } from '../lib/users-store.js';
 import { buildToolContext } from '../lib/agent/context.js';
-import { approvePendingTool, cancelRun, denyPendingTool, startRun } from '../lib/agent/loop.js';
+import {
+  approvePendingTool,
+  cancelRun,
+  choosePendingCandidate,
+  denyPendingTool,
+  rejectPendingCandidates,
+  startRun,
+} from '../lib/agent/loop.js';
 import {
   getAgentChatBlobStore,
   listChatDocs,
@@ -35,6 +42,7 @@ import {
   saveChatDoc,
   type ChatDoc,
 } from '../lib/agent/chat-store.js';
+import { visibleChatDocs } from '../lib/agent/chat-visibility.js';
 import {
   agentProviderSchema,
   getAgentProfilesBlobStore,
@@ -47,6 +55,8 @@ import {
 import { isOwner } from '../lib/roles.js';
 import { randomUUID } from 'node:crypto';
 import { resolveAutonomy, type ToolAutonomy } from '../lib/agent/tools.js';
+import { candidateSetView } from '../lib/agent/candidates.js';
+import { exportPreferencePairs, type LearningEvidenceStore } from '../lib/agent/preferences.js';
 import { objectTypeSchema, type Principal } from '../../schema/object-record-v1.js';
 import { z } from 'zod';
 
@@ -72,13 +82,18 @@ const requestSchema = z.discriminatedUnion('action', [
     object_id: z.string().min(1).optional(),
     title: z.string().min(1).max(200).optional(),
   }),
-  z.object({ action: z.literal('list_chats') }),
+  z.object({ action: z.literal('list_chats'), include_all: z.boolean().optional() }),
   z.object({
     action: z.literal('get_chat'),
     chat_id: z.string().min(1),
     since_seq: z.number().int().nonnegative().optional(),
   }),
-  z.object({ action: z.literal('send'), chat_id: z.string().min(1), text: z.string().min(1).max(20_000) }),
+  z.object({
+    action: z.literal('send'),
+    chat_id: z.string().min(1),
+    text: z.string().min(1).max(20_000),
+    focus: z.string().min(1).max(500).optional(),
+  }),
   z.object({
     action: z.literal('approve_tool'),
     chat_id: z.string().min(1),
@@ -93,6 +108,19 @@ const requestSchema = z.discriminatedUnion('action', [
     reason: z.string().max(2000).optional(),
   }),
   z.object({ action: z.literal('cancel'), chat_id: z.string().min(1) }),
+  z.object({
+    action: z.literal('choose_candidate'),
+    chat_id: z.string().min(1),
+    call_id: z.string().min(1),
+    candidate_id: z.string().min(1),
+  }),
+  z.object({
+    action: z.literal('reject_candidates'),
+    chat_id: z.string().min(1),
+    call_id: z.string().min(1),
+    reason: z.string().min(1).max(2000),
+  }),
+  z.object({ action: z.literal('export_preferences') }),
   // ─── T9.26: roster & assignment (read: Admin; manage/assign: Owner) ────────
   z.object({ action: z.literal('list_profiles') }),
   z.object({
@@ -249,9 +277,20 @@ const buildHandlerImpl = (binding: SiteBinding) => async (event: LambdaEvent, co
       }
 
       case 'list_chats': {
+        if (request.data.include_all && !isOwner(callerRoles)) {
+          return jsonResponse(403, { error: 'Owner access required to list other administrators’ chats.' });
+        }
         const docs = await listChatDocs(chatStore);
+        const visibleDocs = visibleChatDocs(
+          docs,
+          caller.email,
+          Boolean(request.data.include_all),
+          isOwner(callerRoles)
+        );
         const profilesDoc = await getProfilesDoc(await getAgentProfilesBlobStore(event), nowIso());
-        return jsonResponse(200, { chats: docs.map((doc) => chatSummary(doc, idleProfileFor(profilesDoc, doc))) });
+        return jsonResponse(200, {
+          chats: visibleDocs.map((doc) => chatSummary(doc, idleProfileFor(profilesDoc, doc))),
+        });
       }
 
       case 'get_chat': {
@@ -275,6 +314,9 @@ const buildHandlerImpl = (binding: SiteBinding) => async (event: LambdaEvent, co
                 },
               }
             : {}),
+          ...(doc.status === 'awaiting_candidate' && doc.run?.candidate_selection
+            ? { candidate_set: candidateSetView(doc.run.candidate_selection) }
+            : {}),
         });
       }
 
@@ -288,7 +330,7 @@ const buildHandlerImpl = (binding: SiteBinding) => async (event: LambdaEvent, co
           objectId: doc.object_id,
           objectType: doc.object_type,
         });
-        const { chat_tools } = await resolveActivePolicies(await getGovernanceBlobStore(event));
+        const { chat_tools, learning_mode } = await resolveActivePolicies(await getGovernanceBlobStore(event));
         const autonomy = resolveAutonomy(
           chat_tools as Record<string, ToolAutonomy> | undefined,
           profile.tool_autonomy_overrides
@@ -328,14 +370,18 @@ const buildHandlerImpl = (binding: SiteBinding) => async (event: LambdaEvent, co
             ...(profile.avatar_artifact ? { avatar_artifact: profile.avatar_artifact } : {}),
             system_prompt: profile.system_prompt,
           },
-          autonomy
+          autonomy,
+          learning_mode,
+          request.data.focus
         );
         if (result.resume) await triggerBackground(request.data.chat_id, result.resume.triggerToken);
         return jsonResponse(result.status, result.body);
       }
 
       case 'approve_tool':
-      case 'deny_tool': {
+      case 'deny_tool':
+      case 'choose_candidate':
+      case 'reject_candidates': {
         const doc = await loadChatDoc(chatStore, request.data.chat_id);
         if (!doc?.run) return jsonResponse(404, { error: 'chat not found' });
         // Execution happens NOW, under the RUN's principal (the human who owns
@@ -356,22 +402,44 @@ const buildHandlerImpl = (binding: SiteBinding) => async (event: LambdaEvent, co
           roles,
           exportRoot: binding.dataRoot,
         });
+        const protocolDeps = {
+          chatStore,
+          toolContext,
+          learningStore: (await getAgentLearningBlobStore(event)) as unknown as LearningEvidenceStore,
+          siteId: binding.siteId,
+        };
         const result =
           request.data.action === 'approve_tool'
             ? await approvePendingTool(
-                { chatStore, toolContext },
+                protocolDeps,
                 request.data.chat_id,
                 request.data.call_id,
                 caller,
                 request.data.edited_args
               )
-            : await denyPendingTool(
-                { chatStore, toolContext },
-                request.data.chat_id,
-                request.data.call_id,
-                caller,
-                request.data.reason
-              );
+            : request.data.action === 'deny_tool'
+              ? await denyPendingTool(
+                  protocolDeps,
+                  request.data.chat_id,
+                  request.data.call_id,
+                  caller,
+                  request.data.reason
+                )
+              : request.data.action === 'choose_candidate'
+                ? await choosePendingCandidate(
+                    protocolDeps,
+                    request.data.chat_id,
+                    request.data.call_id,
+                    request.data.candidate_id,
+                    caller
+                  )
+                : await rejectPendingCandidates(
+                    protocolDeps,
+                    request.data.chat_id,
+                    request.data.call_id,
+                    request.data.reason,
+                    caller
+                  );
         if (result.resume) await triggerBackground(request.data.chat_id, result.resume.triggerToken);
         return jsonResponse(result.status, result.body);
       }
@@ -385,6 +453,14 @@ const buildHandlerImpl = (binding: SiteBinding) => async (event: LambdaEvent, co
         });
         const result = await cancelRun({ chatStore, toolContext }, request.data.chat_id);
         return jsonResponse(result.status, result.body);
+      }
+
+      case 'export_preferences': {
+        if (!isOwner(callerRoles)) return jsonResponse(403, { error: 'Owner access required' });
+        const exported = await exportPreferencePairs(
+          (await getAgentLearningBlobStore(event)) as unknown as LearningEvidenceStore
+        );
+        return jsonResponse(200, { ...exported });
       }
 
       case 'list_profiles': {

@@ -113,7 +113,9 @@ export interface MenuItem {
   icon?: ReactNode;
   onSelect?: () => void;
   disabled?: boolean;
+  title?: string;
   tone?: 'default' | 'danger';
+  separatorBefore?: boolean;
 }
 
 export interface DropdownMenuProps {
@@ -209,30 +211,32 @@ export function DropdownMenu({ trigger, items, align = 'start', className }: Dro
           )}
         >
           {items.map((item, index) => (
-            <button
-              key={item.id}
-              ref={(el) => {
-                itemRefs.current[index] = el;
-              }}
-              role="menuitem"
-              type="button"
-              tabIndex={index === activeIndex ? 0 : -1}
-              disabled={item.disabled}
-              onClick={() => select(item)}
-              onMouseEnter={() => !item.disabled && setActiveIndex(index)}
-              className={cn(
-                'adm-focusable flex w-full items-center gap-2 rounded-[var(--adm-radius-sm)] px-2.5 py-1.5 text-left text-[length:var(--adm-text-sm)] disabled:cursor-not-allowed disabled:opacity-40',
-                item.tone === 'danger' ? 'text-[var(--adm-danger)]' : 'text-[var(--adm-text)]',
-                index === activeIndex && !item.disabled
-                  ? item.tone === 'danger'
-                    ? 'bg-[var(--adm-danger-soft)]'
-                    : 'bg-[var(--adm-accent-soft)]'
-                  : ''
-              )}
-            >
-              {item.icon ? <span className="shrink-0">{item.icon}</span> : null}
-              {item.label}
-            </button>
+            <div key={item.id} className={item.separatorBefore ? 'mt-1 border-t border-[var(--adm-border)] pt-1' : ''}>
+              <button
+                ref={(el) => {
+                  itemRefs.current[index] = el;
+                }}
+                role="menuitem"
+                type="button"
+                tabIndex={index === activeIndex ? 0 : -1}
+                disabled={item.disabled}
+                title={item.title}
+                onClick={() => select(item)}
+                onMouseEnter={() => !item.disabled && setActiveIndex(index)}
+                className={cn(
+                  'adm-focusable flex w-full items-center gap-2 rounded-[var(--adm-radius-sm)] px-2.5 py-1.5 text-left text-[length:var(--adm-text-sm)] disabled:cursor-not-allowed disabled:opacity-40',
+                  item.tone === 'danger' ? 'text-[var(--adm-danger)]' : 'text-[var(--adm-text)]',
+                  index === activeIndex && !item.disabled
+                    ? item.tone === 'danger'
+                      ? 'bg-[var(--adm-danger-soft)]'
+                      : 'bg-[var(--adm-accent-soft)]'
+                    : ''
+                )}
+              >
+                {item.icon ? <span className="shrink-0">{item.icon}</span> : null}
+                {item.label}
+              </button>
+            </div>
           ))}
         </div>
       ) : null}

@@ -34,6 +34,30 @@ export type RoleEnv = Partial<
 
 const normalizeEmail = (email: string) => email.trim().toLowerCase();
 
+/**
+ * Environment principals in descending authority order. A normalized email is
+ * returned once even when it appears in more than one allowlist.
+ */
+export const environmentRoleEntries = (env: RoleEnv = process.env as RoleEnv): Array<[string, Role]> => {
+  const entries = new Map<string, Role>();
+  const add = (value: string | undefined, role: Role) => {
+    for (const email of parseAdminEmails(value)) {
+      if (!entries.has(email)) entries.set(email, role);
+    }
+  };
+
+  add(env.ADMIN_EMAILS, 'owner');
+  add(env.ROLE_EMAILS_ADMIN, 'admin');
+  add(env.ROLE_EMAILS_PUBLISHER, 'publisher');
+  add(env.ROLE_EMAILS_EDITOR, 'editor');
+  return [...entries.entries()];
+};
+
+export const environmentRoleForEmail = (email: string, env: RoleEnv = process.env as RoleEnv): Role | undefined => {
+  const normalized = normalizeEmail(email);
+  return environmentRoleEntries(env).find(([candidate]) => candidate === normalized)?.[1];
+};
+
 export const resolveHumanRoles = (email: string, env: RoleEnv = process.env as RoleEnv): Role[] => {
   const normalized = normalizeEmail(email);
   if (!normalized) return [];

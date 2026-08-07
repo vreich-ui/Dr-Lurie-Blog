@@ -38,7 +38,6 @@ import {
   wipeAll,
   wipeStore,
   type BlobArtifactMetadata,
-  type StoreDiagnostic,
 } from '@core/lib/admin/maintenance-client';
 
 async function getToken(): Promise<string> {
@@ -61,7 +60,9 @@ interface BlobRow {
 type DrawerState = { mode: 'create' } | { mode: 'edit'; key: string } | null;
 
 function DiagnosticsCard() {
-  const [diagnostics, setDiagnostics] = useState<Record<string, StoreDiagnostic> | null>(null);
+  const [diagnostics, setDiagnostics] = useState<
+    Awaited<ReturnType<typeof fetchDiagnostics>>['diagnostics'] | null
+  >(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -69,7 +70,7 @@ function DiagnosticsCard() {
     (async () => {
       try {
         const { diagnostics } = await fetchDiagnostics(getToken);
-        if (alive) setDiagnostics(diagnostics as unknown as Record<string, StoreDiagnostic>);
+        if (alive) setDiagnostics(diagnostics);
       } catch (err) {
         if (alive) setError(err instanceof Error ? err.message : 'Diagnostics could not be loaded.');
       }

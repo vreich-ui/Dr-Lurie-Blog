@@ -12,7 +12,14 @@ import type { SiteBinding } from '../lib/site-binding.js';
 import { z } from 'zod';
 
 import { getAdminStateFromEvent, type LambdaContext } from '../lib/admin-auth.js';
-import { resolveRolesForPrincipalAsync, isOwner } from '../lib/roles.js';
+import {
+  environmentRoleEntries,
+  environmentRoleForEmail,
+  resolveRolesForPrincipalAsync,
+  isOwner,
+  type Role,
+  type RoleEnv,
+} from '../lib/roles.js';
 import {
   getUsersBlobStore,
   getUserRecord,
@@ -72,8 +79,7 @@ const safeJsonParse = (event: LambdaEvent): { ok: true; value: unknown } | { ok:
 const nowIso = () => new Date().toISOString();
 
 /** A read-only view for a caller with no stored record yet (e.g. a bootstrap owner's first login). */
-const synthesizedRecord = (email: string, owner: boolean): UserRecord => {
-  const ts = nowIso();
+const synthesizedRecord = (email: string, owner: boolean, ts = nowIso()): UserRecord => {
   return {
     schema_version: 1,
     email,
@@ -89,6 +95,46 @@ const synthesizedRecord = (email: string, owner: boolean): UserRecord => {
     updated_at: ts,
     audit: [],
   };
+};
+
+export interface ListedUser extends Omit<UserRecord, 'role'> {
+  role: Role;
+  source: 'stored' | 'environment';
+}
+
+/** Merge every real access principal into the Owner-visible list without exposing env metadata. */
+export const listUsersWithEnvironment = async (
+  store: UsersBlobStore,
+  env: RoleEnv = process.env as RoleEnv
+): Promise<ListedUser[]> => {
+  const rows = new Map<string, ListedUser>();
+  for (const record of await listUserRecords(store)) {
+    rows.set(normalizeUserEmail(record.email), { ...record, source: 'stored' });
+  }
+
+  for (const [email, environmentRole] of environmentRoleEntries(env)) {
+    const stored = rows.get(email);
+    if (stored) {
+      rows.set(email, {
+        ...stored,
+        // ADMIN_EMAILS is the one environment grant that deliberately beats
+        // the store. Other environment roles retain the stored-role precedence.
+        role: environmentRole === 'owner' ? 'owner' : stored.role,
+        source: 'environment',
+      });
+      continue;
+    }
+
+    const record = synthesizedRecord(email, environmentRole === 'owner');
+    rows.set(email, {
+      ...record,
+      role: environmentRole,
+      invited_by: 'environment',
+      source: 'environment',
+    });
+  }
+
+  return [...rows.values()].sort((a, b) => a.email.localeCompare(b.email));
 };
 
 const handlerImpl = async (event: LambdaEvent, context?: LambdaContext) => {
@@ -118,8 +164,20 @@ const handlerImpl = async (event: LambdaEvent, context?: LambdaContext) => {
     switch (req.verb) {
       case 'me': {
         // T9.5/T9.6: first-login activation (invited → active + stamp user_id)
-        // and last_seen on every self-read. Bootstrap owners have no record.
-        const activated = await activateOnLogin(store, email, adminState.userId, nowIso());
+        // and last_seen on every self-read. Materialize a missing bootstrap
+        // Owner deliberately so the members list reflects their real access.
+        const at = nowIso();
+        const activated = await activateOnLogin(store, email, adminState.userId, at);
+        if (!activated && environmentRoleForEmail(email) === 'owner') {
+          const bootstrapOwner: UserRecord = {
+            ...synthesizedRecord(email, true, at),
+            user_id: adminState.userId,
+            last_seen_at: at,
+            audit: [{ at, actor_email: email, action: 'bootstrap_activate' }],
+          };
+          await putUserRecord(store, bootstrapOwner);
+          return jsonResponse(200, { user: bootstrapOwner, bootstrap: true, roles });
+        }
         return jsonResponse(200, {
           user: activated ?? synthesizedRecord(email, owner),
           bootstrap: !activated,
@@ -150,11 +208,16 @@ const handlerImpl = async (event: LambdaEvent, context?: LambdaContext) => {
 
       case 'list': {
         if (!owner) return jsonResponse(403, { error: 'Owner access required' });
-        return jsonResponse(200, { users: await listUserRecords(store) });
+        return jsonResponse(200, { users: await listUsersWithEnvironment(store) });
       }
 
       case 'invite': {
         if (!owner) return jsonResponse(403, { error: 'Owner access required' });
+        if (environmentRoleForEmail(req.email)) {
+          return jsonResponse(409, {
+            error: 'This member is configured in site environment variables and cannot be changed here.',
+          });
+        }
         const identity = (context as { clientContext?: { identity?: GoTrueIdentity } } | undefined)?.clientContext
           ?.identity;
         const result = await inviteUser({
@@ -175,6 +238,11 @@ const handlerImpl = async (event: LambdaEvent, context?: LambdaContext) => {
         const target = normalizeUserEmail(req.email);
         if (target === email) {
           return jsonResponse(409, { error: 'You cannot change your own role or status.' });
+        }
+        if (environmentRoleForEmail(target)) {
+          return jsonResponse(409, {
+            error: 'This member is configured in site environment variables and cannot be changed here.',
+          });
         }
         const stored = await getUserRecord(store, target);
         if (!stored) {

@@ -19,7 +19,13 @@ import type { ReactNode } from 'react';
 import { EmptyState, Badge } from './primitives';
 import { IconInfo, IconExternalLink } from './icons';
 import { objectTypeLabel } from '@core/lib/admin/display-name';
-import { contentItemPreview, productPreview, tokenSwatches, tokenFonts, pageSectionLabel } from '@core/lib/admin/preview-logic';
+import {
+  contentItemPreview,
+  productPreview,
+  tokenSwatches,
+  tokenFonts,
+  pageSectionLabel,
+} from '@core/lib/admin/preview-logic';
 import type { ObjectRecord } from '@core/schema/object-record-v1';
 
 type Rec = ObjectRecord<Record<string, unknown>>;
@@ -92,7 +98,7 @@ function ContentItemPreview({ record }: { record: Rec }) {
   );
 }
 
-function PagePreview({ record }: { record: Rec }) {
+function PagePreview({ record, focusId }: { record: Rec; focusId?: string }) {
   const body = asBag(record.body);
   const route = str(body.route);
   const published = str(record.publication?.published_time ?? undefined);
@@ -116,10 +122,17 @@ function PagePreview({ record }: { record: Rec }) {
           <ol className="flex flex-col gap-1">
             {sections.map((raw, i) => {
               const label = pageSectionLabel(raw, i);
+              const sectionId = str(asBag(raw).id);
+              const focused = Boolean(focusId && sectionId === focusId);
               return (
                 <li
                   key={i}
-                  className="rounded-[var(--adm-radius-md)] bg-[var(--adm-surface-sunken)] px-3 py-1.5 text-[length:var(--adm-text-sm)] text-[var(--adm-text)]"
+                  className={
+                    focused
+                      ? 'rounded-[var(--adm-radius-md)] border border-[var(--adm-accent)] bg-[var(--adm-accent-soft)] px-3 py-1.5 text-[length:var(--adm-text-sm)] font-medium text-[var(--adm-text)]'
+                      : 'rounded-[var(--adm-radius-md)] bg-[var(--adm-surface-sunken)] px-3 py-1.5 text-[length:var(--adm-text-sm)] text-[var(--adm-text)]'
+                  }
+                  aria-current={focused ? 'true' : undefined}
                 >
                   {i + 1}. {label}
                 </li>
@@ -369,12 +382,12 @@ function RecipePreview({ record }: { record: Rec }) {
   );
 }
 
-export function ObjectPreview({ record }: { record: Rec }) {
+export function ObjectPreview({ record, focusId }: { record: Rec; focusId?: string }) {
   switch (record.object_type) {
     case 'content_item':
       return <ContentItemPreview record={record} />;
     case 'page':
-      return <PagePreview record={record} />;
+      return <PagePreview record={record} focusId={focusId} />;
     case 'section':
       return <SectionPreview record={record} />;
     case 'theme':

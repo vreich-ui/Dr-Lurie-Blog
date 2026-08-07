@@ -8,6 +8,7 @@ import type { GetToken } from '../edit-mode/verbs-client.js';
 const ENDPOINT = '/.netlify/functions/admin-users';
 
 export type UserRole = 'owner' | 'admin';
+export type UserViewRole = UserRole | 'publisher' | 'editor';
 export type UserStatus = 'invited' | 'active' | 'disabled';
 
 export interface UserAuditEntry {
@@ -21,8 +22,9 @@ export interface UserView {
   email: string;
   display_name: string;
   avatar_artifact?: string;
-  role: UserRole;
+  role: UserViewRole;
   status: UserStatus;
+  source?: 'stored' | 'environment';
   invited_by?: string;
   created_at?: string;
   updated_at?: string;
@@ -45,8 +47,11 @@ async function post<T>(getToken: GetToken, body: Record<string, unknown>): Promi
 export const fetchMe = (getToken: GetToken) =>
   post<{ user: UserView; bootstrap: boolean; roles: string[] }>(getToken, { verb: 'me' });
 
-export const updateMe = (getToken: GetToken, fields: { display_name?: string; avatar_artifact?: string }) =>
-  post<{ user: UserView }>(getToken, { verb: 'update_me', ...fields });
+export const updateMe = async (getToken: GetToken, fields: { display_name?: string; avatar_artifact?: string }) => {
+  const result = await post<{ user: UserView }>(getToken, { verb: 'update_me', ...fields });
+  if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('cms:user-updated', { detail: result.user }));
+  return result;
+};
 
 export const listUsers = (getToken: GetToken) => post<{ users: UserView[] }>(getToken, { verb: 'list' });
 
