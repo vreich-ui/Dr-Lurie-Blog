@@ -26,6 +26,7 @@ import {
   type PendingView,
 } from '@core/lib/admin/chat-client';
 import type { GetToken } from '@core/lib/edit-mode/verbs-client';
+import { groupChatEvents, toolLabel } from '@core/lib/admin/chat-logic';
 
 // ─── useChat: since_seq polling over get_chat ────────────────────────────────
 
@@ -201,9 +202,9 @@ export function ChatMessage({ event }: { event: ChatEventView }) {
     );
   }
   return (
-    <Bubble>
+    <div className="max-w-none px-1 py-1 text-[length:var(--adm-text-sm)] leading-6 text-[var(--adm-text)]">
       <Markdown>{String(event.detail?.text ?? '')}</Markdown>
-    </Bubble>
+    </div>
   );
 }
 
@@ -223,7 +224,7 @@ function JsonDisclosure({ label, value }: { label: string; value: unknown }) {
 
 export function ToolCallCard({ event }: { event: ChatEventView }) {
   const isError = Boolean(event.detail?.is_error);
-  const summary = String(event.detail?.summary ?? event.detail?.tool ?? 'Tool');
+  const summary = toolLabel(event);
   const denied = event.type === 'tool_denied';
   const approved = event.type === 'tool_approved';
   const icon = denied || isError ? <IconX size={14} /> : approved ? <IconCheck size={14} /> : <IconCheck size={14} />;
@@ -242,6 +243,50 @@ export function ToolCallCard({ event }: { event: ChatEventView }) {
     <div className="flex items-center gap-2 rounded-[var(--adm-radius-md)] border border-[var(--adm-border)] bg-[var(--adm-surface)] px-3 py-1.5 text-[length:var(--adm-text-xs)] text-[var(--adm-text-muted)]">
       <span className={tone}>{icon}</span>
       <span className="truncate">{label}</span>
+    </div>
+  );
+}
+
+function ActivityLine({ events, preferenceScope = 'default' }: { events: ChatEventView[]; preferenceScope?: string }) {
+  const storageKey = `platform:admin:activity:${preferenceScope}`;
+  const [expanded, setExpanded] = useState(() => {
+    try {
+      return localStorage.getItem(storageKey) === 'expanded';
+    } catch {
+      return false;
+    }
+  });
+  const steps = events.filter((event) => event.type === 'tool_call').length || events.length;
+  const latest = [...events].reverse().find((event) => event.type === 'tool_call') ?? events.at(-1)!;
+  const toggle = () => {
+    const next = !expanded;
+    setExpanded(next);
+    try {
+      localStorage.setItem(storageKey, next ? 'expanded' : 'collapsed');
+    } catch {
+      // Preferences are best-effort in restricted storage contexts.
+    }
+  };
+  return (
+    <div className="rounded-[var(--adm-radius-md)] border border-[var(--adm-border)] bg-[var(--adm-surface-sunken)] px-3 py-2">
+      <button
+        type="button"
+        onClick={toggle}
+        className="adm-focusable flex w-full items-center justify-between gap-3 text-left text-[length:var(--adm-text-xs)] text-[var(--adm-text-muted)]"
+        aria-expanded={expanded}
+      >
+        <span className="truncate">
+          Activity · {steps} step{steps === 1 ? '' : 's'} · {toolLabel(latest)}
+        </span>
+        <span aria-hidden="true">{expanded ? '−' : '+'}</span>
+      </button>
+      {expanded ? (
+        <div className="mt-2 flex flex-col gap-1">
+          {events.map((event) => (
+            <ToolCallCard key={event.seq} event={event} />
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -389,6 +434,7 @@ export function ChatThread({
   onApprove,
   onDeny,
   emptyHint,
+  preferenceScope,
 }: {
   events: ChatEventView[];
   status: ChatStatus | undefined;
@@ -397,45 +443,84 @@ export function ChatThread({
   onApprove: (editedArgs?: Record<string, unknown>) => void;
   onDeny: (reason?: string) => void;
   emptyHint?: React.ReactNode;
+  preferenceScope?: string;
 }) {
   const bottomRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const atBottom = useRef(true);
+  const [showLatest, setShowLatest] = useState(false);
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    if (atBottom.current) bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    else setShowLatest(true);
   }, [events.length, pending, status]);
 
+  const timeline = groupChatEvents(events.filter((event) => !HIDDEN_EVENTS.has(event.type)));
+
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pr-1" role="log" aria-label="Conversation">
+    <div
+      ref={scrollRef}
+      onScroll={() => {
+        const el = scrollRef.current;
+        if (!el) return;
+        atBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 96;
+        if (atBottom.current) setShowLatest(false);
+      }}
+      className="relative flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pr-1"
+      role="log"
+      aria-label="Conversation"
+    >
       {events.length === 0 && status === undefined ? emptyHint : null}
-      {events
-        .filter((event) => !HIDDEN_EVENTS.has(event.type))
-        .map((event) => {
-          if (event.type === 'user_message' || event.type === 'assistant_text') {
-            return <ChatMessage key={event.seq} event={event} />;
-          }
-          if (event.type === 'run_finished') return null;
-          if (event.type === 'run_error') {
-            return (
-              <p key={event.seq} className="text-center text-[length:var(--adm-text-xs)] text-[var(--adm-danger)]">
-                The run hit a problem: {String(event.detail?.message ?? 'unknown error')}
-              </p>
-            );
-          }
-          if (event.type === 'run_cancelled') {
-            return (
-              <p key={event.seq} className="text-center text-[length:var(--adm-text-xs)] text-[var(--adm-text-muted)]">
-                Run cancelled.
-              </p>
-            );
-          }
-          if (event.type === 'tool_approval_required') return null; // rendered live via `pending`
-          return <ToolCallCard key={event.seq} event={event} />;
-        })}
+      {timeline.map((item) => {
+        if (item.kind === 'activity')
+          return (
+            <ActivityLine
+              key={`activity-${item.events[0]?.seq}`}
+              events={item.events}
+              preferenceScope={preferenceScope}
+            />
+          );
+        const event = item.event;
+        if (event.type === 'user_message' || event.type === 'assistant_text') {
+          return <ChatMessage key={event.seq} event={event} />;
+        }
+        if (event.type === 'run_finished') return null;
+        if (event.type === 'run_error') {
+          return (
+            <p key={event.seq} className="text-center text-[length:var(--adm-text-xs)] text-[var(--adm-danger)]">
+              The run hit a problem: {String(event.detail?.message ?? 'unknown error')}
+            </p>
+          );
+        }
+        if (event.type === 'run_cancelled') {
+          return (
+            <p key={event.seq} className="text-center text-[length:var(--adm-text-xs)] text-[var(--adm-text-muted)]">
+              Run cancelled.
+            </p>
+          );
+        }
+        if (event.type === 'tool_approval_required') return null; // rendered live via `pending`
+        return <ToolCallCard key={event.seq} event={event} />;
+      })}
       {pending ? <ApprovalCard pending={pending} busy={busy} onApprove={onApprove} onDeny={onDeny} /> : null}
       {status === 'queued' || status === 'running' ? (
         <p className="text-[length:var(--adm-text-xs)] text-[var(--adm-text-muted)]">
           <span className="mr-1 inline-block animate-pulse">●</span>
           {status === 'queued' ? 'Waking the agent…' : 'Working…'}
         </p>
+      ) : null}
+      {showLatest ? (
+        <Button
+          size="sm"
+          variant="secondary"
+          className="sticky bottom-2 self-center"
+          onClick={() => {
+            atBottom.current = true;
+            setShowLatest(false);
+            bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+          }}
+        >
+          Jump to latest
+        </Button>
       ) : null}
       <div ref={bottomRef} />
     </div>
@@ -497,9 +582,7 @@ export function ChatComposer({
           }}
           rows={2}
           placeholder={
-            live
-              ? 'The agent is working — approve, deny, or wait…'
-              : 'Ask the agent to read, draft, or change something…'
+            live ? 'The agent is working — approve, deny, or wait…' : 'Ask for a change or describe what you need…'
           }
           aria-label="Message the agent"
           disabled={busy && !live}

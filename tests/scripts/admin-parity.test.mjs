@@ -104,7 +104,16 @@ test('parseSiteConfigRedirects reads single-line AND wrapped entries, ignoring c
 
 test('the real shell-routes.ts carries the full admin route surface the audit requires', () => {
   const patterns = parseShellRoutePatterns();
-  for (const route of ['/admin', '/admin/content', '/admin/content/[objectId]', '/admin/agents', '/admin/authorize']) {
+  for (const route of [
+    '/admin',
+    '/admin/content',
+    '/admin/content/[objectId]',
+    '/admin/agents',
+    '/admin/authorize',
+    '/admin/templates',
+    '/admin/media',
+    '/admin/release',
+  ]) {
     assert.ok(patterns.includes(route), `expected shell route ${route}`);
   }
 });
@@ -192,7 +201,9 @@ test('planAdminParityFixes repairs a degraded older-scaffold site, idempotently'
     // (c) missing keepalive schedule;
     fs.writeFileSync(
       tomlPath,
-      fs.readFileSync(tomlPath, 'utf8').replace(/\[functions\."mcp-keepalive"\]\n {2}schedule = "\*\/5 \* \* \* \*"\n/, '')
+      fs
+        .readFileSync(tomlPath, 'utf8')
+        .replace(/\[functions\."mcp-keepalive"\]\n {2}schedule = "\*\/5 \* \* \* \*"\n/, '')
     );
     // (d) missing reader blog loaders (the real fernwell gap, W14 F11).
     fs.rmSync(path.join(dir, 'app', 'pages', '[...blog]'), { recursive: true });
@@ -207,9 +218,8 @@ test('planAdminParityFixes repairs a degraded older-scaffold site, idempotently'
     const dryRun = planAdminParityFixes(`sites/${slug}`, { write: false });
     assert.ok(dryRun.fixes.length >= 8, `expected shims+rewrite+schedule+loaders fixes, got ${dryRun.fixes.length}`);
     assert.ok(
-      computeAdminParity(resolveAuditTarget(`sites/${slug}`))
-        .filter((c) => c.status === 'GAP')
-        .length === beforeGapIds.length,
+      computeAdminParity(resolveAuditTarget(`sites/${slug}`)).filter((c) => c.status === 'GAP').length ===
+        beforeGapIds.length,
       'dry-run must not modify the tree'
     );
 

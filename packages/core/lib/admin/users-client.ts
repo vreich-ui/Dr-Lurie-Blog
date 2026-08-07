@@ -47,8 +47,11 @@ async function post<T>(getToken: GetToken, body: Record<string, unknown>): Promi
 export const fetchMe = (getToken: GetToken) =>
   post<{ user: UserView; bootstrap: boolean; roles: string[] }>(getToken, { verb: 'me' });
 
-export const updateMe = (getToken: GetToken, fields: { display_name?: string; avatar_artifact?: string }) =>
-  post<{ user: UserView }>(getToken, { verb: 'update_me', ...fields });
+export const updateMe = async (getToken: GetToken, fields: { display_name?: string; avatar_artifact?: string }) => {
+  const result = await post<{ user: UserView }>(getToken, { verb: 'update_me', ...fields });
+  if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('cms:user-updated', { detail: result.user }));
+  return result;
+};
 
 export const listUsers = (getToken: GetToken) => post<{ users: UserView[] }>(getToken, { verb: 'list' });
 

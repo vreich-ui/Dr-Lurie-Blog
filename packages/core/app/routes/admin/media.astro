@@ -1,0 +1,9 @@
+---
+import '@site/config/policy-bindings';
+import { getSiteIdentity } from '@core/lib/site-identity';
+import AdminLayout from '~/layouts/AdminLayout.astro';
+import AdminSectionPage from '~/admin/AdminSectionPage';
+const identity = getSiteIdentity();
+---
+
+<AdminLayout title="Admin — Media"><AdminSectionPage client:load identity={identity} section="media" /></AdminLayout>

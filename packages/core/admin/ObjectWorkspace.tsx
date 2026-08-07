@@ -17,20 +17,23 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { AdminShell } from './AdminShell';
 import type { SiteIdentity } from '@core/lib/site-identity';
-import { Badge, Button, Card, EmptyState, StatusPill, Skeleton, IconButton } from './primitives';
-import { Tabs } from './menus';
+import { Badge, Breadcrumbs, Button, Card, EmptyState, StatusPill, Skeleton } from './primitives';
+import { DropdownMenu, Tabs } from './menus';
 import { Input, Select, Textarea } from './forms';
 import { ConfirmDialog, Drawer, useToast } from './overlays';
 import { LockBanner, HistoryTimeline, ReadinessList } from './data';
-import { ObjectPreview } from './ObjectPreview';
-import { AgentChip, ChatComposer, ChatThread, useChat } from './chat';
+import { ObjectLens } from './ObjectLensRegistry';
+import { ObjectBrowser } from './ObjectBrowser';
+import { AgentRail } from './AgentRail';
+import { useChat } from './chat';
 import { createObjectChat } from '@core/lib/admin/chat-client';
 import { MarginaliaThreadList } from './MarginaliaThreadList';
-import { IconAlertTriangle, IconExternalLink, IconPlus, IconRocket, IconWrench } from './icons';
+import { IconAlertTriangle, IconDots, IconExternalLink, IconPlus, IconRocket, IconWrench } from './icons';
 import { objectDisplayName, objectTypeLabel, idTooltip } from '@core/lib/admin/display-name';
 import { resolveWorkspaceObjectType } from '@core/lib/admin/object-type-resolve';
 import type { ObjectType, ObjectRecord, HistoryEntry } from '@core/schema/object-record-v1';
 import type { ReadinessGroup, CriterionStatus } from '@core/lib/admin/readiness-criteria';
+import { useCurrentUser } from '@core/lib/admin/use-current-user';
 
 async function getToken(): Promise<string> {
   const m = await import('@core/lib/admin/goTrueClient');
@@ -70,14 +73,6 @@ function statusOf(record: Rec): { label: string; tone: 'success' | 'info' | 'war
   if (review === 'changes_requested') return { label: 'Changes requested', tone: 'warning' };
   if (record.publication?.published_time) return { label: 'Published', tone: 'success' };
   return { label: 'Draft', tone: 'neutral' };
-}
-
-function hasUnpublishedChanges(record: Rec): boolean {
-  const published = record.publication?.published_time;
-  if (!published) return true;
-  const receiptRev = (record.publication?.publish_receipt as { content_revision?: number } | undefined)
-    ?.content_revision;
-  return typeof receiptRev !== 'number' || receiptRev !== record.content_revision;
 }
 
 // ─── generated inspector VIEW
@@ -413,7 +408,6 @@ function WorkspaceBody({ identity }: { identity: SiteIdentity }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [owner, setOwner] = useState(false);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [now, setNow] = useState(0);
@@ -423,6 +417,8 @@ function WorkspaceBody({ identity }: { identity: SiteIdentity }) {
   // otherwise derived from the id (prefix map + inventory fallback, W15 S1).
   const typeRef = useRef<ObjectType | undefined>(loc.type);
   const chat = useChat(getToken, chatId);
+  const currentUser = useCurrentUser();
+  const owner = currentUser.roles.includes('owner') || currentUser.user?.role === 'owner';
 
   const load = async () => {
     const type = typeRef.current;
@@ -451,15 +447,6 @@ function WorkspaceBody({ identity }: { identity: SiteIdentity }) {
 
   useEffect(() => {
     setNow(Date.now());
-    (async () => {
-      try {
-        const { fetchMe } = await import('@core/lib/admin/users-client');
-        const me = await fetchMe(getToken);
-        setOwner(me.roles.includes('owner'));
-      } catch {
-        /* ignore */
-      }
-    })();
     (async () => {
       // Bare deep links (W15 S1): /admin/content/<id> without `?type=` — the
       // id prefix names the type for eleven governed types; content_item ids
@@ -644,10 +631,13 @@ function WorkspaceBody({ identity }: { identity: SiteIdentity }) {
   const isContentItem = record.object_type === 'content_item';
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex min-h-0 flex-col gap-4">
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
+          <Breadcrumbs
+            items={[{ label: 'Editorial', href: '/admin' }, { label: objectTypeLabel(record.object_type) }]}
+          />
           <div className="flex flex-wrap items-center gap-2">
             <h1
               className="truncate text-[length:var(--adm-text-2xl)] font-semibold text-[var(--adm-text-heading)]"
@@ -657,11 +647,7 @@ function WorkspaceBody({ identity }: { identity: SiteIdentity }) {
             </h1>
           </div>
           <div className="mt-1 flex flex-wrap items-center gap-2">
-            <Badge>{objectTypeLabel(record.object_type)}</Badge>
             <StatusPill status={status.label} tone={status.tone} label={status.label} />
-            {hasUnpublishedChanges(record) && record.publication?.published_time ? (
-              <StatusPill status="unpublished" tone="warning" label="Unpublished changes" />
-            ) : null}
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -673,20 +659,39 @@ function WorkspaceBody({ identity }: { identity: SiteIdentity }) {
               <IconExternalLink size={16} /> Edit on site
             </a>
           ) : null}
-          {isContentItem ? (
-            <Button
-              variant="secondary"
-              size="sm"
-              leftIcon={<IconPlus size={16} />}
-              onClick={doNewVariant}
-              disabled={busy}
-            >
-              New variant
-            </Button>
-          ) : null}
           <Button size="sm" leftIcon={<IconRocket size={16} />} onClick={doPublish} loading={busy}>
             Publish
           </Button>
+          <DropdownMenu
+            align="end"
+            trigger={({ ref, onToggle, open }) => (
+              <button
+                ref={ref}
+                type="button"
+                onClick={onToggle}
+                aria-expanded={open}
+                aria-label="More object actions"
+                className="adm-focusable grid h-8 w-8 place-items-center rounded-[var(--adm-radius-md)] border border-[var(--adm-border-strong)] text-[var(--adm-text)] hover:bg-[var(--adm-surface-sunken)]"
+              >
+                <IconDots size={17} />
+              </button>
+            )}
+            items={[
+              { id: 'details', label: 'Details', icon: <IconWrench size={16} />, onSelect: () => setDetailsOpen(true) },
+              { id: 'activity', label: 'Activity', onSelect: () => setDetailsOpen(true) },
+              ...(owner ? [{ id: 'raw', label: 'Raw', onSelect: () => setDetailsOpen(true) }] : []),
+              ...(isContentItem
+                ? [{ id: 'variant', label: 'New variant', icon: <IconPlus size={16} />, onSelect: doNewVariant }]
+                : []),
+              {
+                id: 'discard',
+                label: 'Discard changes',
+                separatorBefore: true,
+                tone: 'danger' as const,
+                onSelect: () => setConfirmDiscard(true),
+              },
+            ]}
+          />
         </div>
       </div>
 
@@ -700,70 +705,32 @@ function WorkspaceBody({ identity }: { identity: SiteIdentity }) {
         />
       ) : null}
 
-      {/* Chat-first layout (T9.14): conversation center, live preview right,
-          the classic forms one click away in the Details drawer. */}
-      <div className="grid min-h-0 gap-5 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-        <Card className="flex min-h-[28rem] flex-col lg:max-h-[calc(100vh-18rem)]">
-          <div className="mb-3 flex items-center justify-between gap-2 border-b border-[var(--adm-border)] pb-3">
-            <AgentChip agent={chat.agent} />
-            <Button
-              variant="secondary"
-              size="sm"
-              leftIcon={<IconWrench size={16} />}
-              onClick={() => setDetailsOpen(true)}
-            >
-              Details
-            </Button>
-          </div>
-          <ChatThread
-            events={chat.events}
-            status={chat.status}
-            pending={chat.pending}
-            busy={chat.busy}
-            onApprove={(editedArgs) => chat.pending && void chat.approve(chat.pending.call_id, editedArgs)}
-            onDeny={(reason) => chat.pending && void chat.deny(chat.pending.call_id, reason)}
-            emptyHint={
-              <EmptyState
-                title={`Talk to ${chat.agent?.name ?? 'the site agent'} about this ${objectTypeLabel(record.object_type).toLowerCase()}`}
-                message="It reads the object and its contract, proposes changes, and every write waits for your approval."
-              />
-            }
-          />
-          {chat.error ? (
-            <p className="mt-2 text-[length:var(--adm-text-xs)] text-[var(--adm-danger)]">{chat.error}</p>
-          ) : null}
-          <div className="mt-3 border-t border-[var(--adm-border)] pt-3">
-            <ChatComposer
-              status={chat.status}
-              busy={chat.busy}
-              onSend={(text) => void chat.send(text)}
-              onCancel={() => void chat.cancel()}
-              suggestions={suggestions}
-              above={
-                readiness && readinessOpenItems > 0 ? (
-                  <details className="rounded-[var(--adm-radius-md)] border border-[var(--adm-border)] bg-[var(--adm-surface-sunken)] px-3 py-2">
-                    <summary className="cursor-pointer select-none text-[length:var(--adm-text-xs)] font-medium text-[var(--adm-warning)]">
-                      {readinessOpenItems} readiness item{readinessOpenItems === 1 ? '' : 's'} before publish
-                    </summary>
-                    <div className="mt-2">
-                      <ReadinessList groups={readiness} />
-                    </div>
-                  </details>
-                ) : null
-              }
-            />
-          </div>
-        </Card>
-
-        <div className="flex min-h-0 flex-col gap-3">
-          <Card
-            kicker="Live preview"
-            title={undefined}
-            className="min-h-[20rem] overflow-auto lg:max-h-[calc(100vh-18rem)]"
-          >
-            <ObjectPreview record={record} />
-          </Card>
-        </div>
+      <div className="grid min-h-0 gap-4 lg:grid-cols-[minmax(12rem,20%)_minmax(0,52%)_minmax(18rem,28%)]">
+        <ObjectBrowser activeId={record.object_id} />
+        <section
+          className="min-h-0 overflow-y-auto rounded-[var(--adm-radius-lg)] border border-[var(--adm-border)] bg-[var(--adm-surface)] p-5 lg:h-[calc(100dvh-8rem)]"
+          aria-label={`${objectTypeLabel(record.object_type)} workspace`}
+        >
+          <ObjectLens record={record} />
+        </section>
+        <AgentRail
+          chat={chat}
+          focus={objectDisplayName(record)}
+          preferenceScope={`${currentUser.user?.email ?? 'anonymous'}:${record.object_id}`}
+          suggestions={suggestions}
+          aboveComposer={
+            readiness && readinessOpenItems > 0 ? (
+              <details className="rounded-[var(--adm-radius-md)] border border-[var(--adm-border)] bg-[var(--adm-surface-sunken)] px-3 py-2">
+                <summary className="cursor-pointer select-none text-[length:var(--adm-text-xs)] font-medium text-[var(--adm-warning)]">
+                  {readinessOpenItems} readiness item{readinessOpenItems === 1 ? '' : 's'} before publish
+                </summary>
+                <div className="mt-2">
+                  <ReadinessList groups={readiness} />
+                </div>
+              </details>
+            ) : null
+          }
+        />
       </div>
 
       {/* Details drawer — the classic CMS forms, one click away, never gone. */}
@@ -783,30 +750,22 @@ function WorkspaceBody({ identity }: { identity: SiteIdentity }) {
               label: 'Comments',
               content: <MarginaliaThreadList objectType={record.object_type} objectId={record.object_id} />,
             },
-            {
-              id: 'raw',
-              label: 'Raw',
-              content: (
-                <pre className="max-h-[28rem] overflow-auto rounded-[var(--adm-radius-md)] bg-[var(--adm-surface-sunken)] p-3 text-[length:var(--adm-text-xs)] text-[var(--adm-text)]">
-                  {JSON.stringify(record, null, 2)}
-                </pre>
-              ),
-            },
+            ...(owner
+              ? [
+                  {
+                    id: 'raw',
+                    label: 'Raw',
+                    content: (
+                      <pre className="max-h-[28rem] overflow-auto rounded-[var(--adm-radius-md)] bg-[var(--adm-surface-sunken)] p-3 text-[length:var(--adm-text-xs)] text-[var(--adm-text)]">
+                        {JSON.stringify(record, null, 2)}
+                      </pre>
+                    ),
+                  },
+                ]
+              : []),
           ]}
         />
       </Drawer>
-
-      {/* Secondary actions */}
-      <div className="flex flex-wrap items-center gap-2 border-t border-[var(--adm-border)] pt-4">
-        <Button variant="secondary" onClick={() => setConfirmDiscard(true)} disabled={busy}>
-          Discard changes
-        </Button>
-        <IconButton
-          label="Back to library"
-          icon={<IconExternalLink size={18} />}
-          onClick={() => window.location.assign('/admin/content')}
-        />
-      </div>
 
       <ConfirmDialog
         open={confirmDiscard}
@@ -827,7 +786,7 @@ export interface ObjectWorkspaceProps {
 
 export default function ObjectWorkspace({ identity }: ObjectWorkspaceProps) {
   return (
-    <AdminShell currentPath="/admin/content" title="Object workspace" identity={identity}>
+    <AdminShell currentPath="/admin/content" title="Object workspace" identity={identity} wide>
       <WorkspaceBody identity={identity} />
     </AdminShell>
   );

@@ -18,8 +18,8 @@ import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 
 import { cn } from './utils';
-import { Avatar, IconButton } from './primitives';
-import { CommandPalette, type CommandItem } from './menus';
+import { Avatar, Badge, IconButton } from './primitives';
+import { CommandPalette, DropdownMenu, type CommandItem } from './menus';
 import { ToastProvider } from './overlays';
 import { Drawer } from './overlays';
 import { AdminErrorBoundary } from './ErrorBoundary';
@@ -39,6 +39,8 @@ import {
 } from './icons';
 import { objectTypeLabel } from '@core/lib/admin/display-name';
 import type { LibraryRow } from '@core/lib/admin/library-logic';
+import { avatarSrc } from '@core/lib/admin/users-client';
+import { useCurrentUser } from '@core/lib/admin/use-current-user';
 
 async function shellToken(): Promise<string> {
   const m = await import('@core/lib/admin/goTrueClient');
@@ -55,27 +57,31 @@ interface NavItem {
 interface NavGroup {
   label?: string;
   items: NavItem[];
+  ownerOnly?: boolean;
 }
 
 // Target IA (plan §2). Routes not yet built are marked `soon` — shown but not
 // linked — so the sidebar reflects the destination without dead links.
-const NAV: NavGroup[] = [
+export const NAV: NavGroup[] = [
   {
     items: [
-      { label: 'Home', href: '/admin', icon: IconHome },
+      { label: 'Editorial', href: '/admin', icon: IconHome },
+      { label: 'Templates', href: '/admin/templates', icon: IconPalette },
+      { label: 'Media', href: '/admin/media', icon: IconLibrary },
       { label: 'Content', href: '/admin/content', icon: IconLibrary },
-      { label: 'Agents', href: '/admin/agents', icon: IconSparkles },
-      { label: 'Studio', href: '/admin/studio', icon: IconPalette },
-      { label: 'Component kit', href: '/admin/kit', icon: IconLibrary },
+      { label: 'Release', href: '/admin/release', icon: IconRocket },
     ],
   },
   {
-    label: 'Settings',
+    label: 'Settings · Platform',
+    ownerOnly: true,
     items: [
       { label: 'Guardrails', href: '/admin/settings/guardrails', icon: IconSettings },
       { label: 'Admins', href: '/admin/settings/admins', icon: IconUser },
       { label: 'Profile', href: '/admin/profile', icon: IconUser },
       { label: 'Maintenance', href: '/admin/maintenance', icon: IconWrench },
+      { label: 'Component kit', href: '/admin/kit', icon: IconLibrary },
+      { label: 'Agents', href: '/admin/agents', icon: IconSparkles },
     ],
   },
 ];
@@ -85,10 +91,11 @@ function isActive(currentPath: string, href: string): boolean {
   return currentPath === href || currentPath.startsWith(`${href}/`);
 }
 
-function NavList({ currentPath, onNavigate }: { currentPath: string; onNavigate?: () => void }) {
+function NavList({ currentPath, owner, onNavigate }: { currentPath: string; owner: boolean; onNavigate?: () => void }) {
+  const groups = NAV.filter((group) => !group.ownerOnly || owner);
   return (
     <nav className="flex flex-col gap-5" aria-label="Admin sections">
-      {NAV.map((group, gi) => (
+      {groups.map((group, gi) => (
         <div key={group.label ?? `group-${gi}`} className="flex flex-col gap-1">
           {group.label ? (
             <p className="px-3 pb-1 text-[length:var(--adm-text-xs)] font-semibold uppercase tracking-wide text-[var(--adm-text-muted)]">
@@ -152,26 +159,17 @@ export interface AdminShellProps {
   /** Server-resolved site identity (D2) — every page component must pass this through. */
   identity: SiteIdentity;
   children: ReactNode;
+  wide?: boolean;
 }
 
-export function AdminShell({ currentPath, title, identity, children }: AdminShellProps) {
-  const [email, setEmail] = useState<string | null>(null);
+export function AdminShell({ currentPath, title, identity, children, wide = false }: AdminShellProps) {
+  const currentUser = useCurrentUser();
+  const user = currentUser.user;
+  const owner = currentUser.roles.includes('owner') || user?.role === 'owner';
   const [mobileNav, setMobileNav] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [objectRows, setObjectRows] = useState<LibraryRow[]>([]);
   const objectsAttempted = useRef(false);
-
-  useEffect(() => {
-    let alive = true;
-    import('@core/lib/admin/goTrueClient')
-      .then((m) => {
-        if (alive) setEmail(m.currentUser()?.email ?? null);
-      })
-      .catch(() => {});
-    return () => {
-      alive = false;
-    };
-  }, []);
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
@@ -207,11 +205,12 @@ export function AdminShell({ currentPath, title, identity, children }: AdminShel
   const onLogout = () => {
     import('@core/lib/admin/goTrueClient')
       .then((m) => m.logout())
+      .then(() => window.dispatchEvent(new CustomEvent('cms:logout')))
       .catch(() => {})
       .finally(() => window.location.assign('/admin'));
   };
 
-  const navCommands: CommandItem[] = NAV.flatMap((group) =>
+  const navCommands: CommandItem[] = NAV.filter((group) => !group.ownerOnly || owner).flatMap((group) =>
     group.items
       .filter((item) => !item.soon)
       .map((item) => ({
@@ -228,7 +227,7 @@ export function AdminShell({ currentPath, title, identity, children }: AdminShel
       label: 'Release to production',
       group: 'Actions',
       icon: <IconRocket size={16} />,
-      onSelect: () => window.location.assign('/admin'),
+      onSelect: () => window.location.assign('/admin/release'),
     },
     {
       id: 'action-new-chat',
@@ -264,7 +263,7 @@ export function AdminShell({ currentPath, title, identity, children }: AdminShel
               {identity.adminLabel}
             </span>
           </a>
-          <NavList currentPath={currentPath} />
+          <NavList currentPath={currentPath} owner={owner} />
         </aside>
 
         <div className="flex min-w-0 flex-1 flex-col">
@@ -288,18 +287,64 @@ export function AdminShell({ currentPath, title, identity, children }: AdminShel
               Search
               <kbd className="rounded bg-[var(--adm-surface-sunken)] px-1 text-[length:var(--adm-text-xs)]">⌘K</kbd>
             </button>
-            {email ? (
-              <div className="flex items-center gap-2">
-                <span className="hidden max-w-[14rem] truncate text-[length:var(--adm-text-sm)] text-[var(--adm-text-muted)] sm:inline">
-                  {email}
-                </span>
-                <Avatar name={email} size={30} />
-                <IconButton label="Sign out" icon={<IconLogout size={18} />} onClick={onLogout} />
-              </div>
+            {user ? (
+              <DropdownMenu
+                align="end"
+                trigger={({ ref, onToggle, open }) => (
+                  <button
+                    ref={ref}
+                    type="button"
+                    onClick={onToggle}
+                    aria-expanded={open}
+                    className="adm-focusable flex items-center gap-2 rounded-[var(--adm-radius-md)] px-2 py-1 hover:bg-[var(--adm-surface-sunken)]"
+                  >
+                    {avatarSrc(user.avatar_artifact) ? (
+                      <img
+                        src={avatarSrc(user.avatar_artifact)}
+                        alt=""
+                        className="h-[30px] w-[30px] rounded-full object-cover"
+                      />
+                    ) : (
+                      <Avatar name={user.display_name || user.email} size={30} />
+                    )}
+                    <span className="hidden max-w-[10rem] truncate text-[length:var(--adm-text-sm)] font-medium text-[var(--adm-text)] lg:inline">
+                      {user.display_name || user.email}
+                    </span>
+                    <Badge tone={owner ? 'accent' : 'neutral'}>{owner ? 'Owner' : 'Admin'}</Badge>
+                  </button>
+                )}
+                items={[
+                  { id: 'identity', label: user.email, disabled: true, title: user.email },
+                  {
+                    id: 'profile',
+                    label: 'Profile',
+                    icon: <IconUser size={16} />,
+                    onSelect: () => window.location.assign('/admin/profile'),
+                  },
+                  ...(owner
+                    ? [
+                        {
+                          id: 'settings',
+                          label: 'Settings',
+                          icon: <IconSettings size={16} />,
+                          onSelect: () => window.location.assign('/admin/settings/admins'),
+                        },
+                      ]
+                    : []),
+                  {
+                    id: 'logout',
+                    label: 'Sign out',
+                    icon: <IconLogout size={16} />,
+                    separatorBefore: true,
+                    tone: 'danger' as const,
+                    onSelect: onLogout,
+                  },
+                ]}
+              />
             ) : null}
           </header>
 
-          <main className="mx-auto w-full max-w-6xl flex-1 p-4 sm:p-6">
+          <main className={cn('mx-auto w-full flex-1 p-4 sm:p-6', wide ? 'max-w-none' : 'max-w-6xl')}>
             {/*
               Every admin page mounts AdminShell as the root of its own
               client:load island (see MaintenancePage.tsx et al.), so this is
@@ -315,8 +360,14 @@ export function AdminShell({ currentPath, title, identity, children }: AdminShel
         </div>
 
         {/* Sidebar (mobile drawer) */}
-        <Drawer open={mobileNav} onClose={() => setMobileNav(false)} title={identity.adminLabel} side="left" width={280}>
-          <NavList currentPath={currentPath} onNavigate={() => setMobileNav(false)} />
+        <Drawer
+          open={mobileNav}
+          onClose={() => setMobileNav(false)}
+          title={identity.adminLabel}
+          side="left"
+          width={280}
+        >
+          <NavList currentPath={currentPath} owner={owner} onNavigate={() => setMobileNav(false)} />
         </Drawer>
 
         <CommandPalette

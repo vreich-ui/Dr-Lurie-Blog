@@ -96,7 +96,8 @@ export const createFreeChat = (getToken: GetToken, title?: string) =>
     ...(title ? { title } : {}),
   });
 
-export const listChats = (getToken: GetToken) => post<{ chats: ChatSummaryView[] }>(getToken, { action: 'list_chats' });
+export const listChats = (getToken: GetToken, includeAll = false) =>
+  post<{ chats: ChatSummaryView[] }>(getToken, { action: 'list_chats', ...(includeAll ? { include_all: true } : {}) });
 
 export const getChat = (getToken: GetToken, chatId: string, sinceSeq?: number) =>
   post<ChatView>(getToken, { action: 'get_chat', chat_id: chatId, ...(sinceSeq ? { since_seq: sinceSeq } : {}) });

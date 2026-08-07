@@ -1,0 +1,11 @@
+---
+import '@site/config/policy-bindings';
+import { getSiteIdentity } from '@core/lib/site-identity';
+import AdminLayout from '~/layouts/AdminLayout.astro';
+import AdminSectionPage from '~/admin/AdminSectionPage';
+const identity = getSiteIdentity();
+---
+
+<AdminLayout title="Admin — Templates"
+  ><AdminSectionPage client:load identity={identity} section="templates" /></AdminLayout
+>

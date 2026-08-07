@@ -54,9 +54,9 @@ const { variant = 'desktop' } = Astro.props;
           </button>
         </div>
         <div data-auth-signed-in hidden>
-          <button type="button" data-auth-profile role="menuitem">
+          <a href="/admin/profile" data-auth-profile role="menuitem">
             Account settings
-          </button>
+          </a>
           <a href={getPermalink('/member-updates')} role="menuitem">
             Member updates
           </a>
@@ -104,14 +104,14 @@ const { variant = 'desktop' } = Astro.props;
         </div>
 
         <div class="py-1" data-auth-signed-out>
-          <button
-            type="button"
+          <a
+            href="/admin/profile"
             class="mt-1 w-full rounded-lg bg-[var(--aw-color-accent,#4f46e5)] px-2.5 py-1.5 text-left text-xs font-semibold text-white transition-colors hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--aw-color-accent,#4f46e5)] focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-900"
             data-auth-sign-in
             role="menuitem"
           >
             Sign in
-          </button>
+          </a>
         </div>
 
         <div class="space-y-0.5" data-auth-signed-in hidden>
@@ -159,6 +159,7 @@ const { variant = 'desktop' } = Astro.props;
     getAccessToken,
   } from '@core/lib/admin/goTrueClient';
   import { fetchAdminAccessState } from '@core/lib/admin/admin-access-client';
+  import { fetchMe } from '@core/lib/admin/users-client';
 
   (() => {
     if (!window.__cmsHeaderAuth) {
@@ -235,6 +236,14 @@ const { variant = 'desktop' } = Astro.props;
       const signedIn = Boolean(user);
       const token = signedIn ? await getAccessToken() : undefined;
       const adminState = signedIn ? await getAdminState(token) : { authenticated: false, isAdmin: false };
+      let profile;
+      if (adminState.isAdmin && token) {
+        try {
+          profile = (await fetchMe(async () => token)).user;
+        } catch (error) {
+          console.error('Header profile lookup failed.', error);
+        }
+      }
 
       if (adminState.checkFailed) {
         document.dispatchEvent(
@@ -259,7 +268,10 @@ const { variant = 'desktop' } = Astro.props;
         root.dataset.authSignedIn = String(signedIn);
         root.dataset.authAdmin = String(Boolean(adminState.isAdmin));
 
-        if (triggerLabel) triggerLabel.textContent = signedIn ? 'Account' : 'Sign in';
+        const email = profile?.email || adminState?.email || user?.email || '';
+        const displayName =
+          profile?.display_name || (email ? email.split('@')[0] || email : user?.user_metadata?.full_name || 'Account');
+        if (triggerLabel) triggerLabel.textContent = signedIn ? displayName : 'Sign in';
         // Chevron only makes sense when signed in (dropdown is available)
         if (triggerChevron) {
           triggerChevron.classList.toggle('hidden', !signedIn);
@@ -268,8 +280,6 @@ const { variant = 'desktop' } = Astro.props;
           }
         }
         if (!signedIn) setMenuOpen(root, false);
-        const email = adminState?.email || user?.email || '';
-        const displayName = email ? email.split('@')[0] || email : user?.user_metadata?.full_name || 'Account';
         if (label) label.textContent = signedIn ? displayName : 'Account';
         if (signedOutPanel) signedOutPanel.hidden = signedIn;
         if (signedInPanel) signedInPanel.hidden = !signedIn;
@@ -284,10 +294,6 @@ const { variant = 'desktop' } = Astro.props;
 
     const openSignIn = () => {
       closeAllMenus();
-      window.__cmsLoginModal?.open();
-    };
-
-    const openUserProfile = () => {
       window.__cmsLoginModal?.open();
     };
 
@@ -345,7 +351,6 @@ const { variant = 'desktop' } = Astro.props;
         const root = target?.closest('[data-header-auth]');
         const trigger = target?.closest('[data-auth-trigger]');
         const signInButton = target?.closest('[data-auth-sign-in]');
-        const profileButton = target?.closest('[data-auth-profile]');
         const signOutButton = target?.closest('[data-auth-sign-out]');
 
         if (trigger && root) {
@@ -377,13 +382,6 @@ const { variant = 'desktop' } = Astro.props;
           event.preventDefault();
           event.stopPropagation();
           openSignIn();
-          return;
-        }
-
-        if (profileButton) {
-          event.preventDefault();
-          event.stopPropagation();
-          openUserProfile();
           return;
         }
 

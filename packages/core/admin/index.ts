@@ -10,6 +10,7 @@ export * from './primitives';
 export * from './forms';
 export * from './overlays';
 export * from './menus';
+export * from './Tree';
 export * from './data';
 export { AdminShell } from './AdminShell';
 export type { AdminShellProps } from './AdminShell';

@@ -38,6 +38,7 @@ import {
   ReadinessList,
   LockBanner,
   HistoryTimeline,
+  Tree,
   IconPlus,
   IconTrash,
   IconPencil,
@@ -359,6 +360,39 @@ function GalleryBody({ identity }: { identity: SiteIdentity }) {
             Command palette (⌘K)
           </Button>
         </Row>
+      </Section>
+
+      <Section title="Tree">
+        <div className="max-w-sm">
+          <Tree
+            ariaLabel="Component kit publication tree"
+            storageKey="kit-gallery"
+            activeId="page-about"
+            nodes={[
+              {
+                id: 'foundation',
+                label: 'Foundation',
+                badge: <Badge tone="neutral">2</Badge>,
+                children: [
+                  { id: 'voice', label: 'Brand Voice', href: '#brand-voice' },
+                  { id: 'identity', label: 'Publication identity', href: '#identity' },
+                ],
+              },
+              {
+                id: 'structure',
+                label: 'Structure',
+                children: [
+                  { id: 'page-about', label: 'About' },
+                  { id: 'empty-page', label: 'Empty children', children: [] },
+                  {
+                    id: 'long-label',
+                    label: 'A deliberately long object label that demonstrates truncation without layout shift',
+                  },
+                ],
+              },
+            ]}
+          />
+        </div>
       </Section>
 
       <Section title="Overlays & toasts">

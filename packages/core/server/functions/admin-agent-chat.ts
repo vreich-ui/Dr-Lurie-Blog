@@ -35,6 +35,7 @@ import {
   saveChatDoc,
   type ChatDoc,
 } from '../lib/agent/chat-store.js';
+import { visibleChatDocs } from '../lib/agent/chat-visibility.js';
 import {
   agentProviderSchema,
   getAgentProfilesBlobStore,
@@ -72,7 +73,7 @@ const requestSchema = z.discriminatedUnion('action', [
     object_id: z.string().min(1).optional(),
     title: z.string().min(1).max(200).optional(),
   }),
-  z.object({ action: z.literal('list_chats') }),
+  z.object({ action: z.literal('list_chats'), include_all: z.boolean().optional() }),
   z.object({
     action: z.literal('get_chat'),
     chat_id: z.string().min(1),
@@ -249,9 +250,20 @@ const buildHandlerImpl = (binding: SiteBinding) => async (event: LambdaEvent, co
       }
 
       case 'list_chats': {
+        if (request.data.include_all && !isOwner(callerRoles)) {
+          return jsonResponse(403, { error: 'Owner access required to list other administrators’ chats.' });
+        }
         const docs = await listChatDocs(chatStore);
+        const visibleDocs = visibleChatDocs(
+          docs,
+          caller.email,
+          Boolean(request.data.include_all),
+          isOwner(callerRoles)
+        );
         const profilesDoc = await getProfilesDoc(await getAgentProfilesBlobStore(event), nowIso());
-        return jsonResponse(200, { chats: docs.map((doc) => chatSummary(doc, idleProfileFor(profilesDoc, doc))) });
+        return jsonResponse(200, {
+          chats: visibleDocs.map((doc) => chatSummary(doc, idleProfileFor(profilesDoc, doc))),
+        });
       }
 
       case 'get_chat': {
